@@ -1,0 +1,78 @@
+package klib.fp.types
+
+import klib.fp.typeclass.Monad
+
+sealed trait Either[+A, +B] {
+
+  def toOption: Option[B] =
+    this match {
+      case Right(b) => scala.Some(b)
+      case _        => scala.None
+    }
+
+  def toMaybe: Maybe[B] =
+    this match {
+      case Right(b) => Some(b)
+      case _        => None
+    }
+
+}
+
+final case class Right[+B](b: B) extends Either[Nothing, B]
+final case class Left[+A](a: A) extends Either[A, Nothing]
+
+object Either {
+
+  trait Implicits {
+
+    implicit class EitherIdOps[A](a: A) {
+
+      def left: Either[A, Nothing] =
+        Left(a)
+
+      def right: Either[Nothing, A] =
+        Right(a)
+
+    }
+
+  }
+  object Implicits extends Implicits
+
+  // Instances
+
+  implicit def eitherMonad[L]: Monad[({ type E[R] = Either[L, R] })#E] =
+    new Monad[({ type E[R] = Either[L, R] })#E] {
+
+      override def map[A, B](t: Either[L, A], f: A => B): Either[L, B] =
+        t match {
+          case Right(b) =>
+            Right(f(b))
+          case l @ Left(_) =>
+            l
+        }
+
+      override def apply[A, B](t: Either[L, A], f: Either[L, A => B]): Either[L, B] =
+        t match {
+          case Right(t) =>
+            f match {
+              case Right(f) =>
+                Right(f(t))
+              case l @ Left(_) =>
+                l
+            }
+          case l @ Left(_) =>
+            l
+        }
+
+      override def pure[A](a: A): Either[L, A] =
+        Right(a)
+
+      override def flatten[A](t: Either[L, Either[L, A]]): Either[L, A] =
+        t match {
+          case Right(t)    => t
+          case l @ Left(_) => l
+        }
+
+    }
+
+}
