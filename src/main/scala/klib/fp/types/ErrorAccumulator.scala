@@ -44,6 +44,12 @@ object ErrorAccumulator {
       def alive: ErrorAccumulator[Nothing, Nothing, A] =
         Alive(a)
 
+      def aliveIf[E](f: A => Boolean)(ifNot: E*): ErrorAccumulator[E, Nothing, A] =
+        if (f(a))
+          Alive(a)
+        else
+          Dead(ifNot.toList)
+
     }
 
   }

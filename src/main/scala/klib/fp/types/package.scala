@@ -13,7 +13,51 @@ package object types {
 
   }
 
-  trait Implicits extends Maybe.Implicits with Either.Implicits with ErrorAccumulator.Implicits
+  trait Implicits extends Maybe.Implicits with Either.Implicits with ErrorAccumulator.Implicits {
+
+    implicit class OptionIdOps[A](a: A) {
+
+      def someOpt: Option[A] =
+        scala.Some(a)
+
+    }
+
+    implicit class OptionOps[A](a: Option[A]) {
+
+      def toMaybe: Maybe[A] =
+        a match {
+          case scala.Some(value) =>
+            Some(value)
+          case scala.None =>
+            None
+        }
+
+    }
+
+    implicit class BooleanOps(b: Boolean) {
+
+      def maybe[A](a: => A): Maybe[A] =
+        if (b)
+          Some(a)
+        else
+          None
+
+      final class AwaitingIfFalse[+A](ifTrue: => A) {
+
+        def |[A2 >: A](ifFalse: => A2): A2 =
+          if (b)
+            ifTrue
+          else
+            ifFalse
+
+      }
+
+      def ?[A](ifTrue: => A): AwaitingIfFalse[A] =
+        new AwaitingIfFalse(ifTrue)
+
+    }
+
+  }
   object Implicits extends Implicits
 
 }

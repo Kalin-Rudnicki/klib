@@ -24,6 +24,14 @@ sealed trait Maybe[+A] {
       case None    => scala.None
     }
 
+  def cata[B](mapF: A => B, orElse: => B): B =
+    this match {
+      case Some(a) =>
+        mapF(a)
+      case None =>
+        orElse
+    }
+
 }
 
 final case class Some[+A](a: A) extends Maybe[A]
