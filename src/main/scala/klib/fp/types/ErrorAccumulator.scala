@@ -1,6 +1,8 @@
 package klib.fp.types
 
-import klib.fp.typeclass.Monad
+import klib.fp.typeclass._
+
+import scala.annotation.tailrec
 
 sealed trait ErrorAccumulator[+E, +W, +R] {
 
@@ -49,6 +51,46 @@ object ErrorAccumulator {
           Alive(a)
         else
           Dead(ifNot.toList)
+
+    }
+
+    implicit class ErrorAccumulatorListOps[E, W, R](list: List[ErrorAccumulator[E, W, R]]) {
+
+      def traverseErrors: ErrorAccumulator[E, W, List[R]] = {
+        @tailrec
+        def loop(
+            ea: ErrorAccumulator[E, W, List[R]],
+            queue: List[ErrorAccumulator[E, W, R]],
+        ): ErrorAccumulator[E, W, List[R]] =
+          queue match {
+            case Nil =>
+              ea match {
+                case Alive(r, warnings) =>
+                  Alive(r.reverse, warnings)
+                case d @ Dead(_, _) =>
+                  d
+              }
+            case h :: tail =>
+              loop(
+                (ea, h) match {
+                  case (Alive(eaR, eaWs), Alive(hR, hWs)) =>
+                    Alive(hR :: eaR, eaWs ::: hWs)
+                  case (Dead(eaEs, eaWs), Dead(hEs, hWs)) =>
+                    Dead(eaEs ::: hEs, eaWs ::: hWs)
+                  case (Alive(_, eaWs), Dead(hEs, hWs)) =>
+                    Dead(hEs, eaWs ::: hWs)
+                  case (Dead(eaEs, eaWs), Alive(_, hWs)) =>
+                    Dead(eaEs, eaWs ::: hWs)
+                },
+                tail,
+              )
+          }
+
+        loop(
+          Nil.alive,
+          list,
+        )
+      }
 
     }
 

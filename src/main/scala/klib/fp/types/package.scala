@@ -22,7 +22,7 @@ package object types {
 
     }
 
-    implicit class OptionOps[A](a: Option[A]) {
+    implicit class OptionOps[A](a: scala.Option[A]) {
 
       def toMaybe: Maybe[A] =
         a match {
@@ -30,6 +30,18 @@ package object types {
             Some(value)
           case scala.None =>
             None
+        }
+
+    }
+
+    implicit class EitherOps[A, B](a: scala.Either[A, B]) {
+
+      def toErrorAccumulator: ErrorAccumulator[A, Nothing, B] =
+        a match {
+          case scala.Right(value) =>
+            value.alive
+          case scala.Left(error) =>
+            Dead(error :: Nil)
         }
 
     }
