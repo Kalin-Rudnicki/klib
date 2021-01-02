@@ -1,91 +1,23 @@
 package klib
 
-import klib.Logger.LogLevel.MaxDisplayNameLength
-
 import java.io.PrintStream
 
 final class Logger private (
-    initialLogTolerance: Logger.LogLevel,
-    initialFlags: Set[String],
-    indentStr: String,
+    flags: Set[String],
+    src: Logger.Source,
 ) {
-
-  // =====| Internal State |=====
-
-  private val _logTolerance: Logger.LogLevel = initialLogTolerance
-  private val _flags: Set[String] = initialFlags
 
   // =====| Logging |=====
 
-  final class Source private[Logger] (
-      src: PrintStream,
-      indent: Int,
-  ) {
+  def apply(flags: String*)(srcF: Logger.Source => Unit): Unit =
+    if ((flags.toSet &~ this.flags).isEmpty)
+      srcF(src)
 
-    private val effIdt = indent.max(0)
-    private val idtStr = indentStr * effIdt
-    private val newLineStr = s"${Logger.LogLevel.DisplayNameNewLine}: $idtStr"
-
-    def indented(by: Int = 1)(srcF: Source => Unit): Unit =
-      srcF(new Source(src, indent + by))
-
-    object ansi {
-
-      private val esc = "\u001b["
-
-      def cursorUp(numLines: Int = 1): Unit =
-        src.print(s"$esc${numLines}F")
-
-      def clearLine(mod: Int = 0): Unit =
-        src.print(s"$esc${mod}K")
-
-    }
-
-    // ...
-
-    def log(logLevel: Logger.LogLevel, objs: Any*): Unit =
-      if (logLevel.priority >= _logTolerance.priority) {
-        val tag = logLevel.tag
-        objs.foreach { obj =>
-          src.println(s"$tag: $idtStr${obj.toString.replaceAllLiterally("\n", newLineStr)}")
-        }
-      }
-
-    def never(objs: Any*): Unit =
-      log(Logger.LogLevel.Never, objs: _*)
-
-    def debug(objs: Any*): Unit =
-      log(Logger.LogLevel.Debug, objs: _*)
-
-    def detailed(objs: Any*): Unit =
-      log(Logger.LogLevel.Detailed, objs: _*)
-
-    def info(objs: Any*): Unit =
-      log(Logger.LogLevel.Info, objs: _*)
-
-    def print(objs: Any*): Unit =
-      log(Logger.LogLevel.Print, objs: _*)
-
-    def important(objs: Any*): Unit =
-      log(Logger.LogLevel.Important, objs: _*)
-
-    def warning(objs: Any*): Unit =
-      log(Logger.LogLevel.Warning, objs: _*)
-
-    def error(objs: Any*): Unit =
-      log(Logger.LogLevel.Error, objs: _*)
-
-    def fatal(objs: Any*): Unit =
-      log(Logger.LogLevel.Fatal, objs: _*)
-
-    def always(objs: Any*): Unit =
-      log(Logger.LogLevel.Always, objs: _*)
-
-  }
-
-  def apply(flags: String*)(srcF: Source => Unit): Unit =
-    if ((flags.toSet &~ _flags).isEmpty)
-      srcF(new Source(Console.out, 0))
+  def withIndent(by: Int = 1): Logger =
+    new Logger(
+      flags = flags,
+      src = src.withIndent(by),
+    )
 
 }
 
@@ -95,11 +27,17 @@ object Logger {
       logTolerance: LogLevel,
       flags: Set[String] = Set.empty,
       indentStr: String = "    ",
+      indent: Int = 0,
   ): Logger =
     new Logger(
-      initialLogTolerance = logTolerance,
-      initialFlags = flags,
-      indentStr = indentStr,
+      flags = flags,
+      src = new Source(
+        src = Console.out,
+        logTolerance = logTolerance,
+        indentStr = indentStr,
+        indent = indent,
+        breakManager = new Source.BreakManager,
+      ),
     )
 
   sealed abstract class LogLevel(
@@ -110,7 +48,7 @@ object Logger {
   ) {
 
     def tag: String = {
-      val paddedName = displayName.padTo(MaxDisplayNameLength, ' ')
+      val paddedName = displayName.padTo(LogLevel.MaxDisplayNameLength, ' ')
       color match {
         case Color.Default =>
           s"[$paddedName]"
@@ -220,6 +158,119 @@ object Logger {
 
     private[Logger] val DisplayNameNewLine: String =
       s"\n${" " * (MaxDisplayNameLength + 2)}"
+
+  }
+
+  final class Source private[Logger] (
+      src: PrintStream,
+      logTolerance: LogLevel,
+      indentStr: String,
+      indent: Int,
+      breakManager: Source.BreakManager,
+  ) {
+
+    private val effIdt = indent.max(0)
+    private val idtStr = indentStr * effIdt
+    private val newLineStr = s"${Logger.LogLevel.DisplayNameNewLine}: $idtStr"
+
+    // ...
+
+    def withIndent(by: Int = 1): Source =
+      new Source(
+        src = src,
+        logTolerance = logTolerance,
+        indentStr = indentStr,
+        indent = indent + by,
+        breakManager = breakManager,
+      )
+
+    def indented(by: Int = 1)(srcF: Source => Unit): Unit =
+      srcF(withIndent(by))
+
+    object ansi {
+
+      private val esc = "\u001b["
+
+      /**
+        * NOTE : (row, column) is 1-based, so (1,1) is the top-left
+        */
+      def cursorPos(row: Int, column: Int): Unit =
+        src.print(s"$esc$row;${column}H")
+
+      def cursorUp(numLines: Int = 1): Unit =
+        src.print(s"$esc${numLines}F")
+
+      // TODO (KR) : Info about mod
+      def clearLine(mod: Int = 0): Unit =
+        src.print(s"$esc${mod}K")
+
+      // TODO (KR) : Info about mod
+      def clearScreen(mod: Int = 0): Unit =
+        src.print(s"$esc${mod}J")
+
+    }
+
+    // ...
+
+    def break: Unit = {
+      if (breakManager.state) {
+        src.println
+        breakManager.state = false
+      }
+    }
+
+    def exec(logLevel: LogLevel)(f: => Unit): Unit =
+      if (logLevel.priority >= logTolerance.priority)
+        f
+
+    // ...
+
+    def log(logLevel: Logger.LogLevel, objs: Any*): Unit =
+      if (logLevel.priority >= logTolerance.priority) {
+        val tag = logLevel.tag
+        objs.foreach { obj =>
+          breakManager.state = true
+          src.println(s"$tag: $idtStr${obj.toString.replaceAllLiterally("\n", newLineStr)}")
+        }
+      }
+
+    def never(objs: Any*): Unit =
+      log(Logger.LogLevel.Never, objs: _*)
+
+    def debug(objs: Any*): Unit =
+      log(Logger.LogLevel.Debug, objs: _*)
+
+    def detailed(objs: Any*): Unit =
+      log(Logger.LogLevel.Detailed, objs: _*)
+
+    def info(objs: Any*): Unit =
+      log(Logger.LogLevel.Info, objs: _*)
+
+    def print(objs: Any*): Unit =
+      log(Logger.LogLevel.Print, objs: _*)
+
+    def important(objs: Any*): Unit =
+      log(Logger.LogLevel.Important, objs: _*)
+
+    def warning(objs: Any*): Unit =
+      log(Logger.LogLevel.Warning, objs: _*)
+
+    def error(objs: Any*): Unit =
+      log(Logger.LogLevel.Error, objs: _*)
+
+    def fatal(objs: Any*): Unit =
+      log(Logger.LogLevel.Fatal, objs: _*)
+
+    def always(objs: Any*): Unit =
+      log(Logger.LogLevel.Always, objs: _*)
+
+  }
+
+  object Source {
+
+    private[Logger] class BreakManager {
+      var state: Boolean = false
+    }
 
   }
 
