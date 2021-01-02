@@ -1,5 +1,7 @@
 package klib
 
+import klib.Logger.LogLevel.MaxDisplayNameLength
+
 import java.io.PrintStream
 
 final class Logger private (
@@ -22,18 +24,30 @@ final class Logger private (
 
     private val effIdt = indent.max(0)
     private val idtStr = indentStr * effIdt
+    private val newLineStr = s"${Logger.LogLevel.DisplayNameNewLine}: $idtStr"
 
     def indented(by: Int = 1)(srcF: Source => Unit): Unit =
       srcF(new Source(src, indent + by))
+
+    object ansi {
+
+      private val esc = "\u001b["
+
+      def cursorUp(numLines: Int = 1): Unit =
+        src.print(s"$esc${numLines}F")
+
+      def clearLine(mod: Int = 0): Unit =
+        src.print(s"$esc${mod}K")
+
+    }
 
     // ...
 
     def log(logLevel: Logger.LogLevel, objs: Any*): Unit =
       if (logLevel.priority >= _logTolerance.priority) {
         val tag = logLevel.tag
-        val nlStr = s"${Logger.LogLevel.DisplayNameNewLine}: $idtStr"
         objs.foreach { obj =>
-          src.println(s"$tag: $idtStr${obj.toString.replaceAllLiterally("\n", nlStr)}")
+          src.println(s"$tag: $idtStr${obj.toString.replaceAllLiterally("\n", newLineStr)}")
         }
       }
 
@@ -95,14 +109,16 @@ object Logger {
       val color: Color,
   ) {
 
-    def tag: String =
+    def tag: String = {
+      val paddedName = displayName.padTo(MaxDisplayNameLength, ' ')
       color match {
         case Color.Default =>
-          s"[$displayName]"
+          s"[$paddedName]"
         case _ =>
           def ansi(color: Color): String = s"\u001b[${color.fgMod}m"
-          s"[${ansi(color)}$displayName${ansi(Color.Default)}]"
+          s"[${ansi(color)}$paddedName${ansi(Color.Default)}]"
       }
+    }
 
   }
 
