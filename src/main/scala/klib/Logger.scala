@@ -58,6 +58,9 @@ object Logger {
       }
     }
 
+    override def toString: String =
+      s"$name$tag($priority)"
+
   }
 
   object LogLevel {
@@ -142,7 +145,7 @@ object Logger {
           color = Color.Default, // TODO (KR) :
         )
 
-    private[Logger] val MaxDisplayNameLength: Int =
+    val All: List[LogLevel] =
       List(
         Never,
         Debug,
@@ -154,7 +157,10 @@ object Logger {
         Error,
         Fatal,
         Always,
-      ).map(_.displayName.length).max
+      )
+
+    private[Logger] val MaxDisplayNameLength: Int =
+      All.map(_.displayName.length).max
 
     private[Logger] val DisplayNameNewLine: String =
       s"\n${" " * (MaxDisplayNameLength + 2)}"
