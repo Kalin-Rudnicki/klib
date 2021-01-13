@@ -15,7 +15,7 @@ package object types {
 
   }
 
-  trait Implicits extends Maybe.Implicits with Either.Implicits with ErrorAccumulator.Implicits {
+  trait Implicits extends Maybe.Implicits with Either.Implicits with ErrorAccumulator.Implicits with NonEmptyList.Implicits {
 
     implicit class OptionIdOps[A](a: A) {
 
