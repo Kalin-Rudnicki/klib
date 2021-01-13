@@ -1,5 +1,7 @@
 package klib.fp
 
+import scala.util.Try
+
 package object types {
 
   type \/[+A, +B] = Either[A, B]
@@ -43,6 +45,13 @@ package object types {
           case scala.Left(error) =>
             Dead(error :: Nil)
         }
+
+    }
+
+    implicit class TryOps[A](a: Try[A]) {
+
+      def to_? : ?[A] =
+        a.toEither.toErrorAccumulator
 
     }
 
