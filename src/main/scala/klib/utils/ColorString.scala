@@ -1,4 +1,4 @@
-package klib
+package klib.utils
 
 import scala.annotation.tailrec
 
@@ -222,7 +222,7 @@ sealed trait ColorString {
 }
 
 object ColorString {
-  import klib.{Color => RawColor}
+  import klib.utils.{Color => RawColor}
 
   private def ansiEscape(codes: NonEmptyList[String]): String =
     s"\u001b[${codes.toList.mkString(";")}m"

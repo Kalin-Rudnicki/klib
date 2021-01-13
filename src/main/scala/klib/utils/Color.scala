@@ -1,4 +1,4 @@
-package klib
+package klib.utils
 
 sealed trait Color {
   def fgMod: String

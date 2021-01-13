@@ -1,4 +1,4 @@
-package klib
+package klib.utils
 
 import java.io.PrintStream
 
