@@ -1,6 +1,6 @@
 package klib.fp.types
 
-import klib.fp.typeclass.Monad
+import klib.fp.typeclass.{ForEach, Monad}
 
 sealed trait Either[+A, +B] {
 
@@ -40,8 +40,10 @@ object Either {
 
   // Instances
 
-  implicit def eitherMonad[L]: Monad[({ type E[R] = Either[L, R] })#E] =
-    new Monad[({ type E[R] = Either[L, R] })#E] {
+  type Projection[A] = { type T[B] = Either[A, B] }
+
+  implicit def eitherMonad[L]: Monad[Projection[L]#T] =
+    new Monad[Projection[L]#T] {
 
       override def map[A, B](t: Either[L, A], f: A => B): Either[L, B] =
         t match {
@@ -71,6 +73,18 @@ object Either {
         t match {
           case Right(t)    => t
           case l @ Left(_) => l
+        }
+
+    }
+
+  implicit def eitherForEach[L]: ForEach[Projection[L]#T] =
+    new ForEach[Projection[L]#T] {
+
+      override def forEach[A](t: L \/ A, f: A => Unit): Unit =
+        t match {
+          case Right(b) =>
+            f(b)
+          case Left(_) =>
         }
 
     }

@@ -10,9 +10,24 @@ sealed trait Maybe[+A] {
       case None    => a
     }
 
+  def orElse[A2 >: A](a: Maybe[A2]): Maybe[A2] =
+    this match {
+      case Some(_) =>
+        this
+      case None =>
+        a
+    }
+
   def filter(f: A => Boolean): Maybe[A] =
     this match {
       case Some(a) if !f(a) =>
+        None
+      case _ =>
+        this
+    }
+  def filterNot(f: A => Boolean): Maybe[A] =
+    this match {
+      case Some(a) if f(a) =>
         None
       case _ =>
         this
@@ -22,6 +37,12 @@ sealed trait Maybe[+A] {
     this match {
       case Some(a) => scala.Some(a)
       case None    => scala.None
+    }
+
+  def toList: List[A] =
+    this match {
+      case Some(a) => a :: Nil
+      case None    => Nil
     }
 
   def cata[B](mapF: A => B, orElse: => B): B =
@@ -85,6 +106,18 @@ object Maybe {
         t match {
           case Some(t)  => t
           case n @ None => n
+        }
+
+    }
+
+  implicit val maybeForEach: ForEach[Maybe] =
+    new ForEach[Maybe] {
+
+      override def forEach[A](t: Maybe[A], f: A => Unit): Unit =
+        t match {
+          case Some(a) =>
+            f(a)
+          case None =>
         }
 
     }

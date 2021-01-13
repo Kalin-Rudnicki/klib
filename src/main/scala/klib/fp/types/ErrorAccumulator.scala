@@ -140,4 +140,16 @@ object ErrorAccumulator {
 
     }
 
+  implicit def errorAccumulatorForEach[E, W]: ForEach[Projection[E, W]#T] =
+    new ForEach[Projection[E, W]#T] {
+
+      override def forEach[A](t: ErrorAccumulator[E, W, A], f: A => Unit): Unit =
+        t match {
+          case Alive(r, _) =>
+            f(r)
+          case Dead(_, _) =>
+        }
+
+    }
+
 }

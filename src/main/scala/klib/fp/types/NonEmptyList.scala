@@ -1,6 +1,6 @@
 package klib.fp.types
 
-import klib.fp.typeclass.Monad
+import klib.fp.typeclass.{ForEach, Monad}
 
 final case class NonEmptyList[+A](
     head: A,
@@ -9,6 +9,9 @@ final case class NonEmptyList[+A](
 
   def toList: List[A] =
     head :: tail
+
+  def ::[A2 >: A](a: A2): NonEmptyList[A2] =
+    NonEmptyList(a, head :: tail)
 
 }
 
@@ -63,6 +66,14 @@ object NonEmptyList {
           t.head.tail ::: t.tail.flatMap(_.toList),
         )
 
+    }
+
+  implicit val nonEmptyListForEach: ForEach[NonEmptyList] =
+    new ForEach[NonEmptyList] {
+      override def forEach[A](t: NonEmptyList[A], f: A => Unit): Unit = {
+        f(t.head)
+        t.tail.foreach(f)
+      }
     }
 
 }
