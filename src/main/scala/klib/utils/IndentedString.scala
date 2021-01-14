@@ -1,5 +1,8 @@
 package klib.utils
 
+import klib.Implicits._
+import klib.fp.types._
+
 sealed trait IndentedString {
 
   // TODO (KR) : Possibly optimize this
@@ -49,19 +52,45 @@ object IndentedString {
   final case class Str(str: String) extends IndentedString
 
   final case class Inline(children: List[IndentedString]) extends IndentedString
-  object Inline {
 
-    def apply(children: IndentedString*): Inline =
-      Inline(children.toList)
+  final case class Indented(children: List[IndentedString]) extends IndentedString
+
+  // Helpers
+
+  def inline(children: IndentedString*): IndentedString =
+    Inline(children.toList)
+
+  def indented(children: IndentedString*): IndentedString =
+    Indented(children.toList)
+
+  // Conversions
+
+  trait ToIndentedString[-T] {
+
+    def convert(t: T): IndentedString
 
   }
 
-  final case class Indented(children: List[IndentedString]) extends IndentedString
-  object Indented {
+  implicit def convert[T: ToIndentedString](t: T): IndentedString =
+    implicitly[ToIndentedString[T]].convert(t)
 
-    def apply(children: IndentedString*): Indented =
-      Indented(children.toList)
+  implicit val indentedStringToIndentedString: ToIndentedString[IndentedString] = identity
 
+  implicit val stringToIndentedString: ToIndentedString[String] = Str(_)
+
+  implicit def optionToIndentedString[T: ToIndentedString]: ToIndentedString[Option[_ <: T]] = { opt =>
+    val toIdtStr = implicitly[ToIndentedString[T]]
+    Inline(opt.map(toIdtStr.convert).toList)
+  }
+
+  implicit def maybeToIndentedString[T: ToIndentedString]: ToIndentedString[Maybe[_ <: T]] = { opt =>
+    val toIdtStr = implicitly[ToIndentedString[T]]
+    Inline(opt.map(toIdtStr.convert).toList)
+  }
+
+  implicit def listToIndentedString[T: ToIndentedString]: ToIndentedString[List[_ <: T]] = { list =>
+    val toIdtStr = implicitly[ToIndentedString[T]]
+    Inline(list.map(toIdtStr.convert))
   }
 
 }

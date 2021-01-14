@@ -13,6 +13,20 @@ final case class NonEmptyList[+A](
   def ::[A2 >: A](a: A2): NonEmptyList[A2] =
     NonEmptyList(a, head :: tail)
 
+  def :::[A2 >: A](as: List[A2]): NonEmptyList[A2] =
+    as match {
+      case h :: t =>
+        NonEmptyList(h, t ::: head :: tail)
+      case Nil =>
+        this
+    }
+
+  def zipWithIndex: NonEmptyList[(A, Int)] =
+    NonEmptyList(
+      (head, 0),
+      tail.zipWithIndex.map { case (t, i) => (t, i + 1) },
+    )
+
 }
 
 object NonEmptyList {

@@ -329,6 +329,9 @@ object ColorString {
       def stripAnsi: String =
         str.replaceAll("\u001b\\[\\d+(;\\d+)*m", "")
 
+      def replaceColor(regex: String, color: RawColor): String =
+        str.replaceAll(regex, s"\u001b[${color.fgMod}m$$0\u001b[0m")
+
     }
 
     implicit class ColorStringInterpolator(sc: StringContext) {

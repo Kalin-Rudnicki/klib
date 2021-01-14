@@ -1,13 +1,11 @@
 //
 
-import klib.utils.Timer
+import klib.fp.types._
+import klib.Implicits._
+import klib.utils.{Color, ColorString, Timer}
 
 object Test extends App {
 
-  println(Timer.formatFlex(0))
-  println(Timer.formatFlex(5))
-  println(Timer.formatFlex(5001))
-  println(Timer.formatFlex(5001000))
-  println(Timer.formatFlex(500100050))
+  println("(123,_456,_789)".replaceColor("\\d+", Color.Named.Red))
 
 }

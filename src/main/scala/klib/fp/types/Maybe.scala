@@ -53,6 +53,33 @@ sealed trait Maybe[+A] {
         orElse
     }
 
+  def toEA[E](errs: E*): ErrorAccumulator[E, Nothing, A] =
+    this match {
+      case Some(a) =>
+        Alive(a)
+      case None =>
+        Dead(errs.toList)
+    }
+
+  def <<?[E](errs: E*): ErrorAccumulator[E, Nothing, A] =
+    toEA(errs: _*)
+
+  def isEmpty: Boolean =
+    this match {
+      case Some(_) =>
+        false
+      case None =>
+        true
+    }
+
+  def nonEmpty: Boolean =
+    this match {
+      case Some(_) =>
+        true
+      case None =>
+        false
+    }
+
 }
 
 final case class Some[+A](a: A) extends Maybe[A]

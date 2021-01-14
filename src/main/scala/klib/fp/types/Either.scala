@@ -10,6 +10,14 @@ sealed trait Either[+A, +B] {
       case _        => scala.None
     }
 
+  def toSEither: scala.Either[A, B] =
+    this match {
+      case Right(b) =>
+        scala.Right(b)
+      case Left(a) =>
+        scala.Left(a)
+    }
+
   def toMaybe: Maybe[B] =
     this match {
       case Right(b) => Some(b)
