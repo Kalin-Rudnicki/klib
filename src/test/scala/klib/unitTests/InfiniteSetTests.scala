@@ -464,4 +464,113 @@ class InfiniteSetTests extends AnyFunSpec {
 
   }
 
+  describe("set-theory") {
+
+    def test(
+        name: String,
+        set: InfiniteSet[Int],
+        otherSet: InfiniteSet[Int],
+    ): Unit =
+      describe(name) {
+
+        describe("basic") {
+
+          it("set == set") {
+            assert(set == set)
+          }
+
+          it("set.~.~ == set") {
+            assert(set.~.~ == set)
+          }
+
+          it("set.~.explicit == set.explicit") {
+            assert(set.~.explicit == set.explicit)
+          }
+
+        }
+
+        describe("associativity") {
+
+          it("(set | otherSet) == (otherSet | set)") {
+            assume(set != otherSet)
+            assert((set | otherSet) == (otherSet | set))
+          }
+
+          it("(set & otherSet) == (otherSet & set)") {
+            assume(set != otherSet)
+            assert((set & otherSet) == (otherSet & set))
+          }
+
+          it("(set &~ otherSet) != (otherSet &~ set)") {
+            assume(set != otherSet)
+            assert((set &~ otherSet) != (otherSet &~ set))
+          }
+
+        }
+
+        describe("self-operations") {
+
+          it("(set | set) == set") {
+            assert((set | set) == set)
+          }
+
+          it("(set & set) == set") {
+            assert((set & set) == set)
+          }
+
+          it("(set &~ set) == InfiniteSet.empty") {
+            assert((set &~ set) == InfiniteSet.empty)
+          }
+
+        }
+
+        describe("empty-operations") {
+
+          it("(set | InfiniteSet.empty) == set") {
+            assert((set | InfiniteSet.empty) == set)
+          }
+
+          it("(set & InfiniteSet.empty) == InfiniteSet.empty") {
+            assert((set & InfiniteSet.empty) == InfiniteSet.empty)
+          }
+
+          it("(set &~ InfiniteSet.empty) == set") {
+            assert((set &~ InfiniteSet.empty) == set)
+          }
+
+          it("(InfiniteSet.empty &~ set) == InfiniteSet.empty") {
+            assert((InfiniteSet.empty &~ set) == InfiniteSet.empty)
+          }
+
+        }
+
+        describe("full-operations") {
+
+          it("(set | InfiniteSet.full) == InfiniteSet.full") {
+            assert((set | InfiniteSet.full) == InfiniteSet.full)
+          }
+
+          it("(set & InfiniteSet.full) == set") {
+            assert((set & InfiniteSet.full) == set)
+          }
+
+          it("(set &~ InfiniteSet.full) == InfiniteSet.empty") {
+            assert((set &~ InfiniteSet.full) == InfiniteSet.empty)
+          }
+
+          it("(InfiniteSet.full &~ set) == set.~") {
+            assert((InfiniteSet.full &~ set) == set.~)
+          }
+
+        }
+
+      }
+
+    test("Inclusive1", Inclusive1, Exclusive2)
+    test("Inclusive2", Inclusive2, Exclusive1)
+    test("Exclusive1", Exclusive1, Inclusive2)
+    test("Exclusive2", Exclusive2, Inclusive1)
+
+  }
+
 }

@@ -1,5 +1,7 @@
 package klib.utils
 
+import scala.annotation.tailrec
+
 sealed trait InfiniteSet[T] {
 
   val explicit: Set[T]
@@ -21,8 +23,69 @@ sealed trait InfiniteSet[T] {
 
 object InfiniteSet {
 
+  // =====| Constants |=====
+
+  def empty[T]: InfiniteSet[T] =
+    Inclusive()
+
+  def full[T]: InfiniteSet[T] =
+    Exclusive()
+
+  // aliases
+
+  @inline def nothing[T]: InfiniteSet[T] = empty[T]
+  @inline def everything[T]: InfiniteSet[T] = full[T]
+
+  // =====| Multiple Sets |=====
+
   def explicit[T](sets: InfiniteSet[T]*): Set[T] =
     sets.toSet.flatMap((s: InfiniteSet[T]) => s.explicit)
+
+  def union[T](sets: InfiniteSet[T]*): InfiniteSet[T] = {
+    @tailrec
+    def loop(
+        current: InfiniteSet[T],
+        queue: List[InfiniteSet[T]],
+    ): InfiniteSet[T] =
+      queue match {
+        case head :: tail =>
+          loop(
+            current | head,
+            tail,
+          )
+        case Nil =>
+          current
+      }
+
+    loop(
+      empty[T],
+      sets.toList,
+    )
+  }
+
+  def intersection[T](sets: InfiniteSet[T]*): InfiniteSet[T] = {
+    @tailrec
+    def loop(
+        current: InfiniteSet[T],
+        queue: List[InfiniteSet[T]],
+    ): InfiniteSet[T] =
+      queue match {
+        case head :: tail =>
+          loop(
+            current & head,
+            tail,
+          )
+        case Nil =>
+          current
+      }
+
+    loop(
+      full[T],
+      sets.toList,
+    )
+  }
+
+  // =====| ADT |=====
 
   final case class Inclusive[T](explicit: Set[T]) extends InfiniteSet[T] {
 
