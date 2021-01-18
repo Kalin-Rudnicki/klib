@@ -2,10 +2,29 @@
 
 import klib.fp.types._
 import klib.Implicits._
-import klib.utils.{Color, ColorString, Timer}
+import klib.utils._
 
 object Test extends App {
 
-  println("(123,_456,_789)".replaceColor("\\d+", Color.Named.Red))
+  final case class Node(
+      id: Int,
+      map: Map[Char, Lazy[Node]],
+  )
+
+  lazy val n0: Node =
+    Node(
+      0,
+      Map(
+        'A' -> Lazy(n0),
+        'B' -> Lazy(n1),
+      ),
+    )
+
+  lazy val n1: Node =
+    Node(
+      1,
+      Map(
+      ),
+    )
 
 }
