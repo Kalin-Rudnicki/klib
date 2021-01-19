@@ -4,6 +4,8 @@ import scala.annotation.tailrec
 
 sealed trait InfiniteSet[T] {
 
+  protected val name: String
+
   val explicit: Set[T]
 
   def invert: InfiniteSet[T]
@@ -18,6 +20,9 @@ sealed trait InfiniteSet[T] {
   @inline def |(that: InfiniteSet[T]): InfiniteSet[T] = union(that)
   @inline def &(that: InfiniteSet[T]): InfiniteSet[T] = intersection(that)
   @inline def &~(that: InfiniteSet[T]): InfiniteSet[T] = disjunction(that)
+
+  override def toString: String =
+    s"$name(${explicit.mkString(", ")})"
 
 }
 
@@ -89,6 +94,8 @@ object InfiniteSet {
 
   final case class Inclusive[T](explicit: Set[T]) extends InfiniteSet[T] {
 
+    override protected val name: String = "Inclusive"
+
     override def invert: InfiniteSet[T] =
       Exclusive(explicit)
 
@@ -129,6 +136,8 @@ object InfiniteSet {
   }
 
   final case class Exclusive[T](explicit: Set[T]) extends InfiniteSet[T] {
+
+    override protected val name: String = "Exclusive"
 
     override def invert: InfiniteSet[T] =
       Inclusive(explicit)

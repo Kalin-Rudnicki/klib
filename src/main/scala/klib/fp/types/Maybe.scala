@@ -45,6 +45,12 @@ sealed trait Maybe[+A] {
       case None    => Nil
     }
 
+  def toSet[A2 >: A]: Set[A2] =
+    this match {
+      case Some(a) => Set(a)
+      case None    => Set.empty
+    }
+
   def cata[B](mapF: A => B, orElse: => B): B =
     this match {
       case Some(a) =>
