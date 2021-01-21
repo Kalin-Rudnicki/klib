@@ -122,7 +122,7 @@ object ErrorAccumulator {
             Dead(tErrors, tWarnings ::: fWarnings)
         }
 
-      override def pure[A](a: A): ErrorAccumulator[E, W, A] =
+      override def pure[A](a: => A): ErrorAccumulator[E, W, A] =
         Alive(a, Nil)
 
       override def flatten[A](t: ErrorAccumulator[E, W, ErrorAccumulator[E, W, A]]): ErrorAccumulator[E, W, A] =

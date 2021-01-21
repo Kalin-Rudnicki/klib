@@ -71,7 +71,7 @@ object NonEmptyList {
           ),
         )
 
-      override def pure[A](a: A): NonEmptyList[A] =
+      override def pure[A](a: => A): NonEmptyList[A] =
         NonEmptyList(a, Nil)
 
       override def flatten[A](t: NonEmptyList[NonEmptyList[A]]): NonEmptyList[A] =

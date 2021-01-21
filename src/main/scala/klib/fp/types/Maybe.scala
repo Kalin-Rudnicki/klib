@@ -132,7 +132,7 @@ object Maybe {
           case n @ None => n
         }
 
-      override def pure[A](a: A): Maybe[A] =
+      override def pure[A](a: => A): Maybe[A] =
         Some(a)
 
       override def flatten[A](t: Maybe[Maybe[A]]): Maybe[A] =

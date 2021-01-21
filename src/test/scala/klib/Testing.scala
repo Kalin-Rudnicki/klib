@@ -1,52 +1,31 @@
 package klib
 
-import klib.utils.{Lazy, Logger}
+import klib.Implicits._
+import klib.fp.types._
+import klib.fp.utils.ado
 
 object Testing extends App {
 
-  final case class Box(
-      id: Int,
-      items: Map[Int, Lazy[Box]],
-  )
+  implicit class IOOps[T](t: => T) {
 
-  object Box {
-
-    def apply(id: Int, items: (Int, Lazy[Box])*): Box =
-      Box(id, items.toMap)
+    def toIo: IO[T] =
+      IO(t)
 
   }
 
-  val boxes: List[Box] = {
-    lazy val lazyMap: Map[Int, Box] =
-      Map(
-        0 ->
-          Box(
-            0,
-            0 -> Lazy(lazyMap(0)),
-            1 -> Lazy(lazyMap(1)),
-          ),
-        1 ->
-          Box(
-            1,
-            1 -> Lazy(lazyMap(1)),
-          ),
-      )
-
-    lazyMap.toList.map(_._2)
-  }
-
-  val logger = Logger(Logger.LogLevel.Debug)
-
-  logger() { src =>
-    boxes.foreach { box =>
-      src.debug(box.id)
-      src.indented() { src =>
-        box.items.foreach {
-          case (k, v) =>
-            src.debug(s"$k => ${v.value.id}")
-        }
-      }
+  def makeIo(i: Int): IO[Int] =
+    IO {
+      println(s"[$i]")
+      i
     }
-  }
+
+  val io1 = makeIo(1)
+  val io2 = makeIo(2)
+  val io3 = makeIo(3)
+
+  val ioSum =
+    ado[IO].join(io1, io2, io3)
+
+  ioSum.runSync
 
 }

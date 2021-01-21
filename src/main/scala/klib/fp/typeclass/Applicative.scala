@@ -4,7 +4,7 @@ trait Applicative[T[_]] extends Functor[T] {
 
   def apply[A, B](t: T[A], f: T[A => B]): T[B]
 
-  def pure[A](a: A): T[A]
+  def pure[A](a: => A): T[A]
 
   def aToF[A, B, C](t: T[A], f: (A, B) => C): T[B => C] =
     map[A, B => C](t, t => f(t, _))
@@ -39,7 +39,7 @@ object Applicative {
 
     }
 
-    implicit class ApplicativeLiftOps[A](a: A) {
+    implicit class ApplicativeLiftOps[A](a: => A) {
 
       def pure[T[_]](implicit applicative: Applicative[T]): T[A] =
         applicative.pure(a)

@@ -46,12 +46,23 @@ package object types {
             Dead(error :: Nil)
         }
 
+      def to_\/ : Either[A, B] =
+        a match {
+          case scala.Left(value) =>
+            Left(value)
+          case scala.Right(value) =>
+            Right(value)
+        }
+
     }
 
     implicit class TryOps[A](a: Try[A]) {
 
       def to_? : ?[A] =
         a.toEither.toErrorAccumulator
+
+      def to_\/ : Either[Throwable, A] =
+        a.toEither.to_\/
 
     }
 

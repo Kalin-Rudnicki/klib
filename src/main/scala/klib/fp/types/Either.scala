@@ -74,7 +74,7 @@ object Either {
             l
         }
 
-      override def pure[A](a: A): Either[L, A] =
+      override def pure[A](a: => A): Either[L, A] =
         Right(a)
 
       override def flatten[A](t: Either[L, Either[L, A]]): Either[L, A] =
