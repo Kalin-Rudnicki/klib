@@ -2,11 +2,16 @@ package klib.fp
 
 import scala.util.Try
 
+import klib.Implicits._
+
 package object types {
 
   type \/[+A, +B] = Either[A, B]
 
   type ?[+R] = ErrorAccumulator[Throwable, Throwable, R]
+
+  type ??[+R] = WrappedErrorAccumulator[IO, Throwable, Throwable, R]
+  def ??[R](r: => R): ??[R] = r.pure[??]
 
   final case class Message(message: String) extends Throwable(message) {
 
