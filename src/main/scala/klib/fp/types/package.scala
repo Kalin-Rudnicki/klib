@@ -2,7 +2,7 @@ package klib.fp
 
 import scala.util.Try
 
-import klib.Implicits._
+import klib.fp.typeclass.Implicits._
 
 package object types {
 

@@ -118,18 +118,18 @@ object Maybe {
 
       override def map[A, B](t: Maybe[A], f: A => B): Maybe[B] =
         t match {
-          case Some(t)  => Some(f(t))
-          case n @ None => n
+          case Some(t) => Some(f(t))
+          case None    => None
         }
 
       override def apply[A, B](t: Maybe[A], f: Maybe[A => B]): Maybe[B] =
         t match {
           case Some(t) =>
             f match {
-              case Some(f)  => Some(f(t))
-              case n @ None => n
+              case Some(f) => Some(f(t))
+              case None    => None
             }
-          case n @ None => n
+          case None => None
         }
 
       override def pure[A](a: => A): Maybe[A] =
@@ -137,8 +137,8 @@ object Maybe {
 
       override def flatten[A](t: Maybe[Maybe[A]]): Maybe[A] =
         t match {
-          case Some(t)  => t
-          case n @ None => n
+          case Some(t) => t
+          case None    => None
         }
 
     }
