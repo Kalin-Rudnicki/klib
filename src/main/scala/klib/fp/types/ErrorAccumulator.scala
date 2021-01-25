@@ -57,46 +57,6 @@ object ErrorAccumulator {
 
     }
 
-    implicit class ErrorAccumulatorListOps[E, W, R](list: List[ErrorAccumulator[E, W, R]]) {
-
-      def traverseErrors: ErrorAccumulator[E, W, List[R]] = {
-        @tailrec
-        def loop(
-            ea: ErrorAccumulator[E, W, List[R]],
-            queue: List[ErrorAccumulator[E, W, R]],
-        ): ErrorAccumulator[E, W, List[R]] =
-          queue match {
-            case Nil =>
-              ea match {
-                case Alive(r, warnings) =>
-                  Alive(r.reverse, warnings)
-                case d @ Dead(_, _) =>
-                  d
-              }
-            case h :: tail =>
-              loop(
-                (ea, h) match {
-                  case (Alive(eaR, eaWs), Alive(hR, hWs)) =>
-                    Alive(hR :: eaR, eaWs ::: hWs)
-                  case (Dead(eaEs, eaWs), Dead(hEs, hWs)) =>
-                    Dead(eaEs ::: hEs, eaWs ::: hWs)
-                  case (Alive(_, eaWs), Dead(hEs, hWs)) =>
-                    Dead(hEs, eaWs ::: hWs)
-                  case (Dead(eaEs, eaWs), Alive(_, hWs)) =>
-                    Dead(eaEs, eaWs ::: hWs)
-                },
-                tail,
-              )
-          }
-
-        loop(
-          Nil.alive,
-          list,
-        )
-      }
-
-    }
-
   }
   object Implicits extends Implicits
 
@@ -152,6 +112,47 @@ object ErrorAccumulator {
             f(r)
           case Dead(_, _) =>
         }
+
+    }
+
+  implicit def errorAccumulatorTraverseList[E, W]: Traverse[List, Projection[E, W]#T] =
+    new Traverse[List, Projection[E, W]#T] {
+
+      override def traverse[T](t: List[ErrorAccumulator[E, W, T]]): ErrorAccumulator[E, W, List[T]] = {
+        @tailrec
+        def loop(
+            ea: ErrorAccumulator[E, W, List[T]],
+            queue: List[ErrorAccumulator[E, W, T]],
+        ): ErrorAccumulator[E, W, List[T]] =
+          queue match {
+            case Nil =>
+              ea match {
+                case Alive(r, warnings) =>
+                  Alive(r.reverse, warnings)
+                case d @ Dead(_, _) =>
+                  d
+              }
+            case h :: tail =>
+              loop(
+                (ea, h) match {
+                  case (Alive(eaR, eaWs), Alive(hR, hWs)) =>
+                    Alive(hR :: eaR, eaWs ::: hWs)
+                  case (Dead(eaEs, eaWs), Dead(hEs, hWs)) =>
+                    Dead(eaEs ::: hEs, eaWs ::: hWs)
+                  case (Alive(_, eaWs), Dead(hEs, hWs)) =>
+                    Dead(hEs, eaWs ::: hWs)
+                  case (Dead(eaEs, eaWs), Alive(_, hWs)) =>
+                    Dead(eaEs, eaWs ::: hWs)
+                },
+                tail,
+              )
+          }
+
+        loop(
+          Alive(Nil),
+          t,
+        )
+      }
 
     }
 

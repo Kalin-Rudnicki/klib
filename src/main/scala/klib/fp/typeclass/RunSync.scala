@@ -10,6 +10,8 @@ trait RunSync[T[+_], E] {
 
 object RunSync {
 
+  type ?[T[+_]] = RunSync[T, Throwable]
+
   trait Implicits {
 
     implicit class RunSyncOps[T[+_], A, E](t: T[A])(implicit rs: RunSync[T, E]) {

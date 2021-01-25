@@ -8,6 +8,7 @@ package object typeclass {
       with Monad.Implicits
       with ForEach.Implicits
       with RunSync.Implicits
+      with Traverse.Implicits
   object Implicits extends Implicits
 
   trait Instances extends Functor.Instances with Applicative.Instances with Monad.Instances with ForEach.Instances

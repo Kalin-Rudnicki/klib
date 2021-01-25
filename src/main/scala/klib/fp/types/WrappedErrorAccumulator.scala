@@ -87,4 +87,19 @@ object WrappedErrorAccumulator {
 
     }
 
+  implicit def wrappedErrorAccumulatorTraverseList[T2[+_], E, W](implicit
+      applicative: Applicative[T2],
+      runSync: RunSync[T2, E],
+  ): Traverse[List, Projection[T2, E, W]#T] =
+    new Traverse[List, Projection[T2, E, W]#T] {
+
+      override def traverse[T](t: List[WrappedErrorAccumulator[T2, E, W, T]]): WrappedErrorAccumulator[T2, E, W, List[T]] =
+        new WrappedErrorAccumulator[T2, E, W, List[T]](
+          applicative.pure[ErrorAccumulator[E, W, List[T]]](
+            ErrorAccumulator.errorAccumulatorTraverseList.traverse(t.map(_.run)),
+          ),
+        )
+
+    }
+
 }
