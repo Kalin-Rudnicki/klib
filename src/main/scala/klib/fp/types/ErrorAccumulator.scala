@@ -32,6 +32,9 @@ sealed trait ErrorAccumulator[+E, +W, +R] {
         (None, warnings, errors)
     }
 
+  def wrap[T[+_]: Applicative]: WrappedErrorAccumulator[T, E, W, R] =
+    new WrappedErrorAccumulator(implicitly[Applicative[T]].pure(this))
+
 }
 
 final case class Alive[+W, +R](r: R, warnings: List[W] = Nil) extends ErrorAccumulator[Nothing, W, R]

@@ -9,6 +9,13 @@ final class IO[+T] private (t: => T) {
 
   private def value: T = t
 
+  def bracket[T2](`try`: T => IO[T2])(`finally`: T => IO[Unit])(implicit ioMonad: Monad[IO]): IO[T2] =
+    try {
+      ioMonad.flatMap(this, `try`)
+    } finally {
+      ioMonad.flatMap(this, `finally`)
+    }
+
 }
 
 object IO {

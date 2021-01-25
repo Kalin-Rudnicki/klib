@@ -10,6 +10,14 @@ sealed trait Either[+A, +B] {
       case _        => scala.None
     }
 
+  def toEA: ErrorAccumulator[A, Nothing, B] =
+    this match {
+      case Right(b) =>
+        Alive(b)
+      case Left(a) =>
+        Dead(a :: Nil)
+    }
+
   def toSEither: scala.Either[A, B] =
     this match {
       case Right(b) =>

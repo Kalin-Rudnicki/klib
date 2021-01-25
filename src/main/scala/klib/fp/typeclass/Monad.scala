@@ -25,6 +25,14 @@ object Monad {
 
     }
 
+    implicit class NestedMonadOps[T[_]: Monad, A](t: T[T[A]]) {
+
+      private val monad: Monad[T] = implicitly[Monad[T]]
+
+      def flatten: T[A] = monad.flatten(t)
+
+    }
+
   }
   object Implicits extends Implicits
 

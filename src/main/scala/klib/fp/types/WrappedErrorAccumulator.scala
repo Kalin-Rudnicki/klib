@@ -5,7 +5,7 @@ import klib.fp.typeclass._
 
 import scala.annotation.unchecked.{uncheckedVariance => uV}
 
-final class WrappedErrorAccumulator[+T[+_], +E, +W, +R] private (private val wrapped: T[ErrorAccumulator[E, W, R]]) {
+final class WrappedErrorAccumulator[+T[+_], +E, +W, +R](private val wrapped: T[ErrorAccumulator[E, W, R]]) {
 
   def run(implicit runSync: RunSync[T @uV, E @uV]): ErrorAccumulator[E, W, R] =
     runSync.runSync(wrapped) match {
