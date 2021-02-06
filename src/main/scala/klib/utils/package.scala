@@ -1,61 +1,57 @@
 package klib
 
-import klib.fp.types.{Alive, Dead, ErrorAccumulator}
+import klib.fp.types._
 
 package object utils {
 
   trait Implicits extends ColorString.Implicits
   object Implicits extends Implicits
 
-  def execErrorAccumulator[E, W, R](
-      logger: Logger,
-  )(
-      ea: ErrorAccumulator[E, W, R],
-  )(
-      logError: Logger.Source => E => Unit,
-  )(
-      logWarning: Logger.Source => W => Unit,
-  )(
-      logResult: Logger.Source => R => Unit,
-  ): Nothing = {
-    logger() { src =>
-      def _logErrors(errors: List[E]): Unit = {
-        src.error(s"Errors (${errors.size}):")
-        src.indented() { src =>
-          errors.foreach(logError(src))
+  type HasLogger = { val logger: Logger }
+
+  final case class Command[T <: HasLogger](name: String, build: Seq[String] => T, run: T => ??[Unit]) {
+    import klib.Implicits._
+
+    private[utils] def runWithArgs(args: Seq[String]): IO[Unit] =
+      for {
+        conf <- build(args).pure[IO]
+        (_, warnings, errors) = run(conf).run.toTuple
+        _ <- conf.logger() { src =>
+          def show(label: String, level: Logger.LogLevel, items: List[Throwable]): Unit =
+            if (items.nonEmpty) {
+              src.log(level, s"=====| $label (${items.size}) |=====")
+              src.indented() { src =>
+                items.foreach(src.debug(_))
+                src.break
+              }
+            }
+
+          show("Warnings", Logger.LogLevel.Warning, warnings)
+          show("Errors", Logger.LogLevel.Fatal, errors)
         }
-      }
-      def _logWarnings(warnings: List[W]): Unit = {
-        src.error(s"Warnings (${warnings.size}):")
-        src.indented() { src =>
-          warnings.foreach(logWarning(src))
-        }
-      }
-      def _logResult(result: R): Unit = {
-        src.print("Result:")
-        src.indented() { src =>
-          logResult(src)(result)
-        }
+      } yield ()
+
+  }
+
+  def makeMain(commands: Command[_ <: HasLogger]*)(args: Array[String]): IO[Unit] = {
+    val commandMap: Map[String, Command[_ <: HasLogger]] = commands.toList.map(c => c.name -> c).toMap
+
+    def logFatal(msg: String): IO[Unit] =
+      Logger(Logger.LogLevel.Fatal)() { src =>
+        src.fatal(s"$msg. Options: ${commandMap.toList.map(_._1).sorted.mkString(", ")}")
       }
 
-      ea match {
-        case Alive(r, warnings) =>
-          if (warnings.nonEmpty)
-            _logWarnings(warnings)
-          _logResult(r)
-
-          System.exit(0)
-        case Dead(errors, warnings) =>
-          if (errors.nonEmpty)
-            _logErrors(errors)
-          if (warnings.nonEmpty)
-            _logWarnings(warnings)
-
-          System.exit(1)
-      }
+    args.toList match {
+      case cmd :: args =>
+        commandMap.get(cmd) match {
+          case scala.Some(command) =>
+            command.runWithArgs(args)
+          case scala.None =>
+            logFatal(s"Invalid command ($cmd)")
+        }
+      case Nil =>
+        logFatal("Missing command")
     }
-
-    ???
   }
 
 }
