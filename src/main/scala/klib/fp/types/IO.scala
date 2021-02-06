@@ -2,6 +2,7 @@ package klib.fp.types
 
 import klib.Implicits._
 import klib.fp.typeclass._
+import klib.fp.utils.ado
 
 import scala.util.Try
 
@@ -15,11 +16,12 @@ final class IO[+T] private (t: => T) {
     )
 
   def bracket[T2](`try`: T => IO[T2])(`finally`: T => IO[Unit])(implicit ioMonad: Monad[IO]): IO[T2] =
-    try {
-      ioMonad.flatMap(this, `try`)
-    } finally {
-      ioMonad.flatMap(this, `finally`)
-    }
+    ado[IO]
+      .join(
+        ioMonad.flatMap(this, `try`),
+        ioMonad.flatMap(this, `finally`),
+      )
+      .map(_._1)
 
 }
 

@@ -2,6 +2,8 @@ package klib.utils
 
 import java.io.PrintStream
 
+import klib.fp.types._
+
 final class Logger private (
     flags: Set[String],
     src: Logger.Source,
@@ -9,9 +11,11 @@ final class Logger private (
 
   // =====| Logging |=====
 
-  def apply(flags: String*)(srcF: Logger.Source => Unit): Unit =
-    if ((flags.toSet &~ this.flags).isEmpty)
-      srcF(src)
+  def apply(flags: String*)(srcF: Logger.Source => Unit): IO[Unit] =
+    IO {
+      if ((flags.toSet &~ this.flags).isEmpty)
+        srcF(src)
+    }
 
   def withIndent(by: Int = 1): Logger =
     new Logger(
