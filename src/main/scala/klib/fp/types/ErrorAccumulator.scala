@@ -35,6 +35,14 @@ sealed trait ErrorAccumulator[+E, +W, +R] {
   def wrap[T[+_]: Applicative]: WrappedErrorAccumulator[T, E, W, R] =
     new WrappedErrorAccumulator(implicitly[Applicative[T]].pure(this))
 
+  def mapWE[E2, W2](mapE: E => E2, mapW: W => W2): ErrorAccumulator[E2, W2, R] =
+    this match {
+      case Alive(r, warnings) =>
+        Alive(r, warnings.map(mapW))
+      case Dead(errors, warnings) =>
+        Dead(errors.map(mapE), warnings.map(mapW))
+    }
+
 }
 
 final case class Alive[+W, +R](r: R, warnings: List[W] = Nil) extends ErrorAccumulator[Nothing, W, R]
