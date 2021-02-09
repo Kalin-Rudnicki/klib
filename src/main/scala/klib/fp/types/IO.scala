@@ -4,6 +4,8 @@ import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.utils.ado
 
+import java.io.File
+import scala.io.Source
 import scala.util.Try
 
 final class IO[+T] private (t: => T) {
@@ -29,6 +31,9 @@ object IO {
 
   def apply[T](value: => T): IO[T] =
     new IO(value)
+
+  def readFile(path: File): IO[String] =
+    IO(Source.fromFile(path)).bracket(_.mkString.pure[IO])(_.close.pure[IO])
 
   // TODO (KR) : Maybe do this differently?
   implicit val ioMonad: Monad[IO] =
