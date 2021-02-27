@@ -2,6 +2,8 @@ package klib.fp.types
 
 import klib.fp.typeclass._
 
+import scala.annotation.tailrec
+
 sealed trait Maybe[+A] {
 
   def getOrElse[A2 >: A](a: A2): A2 =
@@ -152,6 +154,29 @@ object Maybe {
             f(a)
           case None =>
         }
+
+    }
+
+  implicit val maybeTraverseList: Traverse[List, Maybe] =
+    new Traverse[List, Maybe] {
+
+      override def traverse[T](t: List[Maybe[T]]): Maybe[List[T]] = {
+        @tailrec
+        def loop(queue: List[Maybe[T]], stack: List[T]): Maybe[List[T]] =
+          queue match {
+            case head :: tail =>
+              head match {
+                case Some(h) =>
+                  loop(tail, h :: stack)
+                case None =>
+                  None
+              }
+            case Nil =>
+              Some(stack.reverse)
+          }
+
+        loop(t, Nil)
+      }
 
     }
 

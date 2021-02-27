@@ -12,6 +12,7 @@ lazy val klib =
       libraryDependencies ++=
         Seq(
           "org.rogach" %% "scallop" % "4.0.1",
+          "org.squeryl" %% "squeryl" % "0.9.15",
         ) ++
           Seq(
             "org.scalatest" %% "scalatest" % "3.2.3",

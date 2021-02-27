@@ -5,6 +5,7 @@ import klib.fp.typeclass._
 import klib.fp.utils.ado
 
 import java.io.File
+import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.Try
 
@@ -63,6 +64,25 @@ object IO {
 
       override def runSync[A](t: IO[A]): Throwable \/ A =
         Try(t.value).to_\/
+
+    }
+
+  implicit val ioTraverseList: Traverse[List, IO] =
+    new Traverse[List, IO] {
+
+      override def traverse[T](t: List[IO[T]]): IO[List[T]] =
+        IO {
+          @tailrec
+          def loop(queue: List[IO[T]], stack: List[T]): List[T] =
+            queue match {
+              case head :: tail =>
+                loop(tail, head.value :: stack)
+              case Nil =>
+                stack.reverse
+            }
+
+          loop(t, Nil)
+        }
 
     }
 
