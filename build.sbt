@@ -29,6 +29,4 @@ lazy val app = crossProject(JSPlatform, JVMPlatform)
   )
 
 lazy val appJS = app.js
-lazy val appJVM = app.jvm.settings(
-  (resources in Compile) += (fastOptJS in (appJS, Compile)).value.data,
-)
+lazy val appJVM = app.jvm
