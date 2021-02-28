@@ -4,7 +4,9 @@ import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.utils.ado
 
+import java.awt.image.BufferedImage
 import java.io.File
+import javax.imageio.ImageIO
 import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.Try
@@ -33,8 +35,14 @@ object IO {
   def apply[T](value: => T): IO[T] =
     new IO(value)
 
+  def now: IO[Long] =
+    System.currentTimeMillis.pure[IO]
+
   def readFile(path: File): IO[String] =
     IO(Source.fromFile(path)).bracket(_.mkString.pure[IO])(_.close.pure[IO])
+
+  def readImage(path: File): IO[BufferedImage] =
+    ImageIO.read(path).pure[IO]
 
   // TODO (KR) : Maybe do this differently?
   implicit val ioMonad: Monad[IO] =

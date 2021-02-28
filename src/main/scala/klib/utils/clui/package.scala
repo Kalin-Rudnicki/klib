@@ -5,8 +5,8 @@ import klib.fp.types._
 
 package object clui {
 
-  def clui[V](
-      reader: Reader,
+  def apply[V](
+      reader: Reader = Reader(LineReader.stdIn("\n> ", "  ")),
       initialState: State.Input[V] = State.Empty,
   )(
       handle: (Logger, State.Input[V], List[String]) => IO[State.Output[V]],

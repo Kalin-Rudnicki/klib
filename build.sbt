@@ -6,13 +6,12 @@ lazy val klib =
     .settings(
       name := "klib",
       organization := "kalin-rudnicki",
-      version := "0.0.4",
+      version := "0.0.5",
       scalaVersion := "2.13.4",
       crossScalaVersions := Seq("2.12.10", "2.13.4"),
       libraryDependencies ++=
         Seq(
           "org.rogach" %% "scallop" % "4.0.1",
-          "org.squeryl" %% "squeryl" % "0.9.15",
         ) ++
           Seq(
             "org.scalatest" %% "scalatest" % "3.2.3",
