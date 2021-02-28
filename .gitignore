@@ -4,6 +4,11 @@
 
 target/
 project/target/
-app/shared/target/
-app/jvm/target/
-app/js/target/
+
+klib-core/shared/target/
+klib-core/jvm/target/
+klib-core/js/target/
+
+klib-webServer/shared/target/
+klib-webServer/jvm/target/
+klib-webServer/js/target/
