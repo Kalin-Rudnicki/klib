@@ -4,3 +4,6 @@
 
 target/
 project/target/
+app/shared/target/
+app/jvm/target/
+app/js/target/
