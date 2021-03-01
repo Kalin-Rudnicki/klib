@@ -2,7 +2,6 @@
 
 val MyScalaVersion = "2.13.4"
 val MyScalaCrossVersions = Seq("2.12.10")
-val CirceVersion = "0.14.0-M4"
 
 lazy val `klib-core` =
   crossProject(JSPlatform, JVMPlatform)
