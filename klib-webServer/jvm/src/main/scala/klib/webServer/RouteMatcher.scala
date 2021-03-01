@@ -8,56 +8,67 @@ import klib.fp.types._
 sealed trait RouteMatcher {
 
   def /:(const: String): RouteMatcher =
-    RouteMatcher.Const(const)(this)
+    RouteMatcher.const(const)(this)
 
 }
 
 object RouteMatcher {
 
-  final class Const private (private val const: String, private val child: RouteMatcher) extends RouteMatcher
-  object Const {
+  trait DecodeString[T] {
+    def decode(string: String): Maybe[T]
+  }
 
-    def apply(const: String)(child: RouteMatcher): RouteMatcher =
-      new Const(const, child)
+  object DecodeString {
 
-    def unapply(arg: Const): Option[(String, RouteMatcher)] =
-      (arg.const, arg.child).someOpt
+    implicit val stringDecodeString: DecodeString[String] = _.some
+
+    implicit val intDecodeString: DecodeString[Int] = _.toIntOption.toMaybe
+
+    implicit val longDecodeString: DecodeString[Long] = _.toLongOption.toMaybe
 
   }
 
-  final class OneOf private (private val children: List[RouteMatcher]) extends RouteMatcher
-  object OneOf {
+  final class Const private[RouteMatcher] (val const: String, val child: RouteMatcher) extends RouteMatcher
 
-    def apply(children: RouteMatcher*): RouteMatcher =
-      new OneOf(children.toList)
-
-    def unapply(arg: OneOf): Option[List[RouteMatcher]] =
-      arg.children.someOpt
-
-  }
+  final class OneOf private[RouteMatcher] (val children: List[RouteMatcher]) extends RouteMatcher
 
   // TODO (KR) : (method: Method)
-  final class Complete private (private val method: String, private val toResult: ??[MatchResult]) extends RouteMatcher
-  object Complete {
+  final class Complete private[RouteMatcher] (val method: String, val toResult: ??[MatchResult]) extends RouteMatcher
 
-    def apply(method: String)(toResult: ??[MatchResult]): RouteMatcher =
-      new Complete(method, toResult)
-
-    def unapply(arg: Complete): Option[(String, ??[MatchResult])] =
-      (arg.method, arg.toResult).someOpt
-
+  final class WithBody[B] private[RouteMatcher] (val decoder: Decoder[B], val child: B => RouteMatcher)
+      extends RouteMatcher {
+    type Type = B
   }
 
-  final class WithBody[B] private (private val decoder: Decoder[B], private val child: B => RouteMatcher)
-      extends RouteMatcher
-  object WithBody {
-
-    def apply[B: Decoder](child: B => RouteMatcher): RouteMatcher =
-      new WithBody(implicitly[Decoder[B]], child)
-
-    def unapply[B](arg: WithBody[B]): Option[(Decoder[B], B => RouteMatcher)] =
-      (arg.decoder, arg.child).someOpt
-
+  final class PathArg[A] private[RouteMatcher] (val decodeString: DecodeString[A], val child: A => RouteMatcher)
+      extends RouteMatcher {
+    type Type = A
   }
+
+  final class WithParam[A] private[RouteMatcher] (
+      val decodeString: DecodeString[A],
+      val param: String,
+      val child: A => RouteMatcher,
+  ) extends RouteMatcher {
+    type Type = A
+  }
+
+  def const(const: String)(child: RouteMatcher): RouteMatcher =
+    new Const(const, child)
+
+  def oneOf(children: RouteMatcher*): RouteMatcher =
+    new OneOf(children.toList)
+
+  def complete(method: String)(toResult: ??[MatchResult]): RouteMatcher =
+    new Complete(method, toResult)
+
+  def withBody[B: Decoder](child: ??[B] => RouteMatcher): RouteMatcher =
+    new WithBody(implicitly[Decoder[B]], child)
+
+  def pathArg[A: DecodeString](child: A => RouteMatcher): RouteMatcher =
+    new PathArg(implicitly[DecodeString[A]], child)
+
+  def withParam[A: DecodeString](param: String)(child: A => RouteMatcher): RouteMatcher =
+    new WithParam(implicitly[DecodeString[A]], param, child)
 
 }

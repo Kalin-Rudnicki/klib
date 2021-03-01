@@ -30,9 +30,6 @@ lazy val `klib-core` =
           ).map(_ % Test),
     )
 
-lazy val `klib-core-js` = `klib-core`.js
-lazy val `klib-core-jvm` = `klib-core`.jvm
-
 lazy val `klib-webServer` =
   crossProject(JSPlatform, JVMPlatform)
     .in(file("klib-webServer"))
@@ -49,7 +46,6 @@ lazy val `klib-webServer` =
         "io.circe" %% "circe-parser" % CirceVersion,
       ),
       scalaVersion := MyScalaVersion,
-      crossScalaVersions := MyScalaCrossVersions :+ MyScalaVersion,
       resolvers += Resolver.mavenLocal,
     )
     .jsSettings(
@@ -66,6 +62,9 @@ lazy val `klib-webServer` =
         "org.squeryl" %% "squeryl" % "0.9.15",
       ),
     )
+
+lazy val `klib-core-js` = `klib-core`.js
+lazy val `klib-core-jvm` = `klib-core`.jvm
 
 lazy val `klib-webServer-js` = `klib-webServer`.js.dependsOn(`klib-core-js`)
 lazy val `klib-webServer-jvm` = `klib-webServer`.jvm.dependsOn(`klib-core-jvm`)
