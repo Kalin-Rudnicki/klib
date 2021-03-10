@@ -274,6 +274,20 @@ object Logger {
     def always(objs: Any*): Unit =
       log(Logger.LogLevel.Always, objs: _*)
 
+    // ...
+
+    def logThrowable(
+        throwable: Throwable,
+        ignored: List[IgnoreStackTraceElement] = StandardIgnore,
+    ): Unit = {
+      error(throwable.getMessage)
+      indented() { src =>
+        IgnoreStackTraceElement.trimmedTrace(throwable, ignored).foreach { st =>
+          src.debug(st)
+        }
+      }
+    }
+
   }
 
   object Source {
@@ -281,6 +295,26 @@ object Logger {
     private[Logger] class BreakManager {
       var state: Boolean = false
     }
+
+  }
+
+  val StandardIgnore: List[IgnoreStackTraceElement] =
+    List(
+      IgnoreStackTraceElement.ignorePackage("klib.fp.types"),
+      IgnoreStackTraceElement.ignorePackage("klib.fp.typeclass"),
+      IgnoreStackTraceElement.ignorePackage("scala.util.Try"),
+    )
+
+  trait IgnoreStackTraceElement {
+    def ignore_?(ste: StackTraceElement): Boolean
+  }
+  object IgnoreStackTraceElement {
+
+    def trimmedTrace(throwable: Throwable, ignored: List[IgnoreStackTraceElement]): List[StackTraceElement] =
+      throwable.getStackTrace.toList.filter(st => !ignored.exists(_.ignore_?(st)))
+
+    def ignorePackage(pkg: String): IgnoreStackTraceElement =
+      _.getClassName.startsWith(pkg)
 
   }
 
