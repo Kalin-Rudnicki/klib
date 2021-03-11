@@ -61,7 +61,7 @@ object WrappedErrorAccumulator {
         )
 
       override def pure[A](a: => A): WrappedErrorAccumulator[T2, E, W, A] =
-        new WrappedErrorAccumulator(tMonad.pure(eaMonad.pure(a)))
+        new WrappedErrorAccumulator(tMonad.pure(tRunSync.runSync(tMonad.pure(a)).toEA))
 
       override def flatten[A](
           t: WrappedErrorAccumulator[T2, E, W, WrappedErrorAccumulator[T2, E, W, A]],

@@ -9,9 +9,20 @@ package object types {
   type \/[+A, +B] = Either[A, B]
 
   type ?[+R] = ErrorAccumulator[Throwable, Throwable, R]
+  object ? {
+    def apply[R](r: => R): ?[R] = r.pure[?]
+
+    def dead(throwables: Throwable*): ?[Nothing] =
+      Dead(throwables.toList)
+  }
 
   type ??[+R] = WrappedErrorAccumulator[IO, Throwable, Throwable, R]
-  def ??[R](r: => R): ??[R] = r.pure[??]
+  object ?? {
+    def apply[R](r: => R): ??[R] = r.pure[??]
+
+    def dead(throwables: Throwable*): ??[Nothing] =
+      ?.dead(throwables: _*).wrap[IO]
+  }
 
   final case class Message(message: String) extends Throwable(message) {
 
