@@ -11,13 +11,11 @@ import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.Try
 
-final class IO[+T] private (t: => T) {
-
-  private def value: T = t
+final class IO[+T] private (val unsafeValueF: () => T) {
 
   def wrap: ??[T] =
     new WrappedErrorAccumulator(
-      IO(t.pure[?]),
+      IO(unsafeValueF().pure[?]),
     )
 
   def bracket[T2](`try`: T => IO[T2])(`finally`: T => IO[Unit])(implicit ioMonad: Monad[IO]): IO[T2] =
@@ -33,7 +31,11 @@ final class IO[+T] private (t: => T) {
 object IO {
 
   def apply[T](value: => T): IO[T] =
-    new IO(value)
+    new IO(() => value)
+
+  // TODO (KR) : I dont like this, but the alternative seems to be way more wonky and complex, especially for delayed evaluation
+  def error(throwable: Throwable): IO[Nothing] =
+    IO { throw throwable }
 
   def now: IO[Long] =
     System.currentTimeMillis.pure[IO]
@@ -49,13 +51,13 @@ object IO {
     new Monad[IO] {
 
       override def map[A, B](t: IO[A], f: A => B): IO[B] =
-        IO(f(t.value))
+        IO(f(t.unsafeValueF()))
 
       override def apply[A, B](t: IO[A], f: IO[A => B]): IO[B] =
         IO {
-          // f.value(t.value) causes `ado[IO].join` to produce effects in reverse order+
-          val evaledT = t.value
-          val evaledF = f.value
+          // f.unsafeValueF()(t.unsafeValueF()) causes `ado[IO].join` to produce effects in reverse order+
+          val evaledT = t.unsafeValueF()
+          val evaledF = f.unsafeValueF()
           evaledF(evaledT)
         }
 
@@ -63,7 +65,7 @@ object IO {
         IO(a)
 
       override def flatten[A](t: IO[IO[A]]): IO[A] =
-        IO(t.value.value)
+        IO(t.unsafeValueF().unsafeValueF())
 
     }
 
@@ -71,7 +73,7 @@ object IO {
     new RunSync[IO, Throwable] {
 
       override def runSync[A](t: IO[A]): Throwable \/ A =
-        Try(t.value).to_\/
+        Try(t.unsafeValueF()).to_\/
 
     }
 
@@ -84,7 +86,7 @@ object IO {
           def loop(queue: List[IO[T]], stack: List[T]): List[T] =
             queue match {
               case head :: tail =>
-                loop(tail, head.value :: stack)
+                loop(tail, head.unsafeValueF() :: stack)
               case Nil =>
                 stack.reverse
             }

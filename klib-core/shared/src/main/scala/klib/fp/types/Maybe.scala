@@ -95,6 +95,12 @@ case object None extends Maybe[Nothing]
 
 object Maybe {
 
+  def apply[A](a: A): Maybe[A] =
+    if (a == null)
+      None
+    else
+      Some(a)
+
   trait Implicits {
 
     implicit class MaybeIdOps[A](a: A) {
