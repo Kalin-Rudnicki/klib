@@ -150,10 +150,10 @@ sealed trait ColorString {
         case ColorString.Complex(_, pairs, tail) =>
           pairs.foreach {
             case (str, cStr) =>
-              str.forEach(stringBuilder.append(_))
+              str.foreach(stringBuilder.append(_))
               rec(cStr)
           }
-          tail.forEach(stringBuilder.append(_))
+          tail.foreach(stringBuilder.append(_))
       }
 
     rec(this)
@@ -212,7 +212,7 @@ sealed trait ColorString {
       this,
       ColorString.ColorState.Default,
     )
-    ColorString.Color.Default.diffWithState(finalColorState).forEach {
+    ColorString.Color.Default.diffWithState(finalColorState).foreach {
       case (ansi, _) =>
         stringBuilder.append(ansi)
     }

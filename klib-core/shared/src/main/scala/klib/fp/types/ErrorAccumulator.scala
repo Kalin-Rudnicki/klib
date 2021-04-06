@@ -111,10 +111,10 @@ object ErrorAccumulator {
 
     }
 
-  implicit def errorAccumulatorForEach[E, W]: ForEach[Projection[E, W]#T] =
-    new ForEach[Projection[E, W]#T] {
+  implicit def errorAccumulatorForEach[E, W]: Foreach[Projection[E, W]#T] =
+    new Foreach[Projection[E, W]#T] {
 
-      override def forEach[A](t: ErrorAccumulator[E, W, A], f: A => Unit): Unit =
+      override def foreach[A](t: ErrorAccumulator[E, W, A], f: A => Unit): Unit =
         t match {
           case Alive(r, _) =>
             f(r)
@@ -160,6 +160,56 @@ object ErrorAccumulator {
           Alive(Nil),
           t,
         )
+      }
+
+    }
+
+  implicit def errorAccumulatorTraverseNonEmptyList[E, W]: Traverse[NonEmptyList, Projection[E, W]#T] =
+    new Traverse[NonEmptyList, Projection[E, W]#T] {
+
+      override def traverse[T](t: NonEmptyList[ErrorAccumulator[E, W, T]]): ErrorAccumulator[E, W, NonEmptyList[T]] = {
+        @tailrec
+        def loop(
+            ea: ErrorAccumulator[E, W, NonEmptyList[T]],
+            queue: List[ErrorAccumulator[E, W, T]],
+        ): ErrorAccumulator[E, W, NonEmptyList[T]] =
+          // TODO (KR) : duplicated, add trait?
+          queue match {
+            case Nil =>
+              ea match {
+                case Alive(r, warnings) =>
+                  Alive(r.reverse, warnings)
+                case d @ Dead(_, _) =>
+                  d
+              }
+            case h :: tail =>
+              loop(
+                (ea, h) match {
+                  case (Alive(eaR, eaWs), Alive(hR, hWs)) =>
+                    Alive(hR :: eaR, eaWs ::: hWs)
+                  case (Dead(eaEs, eaWs), Dead(hEs, hWs)) =>
+                    Dead(eaEs ::: hEs, eaWs ::: hWs)
+                  case (Alive(_, eaWs), Dead(hEs, hWs)) =>
+                    Dead(hEs, eaWs ::: hWs)
+                  case (Dead(eaEs, eaWs), Alive(_, hWs)) =>
+                    Dead(eaEs, eaWs ::: hWs)
+                },
+                tail,
+              )
+          }
+
+        t.head match {
+          case Alive(r, warnings) =>
+            loop(
+              Alive(NonEmptyList(r, Nil), warnings),
+              t.tail,
+            )
+          case d @ Dead(_, _) =>
+            loop(
+              d,
+              t.tail,
+            )
+        }
       }
 
     }

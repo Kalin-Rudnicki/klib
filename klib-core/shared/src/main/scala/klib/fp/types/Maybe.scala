@@ -151,10 +151,10 @@ object Maybe {
 
     }
 
-  implicit val maybeForEach: ForEach[Maybe] =
-    new ForEach[Maybe] {
+  implicit val maybeForEach: Foreach[Maybe] =
+    new Foreach[Maybe] {
 
-      override def forEach[A](t: Maybe[A], f: A => Unit): Unit =
+      override def foreach[A](t: Maybe[A], f: A => Unit): Unit =
         t match {
           case Some(a) =>
             f(a)

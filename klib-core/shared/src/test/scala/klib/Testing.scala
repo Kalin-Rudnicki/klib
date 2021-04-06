@@ -6,35 +6,41 @@ import klib.utils._
 
 object Testing extends App {
 
-  val logger: Logger = Logger(Logger.LogLevel.Debug)
+  val list1: NonEmptyList[?[Int]] =
+    NonEmptyList.nel(
+      1.pure[?],
+      2.pure[?],
+      3.pure[?],
+    )
 
-  (
-    for {
-      r1 <- (
-          for {
-            _ <- 1.pure[??]
-            _ <- 2.pure[??]
-            _ <- 3.pure[??]
-            _ <-
-              (
-                if (false)
-                  4.pure[?]
-                else
-                  Dead(Message("Oops") :: Nil)
-              ).wrap[IO]
-          } yield ()
-      ).run.pure[??]
-      _ <- r1 match {
-        case Alive(_, _) =>
-          logger() { src =>
-            src.info("Lived...")
-          }.wrap
-        case Dead(errors, _) =>
-          logger() { src =>
-            errors.foreach(src.logThrowable(_))
-          }.wrap
-      }
-    } yield ()
-  ).run
+  val list2: NonEmptyList[?[Int]] =
+    NonEmptyList.nel(
+      1.pure[?],
+      2.pure[?],
+      ?.dead(Message("3 is dead")),
+    )
+
+  val list3: NonEmptyList[?[Int]] =
+    NonEmptyList.nel(
+      ?.dead(Message("1 is dead")),
+      2.pure[?],
+      ?.dead(Message("3 is dead")),
+    )
+
+  // =====|  |=====
+
+  // ...
+  println("=====| List |=====")
+  println(list1.toList.traverse)
+  println(list2.toList.traverse)
+  println(list3.toList.traverse)
+  println
+
+  // ...
+  println("=====| NonEmptyList |=====")
+  println(list1.traverse)
+  println(list2.traverse)
+  println(list3.traverse)
+  println
 
 }

@@ -1,6 +1,6 @@
 package klib.fp.types
 
-import klib.fp.typeclass.{ForEach, Monad}
+import klib.fp.typeclass.{Foreach, Monad}
 
 sealed trait Either[+A, +B] {
 
@@ -93,10 +93,10 @@ object Either {
 
     }
 
-  implicit def eitherForEach[L]: ForEach[Projection[L]#T] =
-    new ForEach[Projection[L]#T] {
+  implicit def eitherForEach[L]: Foreach[Projection[L]#T] =
+    new Foreach[Projection[L]#T] {
 
-      override def forEach[A](t: L \/ A, f: A => Unit): Unit =
+      override def foreach[A](t: L \/ A, f: A => Unit): Unit =
         t match {
           case Right(b) =>
             f(b)
