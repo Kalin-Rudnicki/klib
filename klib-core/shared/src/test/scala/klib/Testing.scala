@@ -1,46 +1,31 @@
 package klib
 
+import java.io.File
+import java.io.PrintWriter
+
 import klib.Implicits._
 import klib.fp.types._
 import klib.utils._
 
 object Testing extends App {
 
-  val list1: NonEmptyList[?[Int]] =
-    NonEmptyList.nel(
-      1.pure[?],
-      2.pure[?],
-      3.pure[?],
-    )
+  def getFileName(fileNum: Int): File =
+    new File(s"test-$fileNum.txt")
 
-  val list2: NonEmptyList[?[Int]] =
-    NonEmptyList.nel(
-      1.pure[?],
-      2.pure[?],
-      ?.dead(Message("3 is dead")),
-    )
+  def getFileContents(fileNum: Int): String =
+    s"=====| Header |=====\nThis is File #$fileNum\nAdded stuff...\n"
 
-  val list3: NonEmptyList[?[Int]] =
-    NonEmptyList.nel(
-      ?.dead(Message("1 is dead")),
-      2.pure[?],
-      ?.dead(Message("3 is dead")),
-    )
+  def adHocWrite(fileNum: Int): Unit = {
+    val pw = new PrintWriter(getFileName(fileNum))
+    pw.print(getFileContents(fileNum))
+    pw.close()
+  }
 
-  // =====|  |=====
+  def ioWrite(fileNum: Int): IO[Unit] =
+    IO.writeFile(getFileName(fileNum), getFileContents(fileNum))
 
-  // ...
-  println("=====| List |=====")
-  println(list1.toList.traverse)
-  println(list2.toList.traverse)
-  println(list3.toList.traverse)
-  println
-
-  // ...
-  println("=====| NonEmptyList |=====")
-  println(list1.traverse)
-  println(list2.traverse)
-  println(list3.traverse)
-  println
+  adHocWrite(1)
+  adHocWrite(2).pure[IO].runSync
+  ioWrite(3).runSync
 
 }

@@ -1,15 +1,17 @@
 package klib.fp.types
 
-import klib.Implicits._
-import klib.fp.typeclass._
-import klib.fp.utils.ado
-
 import java.awt.image.BufferedImage
 import java.io.File
+import java.io.PrintWriter
 import javax.imageio.ImageIO
+
 import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.Try
+
+import klib.Implicits._
+import klib.fp.typeclass._
+import klib.fp.utils.ado
 
 final class IO[+T] private (val unsafeValueF: () => T) {
 
@@ -19,11 +21,14 @@ final class IO[+T] private (val unsafeValueF: () => T) {
     )
 
   def bracket[T2](`try`: T => IO[T2])(`finally`: T => IO[Unit])(implicit ioMonad: Monad[IO]): IO[T2] =
-    ado[IO]
-      .join(
-        ioMonad.flatMap(this, `try`),
-        ioMonad.flatMap(this, `finally`),
-      )
+    this
+      .flatMap { self =>
+        ado[IO]
+          .join(
+            `try`(self),
+            `finally`(self),
+          )
+      }
       .map(_._1)
 
 }
@@ -45,6 +50,9 @@ object IO {
 
   def readImage(path: File): IO[BufferedImage] =
     ImageIO.read(path).pure[IO]
+
+  def writeFile(path: File, contents: String): IO[Unit] =
+    new PrintWriter(path).pure[IO].bracket(_.write(contents).pure[IO])(_.close.pure[IO])
 
   // TODO (KR) : Maybe do this differently?
   implicit val ioMonad: Monad[IO] =
