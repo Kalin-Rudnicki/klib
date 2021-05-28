@@ -9,6 +9,9 @@ final case class NonEmptyList[+A](
     tail: List[A],
 ) {
 
+  def size: Int =
+    tail.size + 1
+
   def toList: List[A] =
     head :: tail
 
