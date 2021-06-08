@@ -15,6 +15,23 @@ final class WrappedErrorAccumulator[+T[+_], +E, +W, +R](private val wrapped: T[E
         Dead(a :: Nil)
     }
 
+  def runAndDumpMessages()(implicit runSync: RunSync[T @uV, E @uV]): Unit = {
+    def dump[M](label: String, throwables: List[M]): Unit =
+      if (throwables.nonEmpty) {
+        Console.err.println(s"=====| $label${(throwables.size == 1) ? "" | "s"} (${throwables.size}) ---")
+        throwables.foreach(Console.err.println)
+        Console.err.println()
+      }
+
+    run(runSync) match {
+      case Alive(_, warnings) =>
+        dump("Warning", warnings)
+      case Dead(errors, warnings) =>
+        dump("Error", errors)
+        dump("Warning", warnings)
+    }
+  }
+
 }
 
 object WrappedErrorAccumulator {

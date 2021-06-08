@@ -6,7 +6,7 @@ import org.rogach.scallop._
 
 import klib.Implicits._
 import klib.fp.types._
-import klib.utils.Logger.{helpers => L}
+import klib.utils.Logger.{helpers => L}, L.Implicits._
 
 trait Executable {
 
@@ -37,9 +37,7 @@ trait Executable {
         L(
           L.log(messageLevel, s"=====| $label${(throwables.size == 1) ? "" | "s"} [${throwables.size}] |====="),
           L.indented(
-            L(
-              throwables.map(L.log.throwable(_, messageLevel)): _*,
-            ),
+            throwables.map(L.log.throwable(_, messageLevel)),
           ),
         )
       else
@@ -81,7 +79,7 @@ object Executable {
     val opts: List[String] = commandMap.toList.map(_._1).sorted
 
     def makeError(message: String): ??[Nothing] =
-      (Dead(Message(s"$message. Options: ${opts.mkString(", ")}") :: Nil): ?[Nothing]).wrap[IO]
+      ??.dead(Message(s"$message. Options: ${opts.mkString(", ")}"))
 
     { (logger, args) =>
       args match {
