@@ -302,7 +302,7 @@ object Logger {
       )
 
     private[Logger] val MaxDisplayNameLength: Int =
-      All.map(_.displayName.length).maxOption.getOrElse(0)
+      All.map(_.displayName.length).max
 
     private[Logger] val BreakDisplayName: String =
       s"[${" " * MaxDisplayNameLength}]"
