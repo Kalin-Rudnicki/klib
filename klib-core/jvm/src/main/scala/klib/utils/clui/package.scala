@@ -2,6 +2,7 @@ package klib.utils
 
 import klib.Implicits._
 import klib.fp.types._
+import klib.utils.Logger.{helpers => L}
 
 package object clui {
 
@@ -23,9 +24,7 @@ package object clui {
               ().pure[IO]
             case State.Unknown =>
               for {
-                _ <- logger() { src =>
-                  src.error("Unknown Command")
-                }
+                _ <- logger(L.log.error("Unknown Command"))
                 _ <- loop(s)
               } yield ()
           }

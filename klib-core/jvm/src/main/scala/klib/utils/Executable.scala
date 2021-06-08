@@ -6,6 +6,7 @@ import org.rogach.scallop._
 
 import klib.Implicits._
 import klib.fp.types._
+import klib.utils.Logger.{helpers => L}
 
 trait Executable {
 
@@ -27,6 +28,30 @@ trait Executable {
           (Nil, stack.reverse)
       }
 
+    def throwablesEvent(
+        label: String,
+        messageLevel: Logger.LogLevel,
+        throwables: List[Throwable],
+    ): Logger.Event =
+      if (throwables.nonEmpty)
+        L(
+          L.log(messageLevel, s"=====| $label${(throwables.size == 1) ? "" | "s"} [${throwables.size}] |====="),
+          L.indented(
+            L(
+              throwables.map(L.log.throwable(_, messageLevel)): _*,
+            ),
+          ),
+        )
+      else
+        L()
+
+    def resEvent(res: Maybe[Unit]): Logger.Event =
+      L.log.always(
+        res.isEmpty ?
+          "<Failure>".toColorString.red |
+          "<Success>".toColorString.green,
+      )
+
     val (loggerArgs, programArgs) = split_--(args.toList, Nil)
 
     val logger = new Executable.LoggerConf(loggerArgs).logger
@@ -34,26 +59,13 @@ trait Executable {
 
     val (res, warnings, errors) = result.run.toTuple
 
-    logger() { src =>
-      def show(name: String, level: Logger.LogLevel, throwables: List[Throwable]): Unit =
-        if (throwables.nonEmpty) {
-          src.log(level, s"=====| $name${if (throwables.size == 1) "" else "s"} [${throwables.size}] |=====")
-          throwables.foreach { throwable =>
-            src.log(level, throwable.getMessage)
-            throwable.getStackTrace.foreach(src.log(Logger.LogLevel.Debug, _))
-          }
-        }
-
-      show("Warning", Logger.LogLevel.Warning, warnings)
-      show("Error", Logger.LogLevel.Fatal, errors)
-
-      val resMsg =
-        if (res.isEmpty)
-          "<Failure>".toColorString.red
-        else
-          "<Success>".toColorString.green
-      src.important(resMsg)
-    }
+    logger(
+      L(
+        throwablesEvent("Error", Logger.LogLevel.Fatal, errors),
+        throwablesEvent("Warning", Logger.LogLevel.Warning, warnings),
+        resEvent(res),
+      ),
+    )
   }
 
   def execute(logger: Logger, args: List[String]): ??[Unit]
@@ -101,18 +113,20 @@ object Executable {
 
   // =====| Logger |=====
 
-  private implicit val logLevelConverter: ValueConverter[Logger.LogLevel] =
-    new ValueConverter[Logger.LogLevel] {
+  private implicit val logLevelConverter: ValueConverter[Logger.LogLevel with Logger.LogLevel.Tolerance] =
+    new ValueConverter[Logger.LogLevel with Logger.LogLevel.Tolerance] {
       override val argType: ArgType.V = ArgType.SINGLE
 
       private val logLevelMap =
-        Logger.LogLevel.All
+        Logger.LogLevel.AllTolerance
           .flatMap(ll =>
             (ll.priority.toString -> ll) :: (ll.name.toUpperCase -> ll) :: (ll.displayName.toUpperCase -> ll) :: Nil,
           )
           .toMap
 
-      override def parse(s: List[(String, List[String])]): scala.Either[String, Option[Logger.LogLevel]] =
+      override def parse(
+          s: List[(String, List[String])],
+      ): scala.Either[String, Option[Logger.LogLevel with Logger.LogLevel.Tolerance]] =
         s match {
           case (_, arg :: Nil) :: Nil =>
             logLevelMap.get(arg.toUpperCase) match {
@@ -133,17 +147,20 @@ object Executable {
     banner("[Note] Commands are expected in format of: [LOGGER_OPTS...] '--' [PROGRAM_OPTS...]")
     banner("       If no '--' is provided, all args are considered to be [PROGRAM_OPTS...]")
 
-    val logTolerance: ScallopOption[Logger.LogLevel] = opt[Logger.LogLevel](default = Logger.LogLevel.Info.someOpt)
+    val logTolerance: ScallopOption[Logger.LogLevel with Logger.LogLevel.Tolerance] =
+      opt[Logger.LogLevel with Logger.LogLevel.Tolerance](default = Logger.LogLevel.Info.someOpt)
     val flags: ScallopOption[Set[String]] = opt[List[String]](default = Nil.someOpt).map(_.toSet)
+    val ignoredPackages: ScallopOption[Set[String]] = opt[List[String]](default = Nil.someOpt).map(_.toSet)
     val idtStr: ScallopOption[String] = opt[String](default = "    ".someOpt)
 
     verify()
 
     def logger: Logger =
       Logger(
-        logTolerance = logTolerance(),
-        flags = flags(),
-        indentStr = idtStr(),
+        defaultLogTolerance = logTolerance(),
+        defaultFlags = flags(),
+        defaultIndentStr = idtStr(),
+        defaultIgnorePackages = ignoredPackages(),
       )
 
   }

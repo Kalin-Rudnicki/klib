@@ -326,7 +326,7 @@ object ColorString {
 
     implicit class ColorStringStringOps(str: String) {
 
-      def stripAnsi: String =
+      def stripColor: String =
         str.replaceAll("\u001b\\[\\d+(;\\d+)*m", "")
 
       def replaceColor(regex: String, color: RawColor): String =
