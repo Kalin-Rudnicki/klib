@@ -65,6 +65,85 @@ final class Logger private (
 
   // =====|  |=====
 
+  def unsafeLog(
+      event: Logger.Event,
+      logTolerance: Maybe[Logger.LogLevel with Logger.LogLevel.Tolerance] = None,
+      additionalFlags: Maybe[Set[String]] = None,
+      additionalIgnoredPackages: Maybe[Set[String]] = None, // TODO (KR) : Possibly tweak how this is done (?)
+      indentString: Maybe[String] = None,
+  ): Unit = {
+    val logTol: Logger.LogLevel =
+      logTolerance.getOrElse(this.defaultLogTolerance)
+    val flags: Set[String] =
+      additionalFlags.cata(this.defaultFlags ++ _, this.defaultFlags)
+    val ignoredPackages: Set[String] =
+      additionalIgnoredPackages.cata(this.defaultIgnoredPackages ++ _, this.defaultIgnoredPackages)
+    val idtStr: String =
+      indentString.getOrElse(this.defaultIndentString)
+
+    val ignoreStackTraceElements: List[Logger.IgnoreStackTraceElement] =
+      ignoredPackages.toList.map(Logger.IgnoreStackTraceElement.ignorePackage)
+
+    def conditionally(logLevel: Logger.LogLevel)(f: => Unit): Unit =
+      if (logLevel.priority >= logTol.priority)
+        f
+
+    def handle(
+        indent: String,
+        event: Logger.Event,
+    ): Unit = {
+      def buildString(logLevel: Logger.LogLevel, message: Any): String =
+        s"${logLevel.tag}:$indent${message.toString.replaceAll("\n", s"${Logger.LogLevel.DisplayNameNewLine}:$indent")}"
+
+      event match {
+        case Logger.Event.Compound(events) =>
+          events.foreach(handle(indent, _))
+        case Logger.Event.Log(logLevel, message) =>
+          conditionally(logLevel) {
+            val str = buildString(logLevel, message)
+            sources.foreach(_.println(str))
+          }
+        case Logger.Event.Break(printIndent) =>
+          sources.foreach(_.break(printIndent))
+        case Logger.Event.Indented(event, by) =>
+          handle(indent + idtStr * by.max(0), event)
+        case Logger.Event.LogThrowable(messageLevel, stackTraceLevel, throwable) =>
+          handle(
+            indent,
+            L(
+              L.log(messageLevel, throwable.getMessage),
+              L.indented(
+                L(
+                  Logger.IgnoreStackTraceElement.trimmedTrace(throwable, ignoreStackTraceElements).map { ste =>
+                    L.log(stackTraceLevel, ste.toString)
+                  }: _*,
+                ),
+              ),
+            ),
+          )
+        case Logger.Event.Raw(logLevel, str) =>
+          def action(): Unit = {
+            sources.foreach(_.print(str))
+          }
+
+          logLevel match {
+            case Some(logLevel) =>
+              conditionally(logLevel) {
+                action()
+              }
+            case None =>
+              action()
+          }
+        case Logger.Event.RequireFlags(requiredFlags, event) =>
+          if ((requiredFlags -- flags).isEmpty) {
+            handle(indent, event())
+          }
+      }
+    }
+
+    handle(" ", event)
+  }
+
   def apply(
       event: Logger.Event,
       logTolerance: Maybe[Logger.LogLevel with Logger.LogLevel.Tolerance] = None,
@@ -72,78 +151,13 @@ final class Logger private (
       additionalIgnoredPackages: Maybe[Set[String]] = None, // TODO (KR) : Possibly tweak how this is done (?)
       indentString: Maybe[String] = None,
   ): IO[Unit] =
-    IO {
-      val logTol: Logger.LogLevel =
-        logTolerance.getOrElse(this.defaultLogTolerance)
-      val flags: Set[String] =
-        additionalFlags.cata(this.defaultFlags ++ _, this.defaultFlags)
-      val ignoredPackages: Set[String] =
-        additionalIgnoredPackages.cata(this.defaultIgnoredPackages ++ _, this.defaultIgnoredPackages)
-      val idtStr: String =
-        indentString.getOrElse(this.defaultIndentString)
-
-      val ignoreStackTraceElements: List[Logger.IgnoreStackTraceElement] =
-        ignoredPackages.toList.map(Logger.IgnoreStackTraceElement.ignorePackage)
-
-      def conditionally(logLevel: Logger.LogLevel)(f: => Unit): Unit =
-        if (logLevel.priority >= logTol.priority)
-          f
-
-      def handle(
-          indent: String,
-          event: Logger.Event,
-      ): Unit = {
-        def buildString(logLevel: Logger.LogLevel, message: Any): String =
-          s"${logLevel.tag}:$indent${message.toString.replaceAll("\n", s"${Logger.LogLevel.DisplayNameNewLine}:$indent")}"
-
-        event match {
-          case Logger.Event.Compound(events) =>
-            events.foreach(handle(indent, _))
-          case Logger.Event.Log(logLevel, message) =>
-            conditionally(logLevel) {
-              val str = buildString(logLevel, message)
-              sources.foreach(_.println(str))
-            }
-          case Logger.Event.Break(printIndent) =>
-            sources.foreach(_.break(printIndent))
-          case Logger.Event.Indented(event, by) =>
-            handle(indent + idtStr * by.max(0), event)
-          case Logger.Event.LogThrowable(messageLevel, stackTraceLevel, throwable) =>
-            handle(
-              indent,
-              L(
-                L.log(messageLevel, throwable.getMessage),
-                L.indented(
-                  L(
-                    Logger.IgnoreStackTraceElement.trimmedTrace(throwable, ignoreStackTraceElements).map { ste =>
-                      L.log(stackTraceLevel, ste.toString)
-                    }: _*,
-                  ),
-                ),
-              ),
-            )
-          case Logger.Event.Raw(logLevel, str) =>
-            def action(): Unit = {
-              sources.foreach(_.print(str))
-            }
-
-            logLevel match {
-              case Some(logLevel) =>
-                conditionally(logLevel) {
-                  action()
-                }
-              case None =>
-                action()
-            }
-          case Logger.Event.RequireFlags(requiredFlags, event) =>
-            if ((requiredFlags -- flags).isEmpty) {
-              handle(indent, event())
-            }
-        }
-      }
-
-      handle(" ", event)
-    }
+    unsafeLog(
+      event = event,
+      logTolerance = logTolerance,
+      additionalFlags = additionalFlags,
+      additionalIgnoredPackages = additionalIgnoredPackages,
+      indentString = indentString,
+    ).pure[IO]
 
 }
 
