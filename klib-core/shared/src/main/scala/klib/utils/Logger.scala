@@ -1,5 +1,7 @@
 package klib.utils
 
+import scala.language.implicitConversions
+
 import klib.Implicits._
 import klib.fp.types._
 import klib.utils.Logger.{helpers => L}
@@ -383,8 +385,18 @@ object Logger {
 
   object helpers {
 
+    object Implicits {
+
+      implicit def listOfEventsToList(events: List[Event]): Event =
+        helpers(events)
+
+    }
+
+    def apply(events: List[Event]): Event =
+      Event.Compound(events)
+
     def apply(events: Event*): Event =
-      Event.Compound(events.toList)
+      helpers(events.toList)
 
     object log {
 
