@@ -31,6 +31,8 @@ package object types {
 
   }
 
+  final case class Compound(children: List[Throwable]) extends Throwable(children.map(_.getMessage).mkString("\n"))
+
   trait Implicits extends Maybe.Implicits with Either.Implicits with ErrorAccumulator.Implicits with NonEmptyList.Implicits {
 
     implicit class OptionIdOps[A](a: A) {
