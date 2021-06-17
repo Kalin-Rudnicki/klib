@@ -9,7 +9,7 @@ lazy val `klib-core` =
     .settings(
       name := "klib-core",
       organization := "kalin-rudnicki",
-      version := "0.2.4",
+      version := "0.2.5",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
