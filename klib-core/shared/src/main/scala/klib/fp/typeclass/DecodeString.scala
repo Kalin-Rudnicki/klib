@@ -27,19 +27,8 @@ object DecodeString {
   private def makeDecoder[R](name: String, f: String => Option[R]): DecodeString[R] =
     s => f(s).toMaybe.toEA(Message(s"Malformatted $name '$s'"))
 
-  "".toBoolean
-
   implicit val booleanDecodeString: DecodeString[Boolean] =
-    makeDecoder(
-      "boolean",
-      s =>
-        if (s.equalsIgnoreCase("true"))
-          true.someOpt
-        else if (s.equalsIgnoreCase("false"))
-          false.someOpt
-        else
-          scala.None,
-    )
+    makeDecoder("boolean", _.toBooleanOption)
 
   implicit val intDecodeString: DecodeString[Int] =
     makeDecoder("int", _.toIntOption)
