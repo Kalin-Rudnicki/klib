@@ -30,7 +30,16 @@ object DecodeString {
   "".toBoolean
 
   implicit val booleanDecodeString: DecodeString[Boolean] =
-    makeDecoder("boolean", _.toBooleanOption)
+    makeDecoder(
+      "boolean",
+      s =>
+        if (s.equalsIgnoreCase("true"))
+          true.someOpt
+        else if (s.equalsIgnoreCase("false"))
+          false.someOpt
+        else
+          scala.None,
+    )
 
   implicit val intDecodeString: DecodeString[Int] =
     makeDecoder("int", _.toIntOption)
