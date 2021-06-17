@@ -9,6 +9,7 @@ package object typeclass {
       with Foreach.Implicits
       with RunSync.Implicits
       with Traverse.Implicits
+      with DecodeString.Implicits
   object Implicits extends Implicits
 
   trait Instances extends Functor.Instances with Applicative.Instances with Monad.Instances with Foreach.Instances

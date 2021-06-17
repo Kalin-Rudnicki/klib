@@ -1,7 +1,7 @@
 //
 
 val MyScalaVersion = "2.13.4"
-val MyScalaCrossVersions = Seq("2.12.10")
+val MyScalaCrossVersions = Seq()
 
 lazy val `klib-core` =
   crossProject(JSPlatform, JVMPlatform)
@@ -9,7 +9,7 @@ lazy val `klib-core` =
     .settings(
       name := "klib-core",
       organization := "kalin-rudnicki",
-      version := "0.2.5",
+      version := "0.2.6",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
