@@ -37,8 +37,64 @@ object Monad {
   object Implicits extends Implicits
 
   trait Instances {
+    import scala.concurrent.{ExecutionContext, Future, Promise}
+    import scala.util.{Failure, Success}
 
-    // TODO (KR) :
+    implicit def futureMonad(implicit ec: ExecutionContext): Monad[Future] =
+      new Monad[Future] {
+        override def map[A, B](t: Future[A], f: A => B): Future[B] = {
+          val p: Promise[B] = Promise()
+
+          t.onComplete {
+            case Failure(exception) =>
+              p.failure(exception)
+            case Success(value) =>
+              p.success(f(value))
+          }
+
+          p.future
+        }
+
+        override def apply[A, B](t: Future[A], f: Future[A => B]): Future[B] = {
+          val p: Promise[B] = Promise()
+
+          f.onComplete {
+            case Failure(fException) =>
+              p.failure(fException)
+            case Success(fValue) =>
+              t.onComplete {
+                case Failure(tException) =>
+                  p.failure(tException)
+                case Success(tValue) =>
+                  p.success(fValue(tValue))
+              }
+          }
+
+          p.future
+        }
+
+        override def pure[A](a: => A): Future[A] =
+          Future(a)
+
+        override def flatten[A](t: Future[Future[A]]): Future[A] = {
+          val p: Promise[A] = Promise()
+
+          t.onComplete {
+            case Failure(exception) =>
+              p.failure(exception)
+            case Success(t2) =>
+              t2.onComplete {
+                case Failure(exception) =>
+                  p.failure(exception)
+                case Success(value) =>
+                  p.success(value)
+              }
+          }
+
+          p.future
+        }
+
+      }
 
   }
   object Instances extends Instances
