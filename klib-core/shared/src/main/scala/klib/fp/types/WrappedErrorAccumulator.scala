@@ -1,9 +1,9 @@
 package klib.fp.types
 
+import scala.annotation.unchecked.{uncheckedVariance => uV}
+
 import klib.Implicits._
 import klib.fp.typeclass._
-
-import scala.annotation.unchecked.{uncheckedVariance => uV}
 
 final class WrappedErrorAccumulator[+T[+_], +E, +W, +R](private val wrapped: T[ErrorAccumulator[E, W, R]]) {
 

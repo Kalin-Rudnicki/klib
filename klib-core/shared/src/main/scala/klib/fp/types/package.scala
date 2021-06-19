@@ -3,6 +3,7 @@ package klib.fp
 import scala.util.Try
 
 import klib.fp.typeclass.Implicits._
+import klib.fp.utils.ado
 
 package object types {
 
@@ -104,6 +105,21 @@ package object types {
 
       def ?[A](ifTrue: => A): AwaitingIfFalse[A] =
         new AwaitingIfFalse(ifTrue)
+
+    }
+
+    implicit class `??Ops`[T](t: ??[T]) {
+
+      def bracket[T2](`try`: T => ??[T2])(`finally`: T => ??[Unit]): ??[T2] = {
+        t.flatMap { self =>
+            ado[??]
+              .join(
+                `try`(self),
+                `finally`(self),
+              )
+          }
+          .map(_._1)
+      }
 
     }
 
