@@ -53,16 +53,16 @@ trait Executable {
     val (loggerArgs, programArgs) = split_--(args.toList, Nil)
 
     val logger = new Executable.LoggerConf(loggerArgs).logger
-    val result = execute(logger, programArgs)
-
-    val (res, warnings, errors) = result.run.toTuple
-
     logger(
-      L(
-        throwablesEvent("Error", Logger.LogLevel.Fatal, errors),
-        throwablesEvent("Warning", Logger.LogLevel.Warning, warnings),
-        resEvent(res),
-      ),
+      execute(logger, programArgs).runSync match {
+        case Alive(r) =>
+          resEvent(r.some)
+        case Dead(errors) =>
+          L(
+            throwablesEvent("Error", Logger.LogLevel.Fatal, errors),
+            resEvent(None),
+          )
+      },
     )
   }
 

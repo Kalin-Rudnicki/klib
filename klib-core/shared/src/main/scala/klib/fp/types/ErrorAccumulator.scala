@@ -4,49 +4,20 @@ import klib.fp.typeclass._
 
 import scala.annotation.tailrec
 
-sealed trait ErrorAccumulator[+E, +W, +R] {
+sealed trait ErrorAccumulator[+E, +R] {
 
-  val warnings: List[W]
-
-  def withWarning[W2 >: W](w: W2): ErrorAccumulator[E, W2, R] =
+  def mapErrors[E2](mapE: E => E2): ErrorAccumulator[E2, R] =
     this match {
-      case Alive(r, warnings) =>
-        Alive(r, w :: warnings)
-      case Dead(errors, warnings) =>
-        Dead(errors, w :: warnings)
-    }
-
-  def withWarnings[W2 >: W](ws: W2*): ErrorAccumulator[E, W2, R] =
-    this match {
-      case Alive(r, warnings) =>
-        Alive(r, ws.toList ::: warnings)
-      case Dead(errors, warnings) =>
-        Dead(errors, ws.toList ::: warnings)
-    }
-
-  def toTuple: (Maybe[R], List[W], List[E]) =
-    this match {
-      case Alive(r, warnings) =>
-        (Some(r), warnings, Nil)
-      case Dead(errors, warnings) =>
-        (None, warnings, errors)
-    }
-
-  def wrap[T[+_]: Applicative]: WrappedErrorAccumulator[T, E, W, R] =
-    new WrappedErrorAccumulator(implicitly[Applicative[T]].pure(this))
-
-  def mapWE[E2, W2](mapE: E => E2, mapW: W => W2): ErrorAccumulator[E2, W2, R] =
-    this match {
-      case Alive(r, warnings) =>
-        Alive(r, warnings.map(mapW))
-      case Dead(errors, warnings) =>
-        Dead(errors.map(mapE), warnings.map(mapW))
+      case alive @ Alive(_) =>
+        alive
+      case Dead(errors) =>
+        Dead(errors.map(mapE))
     }
 
 }
 
-final case class Alive[+W, +R](r: R, warnings: List[W] = Nil) extends ErrorAccumulator[Nothing, W, R]
-final case class Dead[+E, +W](errors: List[E], warnings: List[W] = Nil) extends ErrorAccumulator[E, W, Nothing]
+final case class Alive[+W, +R](r: R) extends ErrorAccumulator[Nothing, R]
+final case class Dead[+E](errors: List[E]) extends ErrorAccumulator[E, Nothing]
 
 object ErrorAccumulator {
 
@@ -54,14 +25,21 @@ object ErrorAccumulator {
 
     implicit class ErrorAccumulatorIdOps[A](a: A) {
 
-      def alive: ErrorAccumulator[Nothing, Nothing, A] =
+      def alive: ErrorAccumulator[Nothing, A] =
         Alive(a)
 
-      def aliveIf[E](f: A => Boolean)(ifNot: E*): ErrorAccumulator[E, Nothing, A] =
+      def aliveIf[E](f: A => Boolean)(ifNot: E*): ErrorAccumulator[E, A] =
         if (f(a))
           Alive(a)
         else
           Dead(ifNot.toList)
+
+    }
+
+    implicit class `?Ops`[T](t: ?[T]) {
+
+      def to_?? : ??[T] =
+        new ??(IO(t))
 
     }
 
@@ -70,87 +48,87 @@ object ErrorAccumulator {
 
   // Instances
 
-  type Projection[E, W] = { type T[R] = ErrorAccumulator[E, W, R] }
+  type Projection[E] = { type T[R] = ErrorAccumulator[E, R] }
 
-  implicit def errorAccumulatorMonad[E, W]: Monad[Projection[E, W]#T] =
-    new Monad[Projection[E, W]#T] {
+  implicit def errorAccumulatorMonad[E]: Monad[Projection[E]#T] =
+    new Monad[Projection[E]#T] {
 
-      override def map[A, B](t: ErrorAccumulator[E, W, A], f: A => B): ErrorAccumulator[E, W, B] =
+      override def map[A, B](t: ErrorAccumulator[E, A], f: A => B): ErrorAccumulator[E, B] =
         t match {
-          case Alive(t, warnings) => Alive(f(t), warnings)
-          case d @ Dead(_, _)     => d
+          case Alive(t)    => Alive(f(t))
+          case d @ Dead(_) => d
         }
 
-      override def apply[A, B](t: ErrorAccumulator[E, W, A], f: ErrorAccumulator[E, W, A => B]): ErrorAccumulator[E, W, B] =
+      override def apply[A, B](t: ErrorAccumulator[E, A], f: ErrorAccumulator[E, A => B]): ErrorAccumulator[E, B] =
         (t, f) match {
-          case (Alive(t, tWarnings), Alive(f, fWarnings)) =>
-            Alive(f(t), tWarnings ::: fWarnings)
-          case (Dead(tErrors, tWarnings), Dead(fErrors, fWarnings)) =>
-            Dead(tErrors ::: fErrors, tWarnings ::: fWarnings)
-          case (Alive(_, tWarnings), Dead(fErrors, fWarnings)) =>
-            Dead(fErrors, tWarnings ::: fWarnings)
-          case (Dead(tErrors, tWarnings), Alive(_, fWarnings)) =>
-            Dead(tErrors, tWarnings ::: fWarnings)
+          case (Alive(t), Alive(f)) =>
+            Alive(f(t))
+          case (Dead(tErrors), Dead(fErrors)) =>
+            Dead(tErrors ::: fErrors)
+          case (Alive(_), Dead(fErrors)) =>
+            Dead(fErrors)
+          case (Dead(tErrors), Alive(_)) =>
+            Dead(tErrors)
         }
 
-      override def pure[A](a: => A): ErrorAccumulator[E, W, A] =
-        Alive(a, Nil)
+      override def pure[A](a: => A): ErrorAccumulator[E, A] =
+        Alive(a)
 
-      override def flatten[A](t: ErrorAccumulator[E, W, ErrorAccumulator[E, W, A]]): ErrorAccumulator[E, W, A] =
+      override def flatten[A](t: ErrorAccumulator[E, ErrorAccumulator[E, A]]): ErrorAccumulator[E, A] =
         t match {
-          case Alive(t, warnings1) =>
+          case Alive(t) =>
             t match {
-              case Alive(t, warnings2) =>
-                Alive(t, warnings1 ::: warnings2)
-              case Dead(errors, warnings2) =>
-                Dead(errors, warnings1 ::: warnings2)
+              case Alive(t) =>
+                Alive(t)
+              case d @ Dead(errors) =>
+                d
             }
-          case d @ Dead(_, _) =>
+          case d @ Dead(_) =>
             d
         }
 
     }
 
-  implicit def errorAccumulatorForEach[E, W]: Foreach[Projection[E, W]#T] =
-    new Foreach[Projection[E, W]#T] {
+  implicit def errorAccumulatorForEach[E]: Foreach[Projection[E]#T] =
+    new Foreach[Projection[E]#T] {
 
-      override def foreach[A](t: ErrorAccumulator[E, W, A], f: A => Unit): Unit =
+      override def foreach[A](t: ErrorAccumulator[E, A], f: A => Unit): Unit =
         t match {
-          case Alive(r, _) =>
+          case Alive(r) =>
             f(r)
-          case Dead(_, _) =>
+          case Dead(_) =>
         }
 
     }
 
-  implicit def errorAccumulatorTraverseList[E, W]: Traverse[List, Projection[E, W]#T] =
-    new Traverse[List, Projection[E, W]#T] {
+  implicit def errorAccumulatorTraverseList[E]: Traverse[List, Projection[E]#T] =
+    new Traverse[List, Projection[E]#T] {
 
-      override def traverse[T](t: List[ErrorAccumulator[E, W, T]]): ErrorAccumulator[E, W, List[T]] = {
+      override def traverse[T](t: List[ErrorAccumulator[E, T]]): ErrorAccumulator[E, List[T]] = {
         @tailrec
         def loop(
-            ea: ErrorAccumulator[E, W, List[T]],
-            queue: List[ErrorAccumulator[E, W, T]],
-        ): ErrorAccumulator[E, W, List[T]] =
+            ea: ErrorAccumulator[E, List[T]],
+            queue: List[ErrorAccumulator[E, T]],
+        ): ErrorAccumulator[E, List[T]] =
           queue match {
             case Nil =>
               ea match {
-                case Alive(r, warnings) =>
-                  Alive(r.reverse, warnings)
-                case d @ Dead(_, _) =>
+                case Alive(r) =>
+                  Alive(r.reverse)
+                case d @ Dead(_) =>
                   d
               }
             case h :: tail =>
               loop(
                 (ea, h) match {
-                  case (Alive(eaR, eaWs), Alive(hR, hWs)) =>
-                    Alive(hR :: eaR, eaWs ::: hWs)
-                  case (Dead(eaEs, eaWs), Dead(hEs, hWs)) =>
-                    Dead(eaEs ::: hEs, eaWs ::: hWs)
-                  case (Alive(_, eaWs), Dead(hEs, hWs)) =>
-                    Dead(hEs, eaWs ::: hWs)
-                  case (Dead(eaEs, eaWs), Alive(_, hWs)) =>
-                    Dead(eaEs, eaWs ::: hWs)
+                  case (Alive(eaR), Alive(hR)) =>
+                    Alive(hR :: eaR)
+                  case (Dead(eaEs), Dead(hEs)) =>
+                    Dead(eaEs ::: hEs)
+                  case (Alive(_), Dead(hEs)) =>
+                    Dead(hEs)
+                  case (Dead(eaEs), Alive(_)) =>
+                    Dead(eaEs)
                 },
                 tail,
               )
@@ -164,47 +142,47 @@ object ErrorAccumulator {
 
     }
 
-  implicit def errorAccumulatorTraverseNonEmptyList[E, W]: Traverse[NonEmptyList, Projection[E, W]#T] =
-    new Traverse[NonEmptyList, Projection[E, W]#T] {
+  implicit def errorAccumulatorTraverseNonEmptyList[E]: Traverse[NonEmptyList, Projection[E]#T] =
+    new Traverse[NonEmptyList, Projection[E]#T] {
 
-      override def traverse[T](t: NonEmptyList[ErrorAccumulator[E, W, T]]): ErrorAccumulator[E, W, NonEmptyList[T]] = {
+      override def traverse[T](t: NonEmptyList[ErrorAccumulator[E, T]]): ErrorAccumulator[E, NonEmptyList[T]] = {
         @tailrec
         def loop(
-            ea: ErrorAccumulator[E, W, NonEmptyList[T]],
-            queue: List[ErrorAccumulator[E, W, T]],
-        ): ErrorAccumulator[E, W, NonEmptyList[T]] =
+            ea: ErrorAccumulator[E, NonEmptyList[T]],
+            queue: List[ErrorAccumulator[E, T]],
+        ): ErrorAccumulator[E, NonEmptyList[T]] =
           // TODO (KR) : duplicated, add trait?
           queue match {
             case Nil =>
               ea match {
-                case Alive(r, warnings) =>
-                  Alive(r.reverse, warnings)
-                case d @ Dead(_, _) =>
+                case Alive(r) =>
+                  Alive(r.reverse)
+                case d @ Dead(_) =>
                   d
               }
             case h :: tail =>
               loop(
                 (ea, h) match {
-                  case (Alive(eaR, eaWs), Alive(hR, hWs)) =>
-                    Alive(hR :: eaR, eaWs ::: hWs)
-                  case (Dead(eaEs, eaWs), Dead(hEs, hWs)) =>
-                    Dead(eaEs ::: hEs, eaWs ::: hWs)
-                  case (Alive(_, eaWs), Dead(hEs, hWs)) =>
-                    Dead(hEs, eaWs ::: hWs)
-                  case (Dead(eaEs, eaWs), Alive(_, hWs)) =>
-                    Dead(eaEs, eaWs ::: hWs)
+                  case (Alive(eaR), Alive(hR)) =>
+                    Alive(hR :: eaR)
+                  case (Dead(eaEs), Dead(hEs)) =>
+                    Dead(eaEs ::: hEs)
+                  case (Alive(_), Dead(hEs)) =>
+                    Dead(hEs)
+                  case (Dead(eaEs), Alive(_)) =>
+                    Dead(eaEs)
                 },
                 tail,
               )
           }
 
         t.head match {
-          case Alive(r, warnings) =>
+          case Alive(r) =>
             loop(
-              Alive(NonEmptyList(r, Nil), warnings),
+              Alive(NonEmptyList(r, Nil)),
               t.tail,
             )
-          case d @ Dead(_, _) =>
+          case d @ Dead(_) =>
             loop(
               d,
               t.tail,

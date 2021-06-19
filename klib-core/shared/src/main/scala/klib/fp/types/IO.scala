@@ -5,19 +5,17 @@ import java.io.{File, PrintWriter, RandomAccessFile}
 import javax.imageio.ImageIO
 import scala.annotation.tailrec
 import scala.io.Source
-import scala.util.Try
+import scala.util.{Failure, Try}
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.utils.ado
 
-final class IO[+T] private (val unsafeValueF: () => T) {
+final class IO[+T](val execute: () => Try[T]) {
 
-  def wrap: ??[T] =
-    new WrappedErrorAccumulator(
-      IO(unsafeValueF().pure[?]),
-    )
+  def runSync: Throwable \/ T =
+    execute().to_\/
 
-  def bracket[T2](`try`: T => IO[T2])(`finally`: T => IO[Unit])(implicit ioMonad: Monad[IO]): IO[T2] =
+  def bracket[T2](`try`: T => IO[T2])(`finally`: T => IO[Unit]): IO[T2] =
     this
       .flatMap { self =>
         ado[IO]
@@ -28,16 +26,26 @@ final class IO[+T] private (val unsafeValueF: () => T) {
       }
       .map(_._1)
 
-}
+  def to_?? : ??[T] =
+    new ??(this.map(_.pure[?]))
 
+}
 object IO {
 
-  def apply[T](value: => T): IO[T] =
-    new IO(() => value)
+  // =====|  |=====
 
-  // TODO (KR) : I dont like this, but the alternative seems to be way more wonky and complex, especially for delayed evaluation
+  @inline
+  def apply[T](t: => T): IO[T] =
+    new IO(() => Try(t))
+
+  @inline
+  def wrapTry[T](`try`: => Try[T]): IO[T] =
+    new IO(() => `try`)
+
+  // =====|  |=====
+
   def error(throwable: Throwable): IO[Nothing] =
-    IO { throw throwable }
+    IO.wrapTry(Failure(throwable))
 
   def now: IO[Long] =
     System.currentTimeMillis.pure[IO]
@@ -60,53 +68,56 @@ object IO {
   def writeFile(path: File, contents: String): IO[Unit] =
     new PrintWriter(path).pure[IO].bracket(_.write(contents).pure[IO])(_.close.pure[IO])
 
-  // TODO (KR) : Maybe do this differently?
+  // =====|  |=====
+
   implicit val ioMonad: Monad[IO] =
     new Monad[IO] {
 
       override def map[A, B](t: IO[A], f: A => B): IO[B] =
-        IO(f(t.unsafeValueF()))
+        IO.wrapTry(t.execute().map(f))
 
-      override def apply[A, B](t: IO[A], f: IO[A => B]): IO[B] =
-        IO {
-          // f.unsafeValueF()(t.unsafeValueF()) causes `ado[IO].join` to produce effects in reverse order+
-          val evaledT = t.unsafeValueF()
-          val evaledF = f.unsafeValueF()
-          evaledF(evaledT)
+      override def apply[A, B](t: IO[A], f: IO[A => B]): IO[B] = {
+        IO.wrapTry {
+          val evaledT = t.execute()
+          val evaledF = f.execute()
+
+          for {
+            t <- evaledT
+            f <- evaledF
+          } yield f(t)
         }
+      }
 
       override def pure[A](a: => A): IO[A] =
         IO(a)
 
       override def flatten[A](t: IO[IO[A]]): IO[A] =
-        IO(t.unsafeValueF().unsafeValueF())
-
-    }
-
-  implicit val ioRunSync: RunSync[IO, Throwable] =
-    new RunSync[IO, Throwable] {
-
-      override def runSync[A](t: IO[A]): Throwable \/ A =
-        Try(t.unsafeValueF()).to_\/
+        IO.wrapTry(t.execute().flatMap(_.execute()))
 
     }
 
   implicit val ioTraverseList: Traverse[List, IO] =
     new Traverse[List, IO] {
 
-      override def traverse[T](t: List[IO[T]]): IO[List[T]] =
-        IO {
-          @tailrec
-          def loop(queue: List[IO[T]], stack: List[T]): List[T] =
-            queue match {
-              case head :: tail =>
-                loop(tail, head.unsafeValueF() :: stack)
-              case Nil =>
-                stack.reverse
-            }
+      override def traverse[T](t: List[IO[T]]): IO[List[T]] = {
+        @tailrec
+        def loop(queue: List[IO[T]], stack: Try[List[T]]): Try[List[T]] =
+          queue match {
+            case head :: tail =>
+              val tT = head.execute()
+              loop(
+                tail,
+                for {
+                  t <- tT
+                  s <- stack
+                } yield t :: s,
+              )
+            case Nil =>
+              stack.map(_.reverse)
+          }
 
-          loop(t, Nil)
-        }
+        IO.wrapTry(loop(t, Try(Nil)))
+      }
 
     }
 

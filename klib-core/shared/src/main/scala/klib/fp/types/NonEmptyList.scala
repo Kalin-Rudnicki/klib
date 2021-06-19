@@ -7,17 +7,20 @@ import klib.fp.typeclass.{Foreach, Monad}
 final case class NonEmptyList[+A](
     head: A,
     tail: List[A],
-) {
+) extends IterableOnce[A] {
 
   def size: Int =
     tail.size + 1
 
+  @inline
   def toList: List[A] =
     head :: tail
 
+  @inline
   def ::[A2 >: A](a: A2): NonEmptyList[A2] =
     NonEmptyList(a, head :: tail)
 
+  @inline
   def :::[A2 >: A](as: List[A2]): NonEmptyList[A2] =
     as match {
       case h :: t =>
@@ -26,6 +29,7 @@ final case class NonEmptyList[+A](
         this
     }
 
+  @inline
   def :::[A2 >: A](as: NonEmptyList[A2]): NonEmptyList[A2] =
     NonEmptyList(as.head, as.tail ::: head :: tail)
 
@@ -182,6 +186,9 @@ final case class NonEmptyList[+A](
       NonEmptyList((this.head, other.head), Nil),
     )
   }
+
+  override def iterator: Iterator[A] =
+    (head :: tail).iterator
 
   override def toString: String =
     s"NonEmptyList(${(head :: tail).mkString(", ")})"

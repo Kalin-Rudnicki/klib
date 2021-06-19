@@ -26,7 +26,7 @@ object TestExec extends Executable.ExecFromConf {
           L.break(false),
           L.log.info("..."),
         ),
-      ).wrap
+      ).to_??
     } yield ()
   }
 

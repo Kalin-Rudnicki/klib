@@ -4,7 +4,7 @@ import klib.fp.typeclass._
 
 import scala.annotation.tailrec
 
-sealed trait Maybe[+A] {
+sealed trait Maybe[+A] extends IterableOnce[A] {
 
   def getOrElse[A2 >: A](a: A2): A2 =
     this match {
@@ -61,7 +61,7 @@ sealed trait Maybe[+A] {
         orElse
     }
 
-  def toEA[E](errs: E*): ErrorAccumulator[E, Nothing, A] =
+  def toEA[E](errs: E*): ErrorAccumulator[E, A] =
     this match {
       case Some(a) =>
         Alive(a)
@@ -69,7 +69,7 @@ sealed trait Maybe[+A] {
         Dead(errs.toList)
     }
 
-  def <<?[E](errs: E*): ErrorAccumulator[E, Nothing, A] =
+  def <<?[E](errs: E*): ErrorAccumulator[E, A] =
     toEA(errs: _*)
 
   def isEmpty: Boolean =
@@ -88,9 +88,17 @@ sealed trait Maybe[+A] {
         false
     }
 
+  override def iterator: Iterator[A] =
+    this match {
+      case Some(a) =>
+        Iterator.single(a)
+      case None =>
+        Iterator.empty
+    }
+
 }
 
-final case class Some[+A](a: A) extends Maybe[A]
+final case class Some[+A](a: A) extends Maybe[A] {}
 case object None extends Maybe[Nothing]
 
 object Maybe {

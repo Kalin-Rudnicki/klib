@@ -1,36 +1,29 @@
 package klib.fp
 
 import scala.util.Try
-
 import klib.fp.typeclass.Implicits._
 import klib.fp.utils.ado
+import klib.utils.@@
 
 package object types {
 
   type \/[+A, +B] = Either[A, B]
 
-  type ?[+R] = ErrorAccumulator[Throwable, Throwable, R]
+  type ?[+R] = ErrorAccumulator[Throwable, R]
   object ? {
     def apply[R](r: => R): ?[R] = r.pure[?]
 
     def dead(throwables: Throwable*): ?[Nothing] =
       Dead(throwables.toList)
   }
-
-  type ??[+R] = WrappedErrorAccumulator[IO, Throwable, Throwable, R]
-  object ?? {
-    def apply[R](r: => R): ??[R] = r.pure[??]
-
-    def dead(throwables: Throwable*): ??[Nothing] =
-      ?.dead(throwables: _*).wrap[IO]
-  }
-
   final case class Message(message: String) extends Throwable(message) {
 
     override def toString: String =
       s"Message($message)"
 
   }
+
+  Message("").getCause
 
   final case class Compound(children: List[Throwable]) extends Throwable(children.map(_.getMessage).mkString("\n"))
 
@@ -57,7 +50,7 @@ package object types {
 
     implicit class EitherOps[A, B](a: scala.Either[A, B]) {
 
-      def toErrorAccumulator: ErrorAccumulator[A, Nothing, B] =
+      def toErrorAccumulator: ErrorAccumulator[A, B] =
         a match {
           case scala.Right(value) =>
             value.alive
@@ -105,21 +98,6 @@ package object types {
 
       def ?[A](ifTrue: => A): AwaitingIfFalse[A] =
         new AwaitingIfFalse(ifTrue)
-
-    }
-
-    implicit class `??Ops`[T](t: ??[T]) {
-
-      def bracket[T2](`try`: T => ??[T2])(`finally`: T => ??[Unit]): ??[T2] = {
-        t.flatMap { self =>
-            ado[??]
-              .join(
-                `try`(self),
-                `finally`(self),
-              )
-          }
-          .map(_._1)
-      }
 
     }
 

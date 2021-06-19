@@ -7,7 +7,6 @@ package object typeclass {
       with Applicative.Implicits
       with Monad.Implicits
       with Foreach.Implicits
-      with RunSync.Implicits
       with Traverse.Implicits
       with DecodeString.Implicits
   object Implicits extends Implicits
