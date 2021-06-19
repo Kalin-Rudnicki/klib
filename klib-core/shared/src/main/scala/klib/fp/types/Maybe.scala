@@ -186,4 +186,15 @@ object Maybe {
 
     }
 
+  implicit def applicativeTraverseMaybe[A[_]](implicit aApplicative: Applicative[A]): Traverse[Maybe, A] =
+    new Traverse[Maybe, A] {
+
+      override def traverse[T](t: Maybe[A[T]]): A[Maybe[T]] =
+        t match {
+          case Some(a) => aApplicative.map(a, (a: T) => Some(a))
+          case None    => aApplicative.pure(None)
+        }
+
+    }
+
 }

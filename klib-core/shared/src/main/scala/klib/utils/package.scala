@@ -9,6 +9,7 @@ package object utils {
 
     implicit class TaggedIdOps[T](t: T) {
       def wrap[W <: @@[T, _]]: W = t.asInstanceOf[W]
+      def _wrap[W <: @@[T, _]]: W = t.asInstanceOf[W]
     }
 
     implicit class TaggedOps[T](w: T @@ _) {
