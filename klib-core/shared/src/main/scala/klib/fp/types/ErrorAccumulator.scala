@@ -16,7 +16,7 @@ sealed trait ErrorAccumulator[+E, +R] {
 
 }
 
-final case class Alive[+W, +R](r: R) extends ErrorAccumulator[Nothing, R]
+final case class Alive[+R](r: R) extends ErrorAccumulator[Nothing, R]
 final case class Dead[+E](errors: List[E]) extends ErrorAccumulator[E, Nothing]
 
 object ErrorAccumulator {
