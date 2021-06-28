@@ -14,6 +14,7 @@ sealed trait InfiniteSet[T] {
   def disjunction(that: InfiniteSet[T]): InfiniteSet[T]
 
   def contains(t: T): Boolean
+  def exists(f: T => Boolean): Boolean
 
   // aliases
   @inline def ~ : InfiniteSet[T] = invert
@@ -126,6 +127,9 @@ object InfiniteSet {
     override def contains(t: T): Boolean =
       explicit.contains(t)
 
+    override def exists(f: T => Boolean): Boolean =
+      explicit.exists(f)
+
   }
 
   object Inclusive {
@@ -168,6 +172,9 @@ object InfiniteSet {
 
     override def contains(t: T): Boolean =
       !explicit.contains(t)
+
+    override def exists(f: T => Boolean): Boolean =
+      !explicit.exists(f)
 
   }
 
