@@ -14,7 +14,7 @@ object TestExec extends Executable.ExecFromConf {
 
   override def buildConf(args: Seq[String]): Conf = new Conf(args)
 
-  override def run(logger: Logger, conf: Conf): ??[Unit] = {
+  override def run(logger: Logger, conf: Conf): IO[Unit] = {
 
     for {
       _ <- logger(
@@ -26,7 +26,7 @@ object TestExec extends Executable.ExecFromConf {
           L.break(false),
           L.log.info("..."),
         ),
-      ).to_??
+      )
     } yield ()
   }
 

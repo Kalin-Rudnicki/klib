@@ -1,6 +1,6 @@
 package klib.utils
 
-import klib.Implicits._
+import klib.extensions._
 import klib.fp.typeclass._
 
 final class Pointer[T] private {

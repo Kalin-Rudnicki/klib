@@ -1,10 +1,12 @@
 package klib.fp.types
 
+import klib.extensions._
+import klib.instances._
 import klib.fp.typeclass._
 
 import scala.annotation.tailrec
 
-sealed trait Maybe[+A] extends IterableOnce[A] {
+sealed trait Maybe[+A] {
 
   def getOrElse[A2 >: A](a: A2): A2 =
     this match {
@@ -88,17 +90,9 @@ sealed trait Maybe[+A] extends IterableOnce[A] {
         false
     }
 
-  override def iterator: Iterator[A] =
-    this match {
-      case Some(a) =>
-        Iterator.single(a)
-      case None =>
-        Iterator.empty
-    }
-
 }
 
-final case class Some[+A](a: A) extends Maybe[A] {}
+final case class Some[+A](a: A) extends Maybe[A]
 case object None extends Maybe[Nothing]
 
 object Maybe {
@@ -109,100 +103,104 @@ object Maybe {
     else
       Some(a)
 
-  trait Implicits {
+  object extensions {
 
-    implicit class MaybeIdOps[A](a: A) {
+    extension [I](i: I) {
 
-      def some: Maybe[A] =
-        Some(a)
+      def some: Maybe[I] =
+        Some(i)
 
-      def ensure(f: A => Boolean): Maybe[A] =
-        if (f(a))
-          Some(a)
+      def ensure(f: I => Boolean): Maybe[I] =
+        if (f(i))
+          Some(i)
         else
           None
 
     }
 
   }
-  object Implicits extends Implicits
 
-  // Instances
+  object instances {
 
-  implicit val maybeMonad: Monad[Maybe] =
-    new Monad[Maybe] {
+    given maybeMonad: Monad[Maybe] with {
 
-      override def map[A, B](t: Maybe[A], f: A => B): Maybe[B] =
-        t match {
-          case Some(t) => Some(f(t))
-          case None    => None
-        }
+      extension [A](t: Maybe[A]) {
 
-      override def apply[A, B](t: Maybe[A], f: Maybe[A => B]): Maybe[B] =
-        t match {
-          case Some(t) =>
-            f match {
-              case Some(f) => Some(f(t))
-              case None    => None
-            }
-          case None => None
-        }
-
-      override def pure[A](a: => A): Maybe[A] =
-        Some(a)
-
-      override def flatten[A](t: Maybe[Maybe[A]]): Maybe[A] =
-        t match {
-          case Some(t) => t
-          case None    => None
-        }
-
-    }
-
-  implicit val maybeForEach: Foreach[Maybe] =
-    new Foreach[Maybe] {
-
-      override def foreach[A](t: Maybe[A], f: A => Unit): Unit =
-        t match {
-          case Some(a) =>
-            f(a)
-          case None =>
-        }
-
-    }
-
-  implicit val maybeTraverseList: Traverse[List, Maybe] =
-    new Traverse[List, Maybe] {
-
-      override def traverse[T](t: List[Maybe[T]]): Maybe[List[T]] = {
-        @tailrec
-        def loop(queue: List[Maybe[T]], stack: List[T]): Maybe[List[T]] =
-          queue match {
-            case head :: tail =>
-              head match {
-                case Some(h) =>
-                  loop(tail, h :: stack)
-                case None =>
-                  None
-              }
-            case Nil =>
-              Some(stack.reverse)
+        def map[B](f: A => B): Maybe[B] =
+          t match {
+            case Some(value) => Some(f(value))
+            case None        => None
           }
 
-        loop(t, Nil)
+        def apply[B](f: Maybe[A => B]): Maybe[B] =
+          t match {
+            case Some(t) =>
+              f match {
+                case Some(f) => Some(f(t))
+                case None    => None
+              }
+            case None => None
+          }
+
       }
+
+      def pure[I](i: => I): Maybe[I] =
+        Some(i)
+
+      extension [A](t: Maybe[Maybe[A]])
+        def flatten: Maybe[A] =
+          t match {
+            case Some(t2) => t2
+            case None     => None
+          }
 
     }
 
-  implicit def applicativeTraverseMaybe[A[_]](implicit aApplicative: Applicative[A]): Traverse[Maybe, A] =
-    new Traverse[Maybe, A] {
+    given maybeForeach: Foreach[Maybe] with {
 
-      override def traverse[T](t: Maybe[A[T]]): A[Maybe[T]] =
-        t match {
-          case Some(a) => aApplicative.map(a, (a: T) => Some(a))
-          case None    => aApplicative.pure(None)
+      extension [A](t: Maybe[A])
+        def foreach(f: A => Unit): Unit =
+          t match {
+            case Some(value) => f(value)
+            case None        =>
+          }
+
+    }
+
+    given maybeTraverseList: Traverse[List, Maybe] with {
+
+      extension [T](t: List[Maybe[T]])
+        def traverse: Maybe[List[T]] = {
+          @tailrec
+          def loop(queue: List[Maybe[T]], stack: List[T]): Maybe[List[T]] =
+            queue match {
+              case head :: tail =>
+                head match {
+                  case Some(h) =>
+                    loop(tail, h :: stack)
+                  case None =>
+                    None
+                }
+              case Nil =>
+                Some(stack.reverse)
+            }
+
+          loop(t, Nil)
         }
 
     }
+
+    given applicativeTraverseMaybe[A[_]: Applicative]: Traverse[Maybe, A] with {
+
+      extension [T](t: Maybe[A[T]])
+        def traverse: A[Maybe[T]] =
+          t match {
+            case Some(a) => a.map(Some(_))
+            case None    => None.pure
+          }
+
+    }
+
+  }
 
 }

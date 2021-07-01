@@ -1,6 +1,7 @@
 package klib.utils.clui
 
-import klib.Implicits._
+import klib.extensions._
+import klib.fp.types.IO.instances.ioMonad
 import klib.fp.types._
 
 import scala.annotation.tailrec

@@ -3,9 +3,9 @@ package klib.fp.utils
 
 // format: off
 import klib.fp.typeclass.Applicative
-import klib.fp.typeclass.Implicits._
 
 final class ado[T[_]: Applicative] {
+
   def join[
     T1,
     T2,

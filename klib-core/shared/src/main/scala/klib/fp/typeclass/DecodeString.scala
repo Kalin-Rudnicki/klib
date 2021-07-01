@@ -1,48 +1,40 @@
 package klib.fp.typeclass
 
-import klib.Implicits._
+import klib.extensions._
+import klib.fp.types.ErrorAccumulator.instances.errorAccumulatorMonad
 import klib.fp.types._
 
 trait DecodeString[+T] {
-  def decode(string: String): ?[T]
+
+  extension (string: String) def attemptDecode: ??[T]
+
 }
 
 object DecodeString {
 
-  trait Implicits {
-
-    implicit class DSStringOps(s: String) {
-
-      def attemptDecode[T: DecodeString]: ?[T] =
-        implicitly[DecodeString[T]].decode(s)
-
-    }
-
+  given stringDecodeString: DecodeString[String] with {
+    extension (string: String) def attemptDecode: ??[String] = string.pure[??]
   }
-  object Implicits extends Implicits
-
-  implicit val stringDecodeString: DecodeString[String] =
-    _.pure[?]
 
   private def makeDecoder[R](name: String, f: String => Option[R]): DecodeString[R] =
     s => f(s).toMaybe.toEA(Message(s"Malformatted $name '$s'"))
 
-  implicit val booleanDecodeString: DecodeString[Boolean] =
+  given booleanDecodeString: DecodeString[Boolean] =
     makeDecoder("boolean", _.toBooleanOption)
 
-  implicit val intDecodeString: DecodeString[Int] =
+  given intDecodeString: DecodeString[Int] =
     makeDecoder("int", _.toIntOption)
 
-  implicit val longDecodeString: DecodeString[Long] =
+  given longDecodeString: DecodeString[Long] =
     makeDecoder("long", _.toLongOption)
 
-  implicit val floatDecodeString: DecodeString[Float] =
+  given floatDecodeString: DecodeString[Float] =
     makeDecoder("float", _.toFloatOption)
 
-  implicit val doubleDecodeString: DecodeString[Double] =
+  given doubleDecodeString: DecodeString[Double] =
     makeDecoder("double", _.toDoubleOption)
 
-  implicit def decodeStringList[R: DecodeString]: DecodeString[List[R]] =
-    s => s.split(",").toList.map(implicitly[DecodeString[R]].decode).traverse
+  given decodeStringList[R: DecodeString]: DecodeString[List[R]] =
+    s => s.split(",").toList.map(_.attemptDecode[R]).traverse
 
 }

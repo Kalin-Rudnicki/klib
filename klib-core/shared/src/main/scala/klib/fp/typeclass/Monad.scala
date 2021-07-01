@@ -2,47 +2,31 @@ package klib.fp.typeclass
 
 trait Monad[T[_]] extends Applicative[T] {
 
-  def flatten[A](t: T[T[A]]): T[A]
-
-  def flatMap[A, B](t: T[A], f: A => T[B]): T[B] =
-    flatten(map(t, f))
-
-  def flatApply[A, B](t: T[A], f: T[A => T[B]]): T[B] =
-    flatten(apply(t, f))
+  extension[A](t: T[T[A]]) def flatten: T[A]
+  
+  extension[A](t: T[A]) {
+    
+    def flatMap[B](f: A => T[B]): T[B] =
+      t.map(f).flatten
+      
+    def flatApply[B](f: T[A => T[B]]): T[B] =
+      t.apply(f).flatten
+      
+  }
 
 }
 
 object Monad {
 
-  trait Implicits {
+  object instances {
+    import scala.concurrent._
+    import scala.util._
 
-    implicit class MonadOps[T[_]: Monad, A](t: T[A]) { // extends Applicative.Implicits.ApplicativeOps(t) {
+    given futureMonad(using ec: ExecutionContext): Monad[Future] with {
 
-      private val monad: Monad[T] = implicitly[Monad[T]]
+      extension[A](t: Future[A]) {
 
-      def flatMap[B](f: A => T[B]): T[B] =
-        monad.flatMap(t, f)
-
-    }
-
-    implicit class NestedMonadOps[T[_]: Monad, A](t: T[T[A]]) {
-
-      private val monad: Monad[T] = implicitly[Monad[T]]
-
-      def flatten: T[A] = monad.flatten(t)
-
-    }
-
-  }
-  object Implicits extends Implicits
-
-  trait Instances {
-    import scala.concurrent.{ExecutionContext, Future, Promise}
-    import scala.util.{Failure, Success}
-
-    implicit def futureMonad(implicit ec: ExecutionContext): Monad[Future] =
-      new Monad[Future] {
-        override def map[A, B](t: Future[A], f: A => B): Future[B] = {
+        def map[B](f: A => B): Future[B] = {
           val p: Promise[B] = Promise()
 
           t.onComplete {
@@ -55,7 +39,7 @@ object Monad {
           p.future
         }
 
-        override def apply[A, B](t: Future[A], f: Future[A => B]): Future[B] = {
+        def apply[B](f: Future[A => B]): Future[B] = {
           val p: Promise[B] = Promise()
 
           f.onComplete {
@@ -73,30 +57,30 @@ object Monad {
           p.future
         }
 
-        override def pure[A](a: => A): Future[A] =
-          Future(a)
-
-        override def flatten[A](t: Future[Future[A]]): Future[A] = {
-          val p: Promise[A] = Promise()
-
-          t.onComplete {
-            case Failure(exception) =>
-              p.failure(exception)
-            case Success(t2) =>
-              t2.onComplete {
-                case Failure(exception) =>
-                  p.failure(exception)
-                case Success(value) =>
-                  p.success(value)
-              }
-          }
-
-          p.future
-        }
-
       }
 
+      extension[I](i: => I) def pure: Future[I] = Future(i)
+
+      extension[A](t: Future[Future[A]]) def flatten: Future[A] = {
+        val p: Promise[A] = Promise()
+
+        t.onComplete {
+          case Failure(exception) =>
+            p.failure(exception)
+          case Success(t2) =>
+            t2.onComplete {
+              case Failure(exception) =>
+                p.failure(exception)
+              case Success(value) =>
+                p.success(value)
+            }
+        }
+
+        p.future
+      }
+
+    }
+
   }
-  object Instances extends Instances
 
 }

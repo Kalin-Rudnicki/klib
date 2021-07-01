@@ -1,16 +1,16 @@
 package klib.fp.types
 
-import klib.fp.typeclass.{Foreach, Monad}
+import klib.fp.typeclass._
 
 sealed trait Either[+A, +B] {
 
-  def toOption: Option[B] =
+  final def toOption: Option[B] =
     this match {
       case Right(b) => scala.Some(b)
       case _        => scala.None
     }
 
-  def toEA: ErrorAccumulator[A, B] =
+  final def toEA: ErrorAccumulator[A, B] =
     this match {
       case Right(b) =>
         Alive(b)
@@ -18,7 +18,7 @@ sealed trait Either[+A, +B] {
         Dead(a :: Nil)
     }
 
-  def toSEither: scala.Either[A, B] =
+  final def toSEither: scala.Either[A, B] =
     this match {
       case Right(b) =>
         scala.Right(b)
@@ -26,83 +26,86 @@ sealed trait Either[+A, +B] {
         scala.Left(a)
     }
 
-  def toMaybe: Maybe[B] =
+  final def toMaybe: Maybe[B] =
     this match {
       case Right(b) => Some(b)
       case _        => None
     }
 
 }
+type \/[+A, +B] = Either[A, B]
 
 final case class Right[+B](b: B) extends Either[Nothing, B]
 final case class Left[+A](a: A) extends Either[A, Nothing]
 
 object Either {
 
-  trait Implicits {
+  object extensions {
 
-    implicit class EitherIdOps[A](a: A) {
+    extension [I](i: I) {
 
-      def left: Either[A, Nothing] =
-        Left(a)
+      def left: Either[I, Nothing] =
+        Left(i)
 
-      def right: Either[Nothing, A] =
-        Right(a)
+      def right: Either[Nothing, I] =
+        Right(i)
 
     }
 
   }
-  object Implicits extends Implicits
 
-  // Instances
+  object instances {
 
-  type Projection[A] = { type T[B] = Either[A, B] }
+    given eitherMonad[L]: Monad[[R] =>> Either[L, R]] with {
 
-  implicit def eitherMonad[L]: Monad[Projection[L]#T] =
-    new Monad[Projection[L]#T] {
+      extension [R](t: Either[L, R]) {
 
-      override def map[A, B](t: Either[L, A], f: A => B): Either[L, B] =
-        t match {
-          case Right(b) =>
-            Right(f(b))
-          case l @ Left(_) =>
-            l
-        }
+        def map[B](f: R => B): Either[L, B] =
+          t match {
+            case Right(value) =>
+              Right(f(value))
+            case l @ Left(_) =>
+              l
+          }
 
-      override def apply[A, B](t: Either[L, A], f: Either[L, A => B]): Either[L, B] =
-        t match {
-          case Right(t) =>
-            f match {
-              case Right(f) =>
-                Right(f(t))
-              case l @ Left(_) =>
-                l
-            }
-          case l @ Left(_) =>
-            l
-        }
+        def apply[B](f: Either[L, R => B]): Either[L, B] =
+          t match {
+            case Right(t) =>
+              f match {
+                case Right(f) =>
+                  Right(f(t))
+                case l @ Left(_) =>
+                  l
+              }
+            case l @ Left(_) =>
+              l
+          }
 
-      override def pure[A](a: => A): Either[L, A] =
-        Right(a)
+      }
 
-      override def flatten[A](t: Either[L, Either[L, A]]): Either[L, A] =
-        t match {
-          case Right(t)    => t
-          case l @ Left(_) => l
-        }
+      def pure[I](i: => I): Either[L, I] =
+        Right(i)
+
+      extension [A](t: Either[L, Either[L, A]])
+        def flatten: Either[L, A] =
+          t match {
+            case Right(t)    => t
+            case l @ Left(_) => l
+          }
+
+    }
+
+    given eitherForeach[L]: Foreach[[R] =>> Either[L, R]] with {
+
+      extension [R](t: Either[L, R])
+        def foreach(f: R => Unit): Unit =
+          t match {
+            case Right(value) => f(value)
+            case Left(_)      =>
+          }
 
     }
 
-  implicit def eitherForEach[L]: Foreach[Projection[L]#T] =
-    new Foreach[Projection[L]#T] {
-
-      override def foreach[A](t: L \/ A, f: A => Unit): Unit =
-        t match {
-          case Right(b) =>
-            f(b)
-          case Left(_) =>
-        }
-
-    }
+  }
 
 }

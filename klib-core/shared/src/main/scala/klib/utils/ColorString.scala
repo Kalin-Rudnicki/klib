@@ -2,7 +2,8 @@ package klib.utils
 
 import scala.annotation.tailrec
 
-import klib.fp.Implicits._
+import klib.fp.extensions._
+import klib.fp.types.Maybe.instances.{given, _}
 import klib.fp.types._
 
 sealed trait ColorString {
@@ -112,14 +113,13 @@ sealed trait ColorString {
         str.split(splitStr).map(ColorString.Simple(color, _)).toList
       case ColorString.Complex(color, pairs, tail) =>
         List(
-          pairs.flatMap {
-            case (oStr, cStr) =>
-              List(
-                oStr.toList.flatMap {
-                  _.split(splitStr).map(ColorString.Simple(color, _))
-                },
-                cStr.split(splitStr),
-              ).flatten
+          pairs.flatMap { case (oStr, cStr) =>
+            List(
+              oStr.toList.flatMap {
+                _.split(splitStr).map(ColorString.Simple(color, _))
+              },
+              cStr.split(splitStr),
+            ).flatten
           },
           tail.toList.flatMap {
             _.split(splitStr).map(ColorString.Simple(color, _))
@@ -132,9 +132,8 @@ sealed trait ColorString {
       case ColorString.Simple(_, str) =>
         str.length
       case ColorString.Complex(_, pairs, tail) =>
-        pairs.map {
-          case (oStr, cStr) =>
-            oStr.cata(_.length, 0) + cStr.length
+        pairs.map { case (oStr, cStr) =>
+          oStr.cata(_.length, 0) + cStr.length
         }.sum + tail.cata(_.length, 0)
     }
 
@@ -148,10 +147,9 @@ sealed trait ColorString {
         case ColorString.Simple(_, str) =>
           stringBuilder.append(str)
         case ColorString.Complex(_, pairs, tail) =>
-          pairs.foreach {
-            case (str, cStr) =>
-              str.foreach(stringBuilder.append(_))
-              rec(cStr)
+          pairs.foreach { case (str, cStr) =>
+            str.foreach(stringBuilder.append(_))
+            rec(cStr)
           }
           tail.foreach(stringBuilder.append(_))
       }
@@ -190,17 +188,16 @@ sealed trait ColorString {
           )
         case ColorString.Complex(color, pairs, tail) =>
           val afterPairs =
-            pairs.foldLeft(colorState) {
-              case (ccs, (oStr, cStr)) =>
-                val afterOStr =
-                  oStr.map(append(ccs, color, _)).getOrElse(ccs)
-                val afterCStr =
-                  rec(
-                    cStr,
-                    afterOStr,
-                  )
+            pairs.foldLeft(colorState) { case (ccs, (oStr, cStr)) =>
+              val afterOStr =
+                oStr.map(append(ccs, color, _)).getOrElse(ccs)
+              val afterCStr =
+                rec(
+                  cStr,
+                  afterOStr,
+                )
 
-                afterCStr
+              afterCStr
             }
           val afterTail =
             tail.map(append(afterPairs, color, _)).getOrElse(afterPairs)
@@ -212,9 +209,8 @@ sealed trait ColorString {
       this,
       ColorString.ColorState.Default,
     )
-    ColorString.Color.Default.diffWithState(finalColorState).foreach {
-      case (ansi, _) =>
-        stringBuilder.append(ansi)
+    ColorString.Color.Default.diffWithState(finalColorState).foreach { case (ansi, _) =>
+      stringBuilder.append(ansi)
     }
     stringBuilder.toString
   }
@@ -315,22 +311,59 @@ object ColorString {
 
   }
 
-  trait Implicits {
+  object extensions {
 
-    implicit class ColorStringIdOps(obj: Any) {
+    extension (obj: Any) {
 
       def toColorString: ColorString =
         Simple(Color.Empty, obj.toString)
 
     }
 
-    implicit class ColorStringStringOps(str: String) {
+    extension (str: String) {
 
       def stripColor: String =
         str.replaceAll("\u001b\\[\\d+(;\\d+)*m", "")
 
       def replaceColor(regex: String, color: RawColor): String =
         str.replaceAll(regex, s"\u001b[${color.fgMod}m$$0\u001b[0m")
+
+    }
+
+    extension (csl: List[ColorString]) {
+
+      def csMkString: ColorString =
+        csMkString("")
+
+      def csMkString(joinStr: String, color: Color = Color.Empty): ColorString = {
+        val js = joinStr.nonEmpty ? joinStr.some | None
+
+        val pairs: List[(Maybe[String], ColorString)] = {
+          @tailrec
+          def loop(
+              queue: List[ColorString],
+              stack: List[(Maybe[String], ColorString)],
+          ): List[(Maybe[String], ColorString)] =
+            queue match {
+              case Nil =>
+                stack.reverse
+              case head :: tail =>
+                loop(
+                  tail,
+                  (js, head) :: stack,
+                )
+            }
+
+          csl match {
+            case Nil =>
+              Nil
+            case head :: tail =>
+              loop(tail, (None, head) :: Nil)
+          }
+        }
+
+        ColorString.Complex(color, pairs, None)
+      }
 
     }
 
@@ -370,44 +403,6 @@ object ColorString {
 
     }
 
-    implicit class ColorStringListOps(csl: List[ColorString]) {
-
-      def csMkString: ColorString =
-        csMkString("")
-
-      def csMkString(joinStr: String, color: Color = Color.Empty): ColorString = {
-        val js = joinStr.nonEmpty ? joinStr.some | None
-
-        val pairs: List[(Maybe[String], ColorString)] = {
-          @tailrec
-          def loop(
-              queue: List[ColorString],
-              stack: List[(Maybe[String], ColorString)],
-          ): List[(Maybe[String], ColorString)] =
-            queue match {
-              case Nil =>
-                stack.reverse
-              case head :: tail =>
-                loop(
-                  tail,
-                  (js, head) :: stack,
-                )
-            }
-
-          csl match {
-            case Nil =>
-              Nil
-            case head :: tail =>
-              loop(tail, (None, head) :: Nil)
-          }
-        }
-
-        ColorString.Complex(color, pairs, None)
-      }
-
-    }
-
   }
-  object Implicits extends Implicits
 
 }

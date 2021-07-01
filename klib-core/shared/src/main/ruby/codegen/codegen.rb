@@ -65,7 +65,6 @@ SCALA
 <<-SCALA
 // format: off
 import klib.fp.typeclass.Applicative
-import klib.fp.typeclass.Implicits._
 
 final class ado[T[_]: Applicative] {
 

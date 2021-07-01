@@ -2,12 +2,12 @@ package klib.fp.types
 
 import scala.annotation.tailrec
 
-import klib.fp.typeclass.{Foreach, Monad}
+import klib.fp.typeclass._
 
 final case class NonEmptyList[+A](
     head: A,
     tail: List[A],
-) extends IterableOnce[A] {
+) {
 
   def size: Int =
     tail.size + 1
@@ -187,9 +187,6 @@ final case class NonEmptyList[+A](
     )
   }
 
-  override def iterator: Iterator[A] =
-    (head :: tail).iterator
-
   override def toString: String =
     s"NonEmptyList(${(head :: tail).mkString(", ")})"
 
@@ -200,9 +197,9 @@ object NonEmptyList {
   def nel[A](head: A, tails: A*): NonEmptyList[A] =
     NonEmptyList(head, tails.toList)
 
-  trait Implicits {
+  object extensions {
 
-    implicit class NonEmptyListListOps[A](list: List[A]) {
+    extension [A](list: List[A]) {
 
       def toNel: Maybe[NonEmptyList[A]] =
         list match {
@@ -215,45 +212,43 @@ object NonEmptyList {
     }
 
   }
-  object Implicits extends Implicits
 
-  // Instances
+  object instances {
 
-  implicit val nonEmptyListMonad: Monad[NonEmptyList] =
-    new Monad[NonEmptyList] {
+    given nonEmptyListMonad: Monad[NonEmptyList] with {
 
-      override def map[A, B](t: NonEmptyList[A], f: A => B): NonEmptyList[B] =
-        NonEmptyList(f(t.head), t.tail.map(f))
+      extension [A](t: NonEmptyList[A]) {
 
-      override def apply[A, B](t: NonEmptyList[A], f: NonEmptyList[A => B]): NonEmptyList[B] =
-        flatten(
-          map[A => B, NonEmptyList[B]](
-            f,
-            f =>
-              map[A, B](
-                t,
-                t => f(t),
-              ),
-          ),
-        )
+        def map[B](f: A => B): NonEmptyList[B] =
+          NonEmptyList(f(t.head), t.tail.map(f))
 
-      override def pure[A](a: => A): NonEmptyList[A] =
-        NonEmptyList(a, Nil)
+        def apply[B](f: NonEmptyList[A => B]): NonEmptyList[B] =
+          f.map { f => t.map(f) }.flatten
 
-      override def flatten[A](t: NonEmptyList[NonEmptyList[A]]): NonEmptyList[A] =
-        NonEmptyList(
-          t.head.head,
-          t.head.tail ::: t.tail.flatMap(_.toList),
-        )
-
-    }
-
-  implicit val nonEmptyListForEach: Foreach[NonEmptyList] =
-    new Foreach[NonEmptyList] {
-      override def foreach[A](t: NonEmptyList[A], f: A => Unit): Unit = {
-        f(t.head)
-        t.tail.foreach(f)
       }
+
+      def pure[I](i: => I): NonEmptyList[I] =
+        NonEmptyList(i, Nil)
+
+      extension [A](t: NonEmptyList[NonEmptyList[A]])
+        def flatten: NonEmptyList[A] =
+          NonEmptyList(
+            t.head.head,
+            t.head.tail ::: t.tail.flatMap(_.toList),
+          )
+
     }
+
+    given nonEmptyListForeach: Foreach[NonEmptyList] with {
+
+      extension [A](t: NonEmptyList[A])
+        def foreach(f: A => Unit): Unit = {
+          f(t.head)
+          t.tail.foreach(f)
+        }
+
+    }
+
+  }
 
 }

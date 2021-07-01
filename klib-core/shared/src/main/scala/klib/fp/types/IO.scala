@@ -3,17 +3,62 @@ package klib.fp.types
 import java.awt.image.BufferedImage
 import java.io.{File, PrintWriter, RandomAccessFile}
 import javax.imageio.ImageIO
+
 import scala.annotation.tailrec
 import scala.io.Source
-import scala.util.{Failure, Try}
-import klib.Implicits._
+import scala.util.Try
+
+import klib.extensions._
 import klib.fp.typeclass._
+import klib.fp.types.IO.instances.{given, _}
 import klib.fp.utils.ado
+import klib.utils.Logger
+import klib.utils.Logger.{helpers => L}
 
-final class IO[+T](val execute: () => Try[T]) {
+final class IO[+T](val execute: () => ??[T]) {
 
-  def runSync: Throwable \/ T =
-    execute().to_\/
+  def runSync: ??[T] =
+    execute()
+
+  private def runSyncOr[E](logger: Maybe[Logger])(success: T => E)(or: => E): E =
+    this.runSync match {
+      case Alive(r) =>
+        success(r)
+      case Dead(runSyncErrors) =>
+        def logToConsoleError(errors: List[Throwable]): Unit = {
+          // TODO (KR) : Also log `cause`, if applicable
+          errors.foreach { error =>
+            Console.err.println(s"> ${error.getMessage}")
+            error.getStackTrace.foreach { ste =>
+              Console.err.println(s"    $ste")
+            }
+          }
+        }
+        def attemptLogToLogger(logger: Logger): Unit = {
+          logger(L(runSyncErrors.map(L.log.throwable(_)))).runSync match {
+            case Alive(_) =>
+            case Dead(loggerErrors) =>
+              logToConsoleError(runSyncErrors ::: loggerErrors)
+          }
+        }
+
+        logger match {
+          case Some(logger) =>
+            attemptLogToLogger(logger)
+          case None =>
+            logToConsoleError(runSyncErrors)
+        }
+        or
+    }
+
+  def runSyncOrDump(logger: Maybe[Logger]): Unit =
+    runSyncOr[Unit](logger) { _ => () } { () }
+
+  def runSyncOrThrow(logger: Maybe[Logger]): T =
+    runSyncOr[T](logger) { identity } { throw new RuntimeException("Unable to successfully run IO") }
+
+  def runSyncOrQuit(logger: Maybe[Logger]): T =
+    runSyncOr[T](logger) { identity } { System.exit(1).asInstanceOf[Nothing] }
 
   def bracket[T2](`try`: T => IO[T2])(`finally`: T => IO[Unit]): IO[T2] =
     this
@@ -26,9 +71,6 @@ final class IO[+T](val execute: () => Try[T]) {
       }
       .map(_._1)
 
-  def to_?? : ??[T] =
-    new ??(this.map(_.pure[?]))
-
 }
 object IO {
 
@@ -36,16 +78,20 @@ object IO {
 
   @inline
   def apply[T](t: => T): IO[T] =
-    new IO(() => Try(t))
+    wrapTry(Try(t))
 
   @inline
   def wrapTry[T](`try`: => Try[T]): IO[T] =
-    new IO(() => `try`)
+    wrapEffect(`try`.to_??)
+
+  @inline
+  def wrapEffect[T](effect: => ??[T]): IO[T] =
+    new IO(() => effect)
 
   // =====|  |=====
 
-  def error(throwable: Throwable): IO[Nothing] =
-    IO.wrapTry(Failure(throwable))
+  def error(error1: Throwable, errorN: Throwable*): IO[Nothing] =
+    IO.wrapEffect { Dead(error1 :: errorN.toList) }
 
   def now: IO[Long] =
     System.currentTimeMillis.pure[IO]
@@ -68,57 +114,44 @@ object IO {
   def writeFile(path: File, contents: String): IO[Unit] =
     new PrintWriter(path).pure[IO].bracket(_.write(contents).pure[IO])(_.close.pure[IO])
 
-  // =====|  |=====
+  object instances {
 
-  implicit val ioMonad: Monad[IO] =
-    new Monad[IO] {
+    given ioMonad: Monad[IO] with {
 
-      override def map[A, B](t: IO[A], f: A => B): IO[B] =
-        IO.wrapTry(t.execute().map(f))
+      extension [A](t: IO[A]) {
 
-      override def apply[A, B](t: IO[A], f: IO[A => B]): IO[B] = {
-        IO.wrapTry {
-          val evaledT = t.execute()
-          val evaledF = f.execute()
+        def map[B](f: A => B): IO[B] =
+          IO.wrapEffect { t.execute().map(f) }
 
-          for {
-            t <- evaledT
-            f <- evaledF
-          } yield f(t)
-        }
-      }
+        def apply[B](f: IO[A => B]): IO[B] = {
+          IO.wrapEffect {
+            val evaledT = t.execute()
+            val evaledF = f.execute()
 
-      override def pure[A](a: => A): IO[A] =
-        IO(a)
-
-      override def flatten[A](t: IO[IO[A]]): IO[A] =
-        IO.wrapTry(t.execute().flatMap(_.execute()))
-
-    }
-
-  implicit val ioTraverseList: Traverse[List, IO] =
-    new Traverse[List, IO] {
-
-      override def traverse[T](t: List[IO[T]]): IO[List[T]] = {
-        @tailrec
-        def loop(queue: List[IO[T]], stack: Try[List[T]]): Try[List[T]] =
-          queue match {
-            case head :: tail =>
-              val tT = head.execute()
-              loop(
-                tail,
-                for {
-                  t <- tT
-                  s <- stack
-                } yield t :: s,
-              )
-            case Nil =>
-              stack.map(_.reverse)
+            evaledT.apply(evaledF)
           }
+        }
 
-        IO.wrapTry(loop(t, Try(Nil)))
       }
 
+      def pure[I](i: => I): IO[I] =
+        IO(i)
+
+      // TODO (KR) : Can possibly be improved (?)
+      extension [A](t: IO[IO[A]])
+        def flatten: IO[A] =
+          IO.wrapEffect { t.execute().flatMap(_.execute()) }
+
     }
+
+    given ioTraverseList: Traverse[List, IO] with {
+
+      extension [A](t: List[IO[A]])
+        def traverse: IO[List[A]] =
+          IO.wrapEffect { t.map(_.runSync).traverse }
+
+    }
+
+  }
 
 }

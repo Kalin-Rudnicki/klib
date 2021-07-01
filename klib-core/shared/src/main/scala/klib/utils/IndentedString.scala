@@ -1,6 +1,7 @@
 package klib.utils
 
-import klib.Implicits._
+import klib.extensions._
+import klib.fp.types.Maybe.instances.maybeMonad
 import klib.fp.types._
 
 sealed trait IndentedString {
@@ -71,10 +72,11 @@ object IndentedString {
 
   }
 
-  implicit def convert[T: ToIndentedString](t: T): IndentedString =
-    implicitly[ToIndentedString[T]].convert(t)
+  given convert[T: ToIndentedString]: Conversion[T, IndentedString] with
+    def apply(t: T): IndentedString =
+      summon[ToIndentedString[T]].convert(t)
 
-  implicit val indentedStringToIndentedString: ToIndentedString[IndentedString] = identity
+  implicit val indentedStringToIndentedString: ToIndentedString[IndentedString] = identity(_)
 
   implicit val stringToIndentedString: ToIndentedString[String] = Str(_)
 

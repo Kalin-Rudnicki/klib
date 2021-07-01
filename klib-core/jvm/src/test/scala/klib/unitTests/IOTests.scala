@@ -61,40 +61,6 @@ class IOTests extends AnyFunSpec {
 
     }
 
-    describe("??") {
-
-      def make_??(lb: mutable.ListBuffer[Int], i: Int): ??[Unit] = {
-        lb.append(i)
-        ()
-      }.pure[??]
-
-      it("1") {
-        makeTest { lb =>
-          make_??(lb, 1)
-        }(_.runSync, 1)
-      }
-
-      it("2") {
-        makeTest { lb =>
-          ado[??].join(
-            make_??(lb, 1),
-            make_??(lb, 2),
-          )
-        }(_.runSync, 2)
-      }
-
-      it("3") {
-        makeTest { lb =>
-          ado[??].join(
-            make_??(lb, 1),
-            make_??(lb, 2),
-            make_??(lb, 3),
-          )
-        }(_.runSync, 3)
-      }
-
-    }
-
   }
 
 }

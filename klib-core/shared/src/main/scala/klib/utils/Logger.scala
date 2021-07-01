@@ -1,8 +1,7 @@
 package klib.utils
 
-import scala.language.implicitConversions
-
-import klib.Implicits._
+import klib.extensions._
+import klib.fp.types.IO.instances.ioMonad
 import klib.fp.types._
 import klib.utils.Logger.{helpers => L}
 
@@ -108,6 +107,7 @@ final class Logger private (
         case Logger.Event.Indented(event, by) =>
           handle(indent + idtStr * by.max(0), event)
         case Logger.Event.LogThrowable(messageLevel, stackTraceLevel, throwable) =>
+          // TODO (KR) : Also log `cause`, if applicable
           handle(
             indent,
             L(
@@ -399,10 +399,10 @@ object Logger {
 
   object helpers {
 
-    object Implicits {
+    object extensions {
 
-      implicit def listOfEventsToList(events: List[Event]): Event =
-        helpers(events)
+      given listOfEventsToList: Conversion[List[Event], Event] with
+        def apply(events: List[Event]): Event = helpers(events)
 
     }
 
@@ -448,8 +448,7 @@ object Logger {
       def apply(afterEscape: String, logLevel: Maybe[LogLevel] = None): Event =
         raw(s"$AnsiEscapeString$afterEscape", logLevel)
 
-      /**
-        * NOTE : (row, column) is 1-based, so (1,1) is the top-left
+      /** NOTE : (row, column) is 1-based, so (1,1) is the top-left
         */
       def cursorPos(row: Int, column: Int, logLevel: Maybe[LogLevel] = None): Event =
         ansi(s"$row;${column}H", logLevel)
