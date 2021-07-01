@@ -108,6 +108,7 @@ final class Logger private (
         case Logger.Event.Indented(event, by) =>
           handle(indent + idtStr * by.max(0), event)
         case Logger.Event.LogThrowable(messageLevel, stackTraceLevel, throwable) =>
+          // TODO (KR) : Do something with `cause`
           handle(
             indent,
             L(

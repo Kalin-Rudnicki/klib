@@ -66,7 +66,7 @@ trait Executable {
     )
   }
 
-  def execute(logger: Logger, args: List[String]): ??[Unit]
+  def execute(logger: Logger, args: List[String]): IO[Unit]
 
 }
 
@@ -78,8 +78,8 @@ object Executable {
     val commandMap: Map[String, Executable] = subCommands.toMap
     val opts: List[String] = commandMap.toList.map(_._1).sorted
 
-    def makeError(message: String): ??[Nothing] =
-      ??.dead(Message(s"$message. Options: ${opts.mkString(", ")}"))
+    def makeError(message: String): IO[Nothing] =
+      IO.error(Message(s"$message. Options: ${opts.mkString(", ")}"))
 
     { (logger, args) =>
       args match {
@@ -102,9 +102,9 @@ object Executable {
 
     def buildConf(args: Seq[String]): Conf
 
-    def run(logger: Logger, conf: Conf): ??[Unit]
+    def run(logger: Logger, conf: Conf): IO[Unit]
 
-    override def execute(logger: Logger, args: List[String]): ??[Unit] =
+    override def execute(logger: Logger, args: List[String]): IO[Unit] =
       run(logger, buildConf(args))
 
   }

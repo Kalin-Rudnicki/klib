@@ -38,8 +38,8 @@ object ErrorAccumulator {
 
     implicit class `?Ops`[T](t: ?[T]) {
 
-      def to_?? : ??[T] =
-        new ??(IO(t))
+      def toIO: IO[T] =
+        IO.wrapEffect { t }
 
     }
 

@@ -5,15 +5,57 @@ import java.io.{File, PrintWriter, RandomAccessFile}
 import javax.imageio.ImageIO
 import scala.annotation.tailrec
 import scala.io.Source
-import scala.util.{Failure, Try}
+import scala.util.Try
+
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.utils.ado
+import klib.utils.Logger
+import klib.utils.Logger.{helpers => L}
 
-final class IO[+T](val execute: () => Try[T]) {
+final class IO[+T](val execute: () => ?[T]) {
 
-  def runSync: Throwable \/ T =
-    execute().to_\/
+  def runSync: ?[T] =
+    execute()
+
+  private def runSyncOr[R](logger: Maybe[Logger])(onSuccess: T => R)(onFail: => R): R =
+    runSync match {
+      case Alive(r) =>
+        onSuccess(r)
+      case Dead(runSyncErrors) =>
+        // TODO (KR) : Do something with `cause`
+        def writeToConsoleErr(errors: List[Throwable]): Unit =
+          errors.foreach { error =>
+            Console.err.println(s"> ${error.getMessage}")
+            error.getStackTrace.foreach { ste =>
+              Console.err.println(s"    $ste")
+            }
+          }
+
+        def attemptWriteToLogger(logger: Logger): Unit =
+          logger(L(runSyncErrors.map(L.log.throwable(_)))).runSync match {
+            case Alive(_) =>
+            case Dead(logErrors) =>
+              writeToConsoleErr(runSyncErrors ::: logErrors)
+          }
+
+        logger match {
+          case Some(logger) =>
+            attemptWriteToLogger(logger)
+          case None =>
+            writeToConsoleErr(runSyncErrors)
+        }
+        onFail
+    }
+
+  def runSyncOrDump(logger: Maybe[Logger]): Unit =
+    runSyncOr[Unit](logger) { _ => () } { () }
+
+  def runSyncOrThrow(logger: Maybe[Logger]): T =
+    runSyncOr[T](logger) { identity } { throw new RuntimeException("runSync did not succeed") }
+
+  def runSyncOrExit(logger: Maybe[Logger]): T =
+    runSyncOr[T](logger) { identity } { System.exit(1).asInstanceOf[Nothing] }
 
   def bracket[T2](`try`: T => IO[T2])(`finally`: T => IO[Unit]): IO[T2] =
     this
@@ -26,9 +68,6 @@ final class IO[+T](val execute: () => Try[T]) {
       }
       .map(_._1)
 
-  def to_?? : ??[T] =
-    new ??(this.map(_.pure[?]))
-
 }
 object IO {
 
@@ -36,16 +75,20 @@ object IO {
 
   @inline
   def apply[T](t: => T): IO[T] =
-    new IO(() => Try(t))
+    wrapTry { Try(t) }
 
   @inline
   def wrapTry[T](`try`: => Try[T]): IO[T] =
-    new IO(() => `try`)
+    wrapEffect { `try`.to_? }
+
+  @inline
+  def wrapEffect[T](effect: => ?[T]): IO[T] =
+    new IO(() => effect)
 
   // =====|  |=====
 
-  def error(throwable: Throwable): IO[Nothing] =
-    IO.wrapTry(Failure(throwable))
+  def error(error0: Throwable, errorN: Throwable*): IO[Nothing] =
+    IO.wrapEffect { Dead(error0 :: errorN.toList) }
 
   def now: IO[Long] =
     System.currentTimeMillis.pure[IO]
@@ -74,17 +117,14 @@ object IO {
     new Monad[IO] {
 
       override def map[A, B](t: IO[A], f: A => B): IO[B] =
-        IO.wrapTry(t.execute().map(f))
+        IO.wrapEffect { t.execute().map(f) }
 
       override def apply[A, B](t: IO[A], f: IO[A => B]): IO[B] = {
-        IO.wrapTry {
+        IO.wrapEffect {
           val evaledT = t.execute()
           val evaledF = f.execute()
 
-          for {
-            t <- evaledT
-            f <- evaledF
-          } yield f(t)
+          evaledT.apply(evaledF)
         }
       }
 
@@ -92,32 +132,15 @@ object IO {
         IO(a)
 
       override def flatten[A](t: IO[IO[A]]): IO[A] =
-        IO.wrapTry(t.execute().flatMap(_.execute()))
+        IO.wrapEffect { t.execute().flatMap(_.execute()) }
 
     }
 
   implicit val ioTraverseList: Traverse[List, IO] =
     new Traverse[List, IO] {
 
-      override def traverse[T](t: List[IO[T]]): IO[List[T]] = {
-        @tailrec
-        def loop(queue: List[IO[T]], stack: Try[List[T]]): Try[List[T]] =
-          queue match {
-            case head :: tail =>
-              val tT = head.execute()
-              loop(
-                tail,
-                for {
-                  t <- tT
-                  s <- stack
-                } yield t :: s,
-              )
-            case Nil =>
-              stack.map(_.reverse)
-          }
-
-        IO.wrapTry(loop(t, Try(Nil)))
-      }
+      override def traverse[T](t: List[IO[T]]): IO[List[T]] =
+        IO.wrapEffect { t.map(_.runSync).traverse }
 
     }
 
