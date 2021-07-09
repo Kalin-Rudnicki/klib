@@ -8,7 +8,7 @@ import klib.Implicits._
 import klib.fp.types._
 import klib.utils.Logger.{helpers => L}, L.Implicits._
 
-trait Executable {
+final case class Executable(execute: (Logger, List[String]) => IO[Unit]) {
 
   def apply(args: Array[String]): IO[Unit] = {
     @tailrec
@@ -52,24 +52,29 @@ trait Executable {
 
     val (loggerArgs, programArgs) = split_--(args.toList, Nil)
 
-    val logger = new Executable.LoggerConf(loggerArgs).logger
-    logger(
-      execute(logger, programArgs).runSync match {
-        case Alive(r) =>
-          resEvent(r.some)
-        case Dead(errors) =>
-          L(
-            throwablesEvent("Error", Logger.LogLevel.Fatal, errors),
-            resEvent(None),
+    Executable.LoggerConf(loggerArgs) match {
+      case Right(loggerConf) =>
+        val logger = loggerConf.logger
+        for {
+          res <- execute(logger, programArgs).runSync.pure[IO]
+          _ <- logger(
+            res match {
+              case Alive(r) =>
+                resEvent(r.some)
+              case Dead(errors) =>
+                L(
+                  throwablesEvent("Error", Logger.LogLevel.Fatal, errors),
+                  resEvent(None),
+                )
+            },
           )
-      },
-    )
+        } yield ()
+      case Left(logEvent) =>
+        Logger(Logger.LogLevel.Info)(logEvent)
+    }
   }
 
-  def execute(logger: Logger, args: List[String]): IO[Unit]
-
 }
-
 object Executable {
 
   // =====| Helpers |=====
@@ -81,7 +86,7 @@ object Executable {
     def makeError(message: String): IO[Nothing] =
       IO.error(Message(s"$message. Options: ${opts.mkString(", ")}"))
 
-    { (logger, args) =>
+    Executable { (logger, args) =>
       args match {
         case cmd :: args =>
           commandMap.get(cmd).toMaybe match {
@@ -96,18 +101,54 @@ object Executable {
     }
   }
 
-  trait ExecFromConf extends Executable {
+  final case class LogEventError(logEvent: Logger.Event) extends RuntimeException
 
-    type Conf
+  abstract class Conf(args: Seq[String]) extends ScallopConf(args) {
 
-    def buildConf(args: Seq[String]): Conf
+    def helpString: String =
+      List(
+        this.builder.vers.toMaybe,
+        this.builder.bann.toMaybe,
+        this.builder.help.some,
+        this.builder.foot.toMaybe,
+      ).flatten.mkString("\n")
 
-    def run(logger: Logger, conf: Conf): IO[Unit]
-
-    override def execute(logger: Logger, args: List[String]): IO[Unit] =
-      run(logger, buildConf(args))
+    override def onError(e: Throwable): Unit = {
+      import org.rogach.scallop.exceptions._
+      e match {
+        case Help(_) => throw LogEventError(L.log.info(this.helpString))
+        case Version => throw LogEventError(L.log.info(this.builder.vers.toMaybe.cata(identity, "No version")))
+        case e       => throw LogEventError(L.log.throwable(e))
+      }
+    }
 
   }
+  abstract class ConfBuilder[C <: Conf](build: Seq[String] => C) {
+    def apply(args: Seq[String]): Logger.Event \/ C = {
+      import scala.util._
+      Try {
+        build(args)
+      } match {
+        case Success(conf) =>
+          conf.right
+        case Failure(exception) =>
+          exception match {
+            case LogEventError(logEvent) => logEvent.left
+            case _                       => L.log.throwable(exception).left
+          }
+      }
+    }
+  }
+
+  def fromConf[C <: Conf](builder: ConfBuilder[C])(run: (Logger, C) => IO[Unit]): Executable =
+    Executable { (logger, args) =>
+      builder(args) match {
+        case Right(conf) =>
+          run(logger, conf)
+        case Left(logEvent) =>
+          logger(logEvent)
+      }
+    }
 
   // =====| Logger |=====
 
@@ -141,9 +182,12 @@ object Executable {
 
     }
 
-  final class LoggerConf(args: Seq[String]) extends ScallopConf(args) {
-    banner("[Note] Commands are expected in format of: [LOGGER_OPTS...] '--' [PROGRAM_OPTS...]")
-    banner("       If no '--' is provided, all args are considered to be [PROGRAM_OPTS...]")
+  final class LoggerConf(args: Seq[String]) extends Conf(args) {
+    banner {
+      """[Note] Commands are expected in format of: [LOGGER_OPTS...] '--' [PROGRAM_OPTS...]
+        |       If no '--' is provided, all args are considered to be [PROGRAM_OPTS...]
+        |""".stripMargin
+    }
 
     val logTolerance: ScallopOption[Logger.LogLevel with Logger.LogLevel.Tolerance] =
       opt[Logger.LogLevel with Logger.LogLevel.Tolerance](default = Logger.LogLevel.Info.someOpt)
@@ -162,5 +206,6 @@ object Executable {
       )
 
   }
+  object LoggerConf extends ConfBuilder(new LoggerConf(_))
 
 }

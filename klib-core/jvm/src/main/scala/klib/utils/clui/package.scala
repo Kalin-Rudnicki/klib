@@ -12,7 +12,7 @@ package object clui {
   )(
       handle: (Logger, State.Input[V], List[String]) => IO[State.Output[V]],
   ): Executable =
-    (logger, _) => { // TODO (KR) : Do something with args as well?
+    Executable { (logger, _) => // TODO (KR) : Do something with args as well?
       def loop(s: State.Input[V]): IO[Unit] = {
         for {
           args <- reader.read

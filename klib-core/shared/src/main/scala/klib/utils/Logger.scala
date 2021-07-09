@@ -92,8 +92,15 @@ final class Logger private (
         indent: String,
         event: Logger.Event,
     ): Unit = {
-      def buildString(logLevel: Logger.LogLevel, message: Any): String =
-        s"${logLevel.tag}:$indent${message.toString.replaceAll("\n", s"${Logger.LogLevel.DisplayNameNewLine}:$indent")}"
+      def buildString(logLevel: Logger.LogLevel, message: Any): String = {
+        val messageString =
+          Maybe(message)
+            .cata(
+              _.toString.replaceAll("\n", s"${Logger.LogLevel.DisplayNameNewLine}:$indent"),
+              "null",
+            )
+        s"${logLevel.tag}:$indent$messageString"
+      }
 
       event match {
         case Logger.Event.Compound(events) =>
