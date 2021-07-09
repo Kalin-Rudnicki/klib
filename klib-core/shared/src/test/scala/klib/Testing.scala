@@ -6,16 +6,18 @@ import klib.utils._
 
 object Testing extends App {
 
-  sealed trait Type1T
-  type Type1 = Int @@ Type1T
+  val color = ColorString.Color(None, Color.Named.Black.some)
 
-  sealed trait Type2T
-  type Type2 = Int @@ Type2T
-
-  val int: Int = 5
-
-  val type1_1: Type1 = int.wrap
-  val type1_2: Type1 = int.wrap[Type1]
-
+  print("123")
+  color.toColorState.colorizeAndDeColorize(ColorString.ColorState.Default) match {
+    case Some((colorize, deColorize)) =>
+      print(colorize)
+      print("456")
+      print(deColorize)
+    case None =>
+      print("456")
+  }
+  print("789")
+  println
 
 }
