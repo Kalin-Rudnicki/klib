@@ -272,7 +272,7 @@ object ColorString {
     val Default: Color = Color(fg = RawColor.Default.some, bg = RawColor.Default.some)
   }
 
-  private[ColorString] final case class ColorState(
+  final case class ColorState(
       fg: RawColor,
       bg: RawColor,
   ) {
@@ -280,7 +280,7 @@ object ColorString {
     def toColor: Color = Color(fg = fg.some, bg = bg.some)
 
   }
-  private[ColorString] object ColorState {
+  object ColorState {
     val Default: ColorState = ColorState(RawColor.Default, RawColor.Default)
   }
 
