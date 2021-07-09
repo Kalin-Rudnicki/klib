@@ -20,6 +20,14 @@ object TestExec {
     Executable.fromConf(Conf) { (logger, conf) =>
       for {
         _ <- logger(L.log.info("Testing!"))
+        myVar = Var.`null`[String]
+        _ <- logger(L.log.info(myVar))
+        assign1 = myVar.value = "Assign1"
+        _ <- logger(L.log.info(myVar))
+        _ <- assign1
+        _ <- logger(L.log.info(myVar))
+        _ <- myVar.value = "Assign2"
+        _ <- logger(L.log.info(myVar))
       } yield ()
     }
 
