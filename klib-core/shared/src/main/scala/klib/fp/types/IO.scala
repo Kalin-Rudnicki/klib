@@ -57,7 +57,7 @@ final class IO[+T](val execute: () => ??[T]) {
   def runSyncOrThrow(logger: Maybe[Logger]): T =
     runSyncOr[T](logger) { identity } { throw new RuntimeException("Unable to successfully run IO") }
 
-  def runSyncOrQuit(logger: Maybe[Logger]): T =
+  def runSyncOrExit(logger: Maybe[Logger]): T =
     runSyncOr[T](logger) { identity } { System.exit(1).asInstanceOf[Nothing] }
 
   def bracket[T2](`try`: T => IO[T2])(`finally`: T => IO[Unit]): IO[T2] =
@@ -70,6 +70,14 @@ final class IO[+T](val execute: () => ??[T]) {
           )
       }
       .map(_._1)
+
+  def timed(withTime: Long => IO[Unit]): IO[T] =
+    for {
+      start <- IO.now
+      res <- this
+      end <- IO.now
+      _ <- withTime(end - start)
+    } yield res
 
 }
 object IO {
@@ -90,8 +98,8 @@ object IO {
 
   // =====|  |=====
 
-  def error(error1: Throwable, errorN: Throwable*): IO[Nothing] =
-    IO.wrapEffect { Dead(error1 :: errorN.toList) }
+  def error(error0: Throwable, errorN: Throwable*): IO[Nothing] =
+    IO.wrapEffect { Dead(error0 :: errorN.toList) }
 
   def now: IO[Long] =
     System.currentTimeMillis.pure[IO]

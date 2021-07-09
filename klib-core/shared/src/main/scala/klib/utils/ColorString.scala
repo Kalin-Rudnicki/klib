@@ -262,21 +262,49 @@ object ColorString {
           None
       }
 
+    def toColorState: ColorState =
+      ColorState(
+        fg.getOrElse(RawColor.Default),
+        bg.getOrElse(RawColor.Default),
+      )
+
   }
   object Color {
     val Empty: Color = Color(fg = None, bg = None)
     val Default: Color = Color(fg = RawColor.Default.some, bg = RawColor.Default.some)
   }
 
-  private[ColorString] final case class ColorState(
+  final case class ColorState(
       fg: RawColor,
       bg: RawColor,
   ) {
 
     def toColor: Color = Color(fg = fg.some, bg = bg.some)
 
+    def colorizeAndDeColorize(surroundings: ColorState): Maybe[(String, String)] = {
+      (this.fg != surroundings.fg, this.bg != surroundings.bg) match {
+        case (true, true) =>
+          (
+            ansiEscape(NonEmptyList.nel(this.fg.fgMod, this.bg.bgMod)),
+            ansiEscape(NonEmptyList.nel(surroundings.fg.fgMod, surroundings.bg.bgMod)),
+          ).some
+        case (true, false) =>
+          (
+            ansiEscape(NonEmptyList.nel(this.fg.fgMod)),
+            ansiEscape(NonEmptyList.nel(surroundings.fg.fgMod)),
+          ).some
+        case (false, true) =>
+          (
+            ansiEscape(NonEmptyList.nel(this.bg.bgMod)),
+            ansiEscape(NonEmptyList.nel(surroundings.bg.bgMod)),
+          ).some
+        case (false, false) =>
+          None
+      }
+    }
+
   }
-  private[ColorString] object ColorState {
+  object ColorState {
     val Default: ColorState = ColorState(RawColor.Default, RawColor.Default)
   }
 
