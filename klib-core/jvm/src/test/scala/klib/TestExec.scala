@@ -2,11 +2,8 @@ package klib
 
 import org.rogach.scallop._
 
-import klib.extensions.{given, _}
-import klib.instances.{given, _}
-import klib.fp.types._
-import klib.utils._
-import klib.utils.Logger.{helpers => L}
+import klib.predefs.common.{given, _}
+import klib.predefs.jvm.{given, _}
 
 object TestExec {
 
