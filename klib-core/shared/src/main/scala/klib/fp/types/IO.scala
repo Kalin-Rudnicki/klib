@@ -68,6 +68,14 @@ final class IO[+T](val execute: () => ?[T]) {
       }
       .map(_._1)
 
+  def timed(withTime: Long => IO[Unit]): IO[T] =
+    for {
+      start <- IO.now
+      res <- this
+      end <- IO.now
+      _ <- withTime(end - start)
+    } yield res
+
 }
 object IO {
 
