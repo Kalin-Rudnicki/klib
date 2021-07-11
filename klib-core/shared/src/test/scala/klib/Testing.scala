@@ -14,7 +14,10 @@ object Testing extends App {
 
   val int: Int = 5
 
-  val type1_1: Type1 = int.wrap
+  val type1_1: Type1 = int.wrap[Type1]
   val type1_2: Type1 = int.wrap[Type1]
+
+  println(type1_1)
+  println(type1_2)
 
 }

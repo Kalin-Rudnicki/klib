@@ -7,6 +7,7 @@ object Tagged {
 
   object extensions {
 
+    // TODO (KR) : It would be nice to have [W <: T @@ _], but that doesnt seem to work anymore...
     extension [T](t: T) {
       inline def wrap[W]: W = t.asInstanceOf[W]
       inline def _wrap[W]: W = t.asInstanceOf[W]
