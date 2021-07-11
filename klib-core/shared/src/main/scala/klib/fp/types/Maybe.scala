@@ -1,7 +1,7 @@
 package klib.fp.types
 
-import klib.extensions._
-import klib.instances._
+import klib.fp.extensions.{given, _}
+import klib.instances.{given, _}
 import klib.fp.typeclass._
 
 import scala.annotation.tailrec

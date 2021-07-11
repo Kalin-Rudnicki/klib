@@ -1,6 +1,6 @@
 package klib.fp.typeclass
 
-import klib.extensions._
+import klib.extensions.{given, _}
 import klib.fp.types.ErrorAccumulator.instances.errorAccumulatorMonad
 import klib.fp.types._
 

@@ -1,6 +1,6 @@
 package klib.utils
 
-import klib.extensions._
+import klib.extensions.{given, _}
 import klib.fp.types.IO.instances.ioMonad
 import klib.fp.types._
 import klib.utils.Logger.{helpers => L}

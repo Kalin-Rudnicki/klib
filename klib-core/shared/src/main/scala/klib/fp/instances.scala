@@ -1,6 +1,6 @@
 package klib.fp
 
 object instances {
-  import typeclass.instances._
-  import types.instances._
+  export typeclass.instances.{given, _}
+  export types.instances.{given, _}
 }

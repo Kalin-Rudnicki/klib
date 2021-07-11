@@ -2,7 +2,7 @@ package klib.utils
 
 import scala.annotation.tailrec
 
-import klib.fp.extensions._
+import klib.fp.extensions.{given, _}
 import klib.fp.types.Maybe.instances.{given, _}
 import klib.fp.types._
 

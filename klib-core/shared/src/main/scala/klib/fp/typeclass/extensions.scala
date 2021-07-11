@@ -1,6 +1,6 @@
 package klib.fp.typeclass
 
 object extensions {
-  export Applicative.extensions._
-  export Traverse.extensions._
+  export Applicative.extensions.{given, _}
+  export Traverse.extensions.{given, _}
 }

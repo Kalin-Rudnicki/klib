@@ -3,10 +3,10 @@ package klib.fp.types
 import scala.util.Try
 
 object extensions {
-  export Maybe.extensions._
-  export Either.extensions._
-  export ErrorAccumulator.extensions._
-  export NonEmptyList.extensions._
+  export Maybe.extensions.{given, _}
+  export Either.extensions.{given, _}
+  export ErrorAccumulator.extensions.{given, _}
+  export NonEmptyList.extensions.{given, _}
 
   extension [I](i: I) {
 

@@ -1,6 +1,6 @@
 package klib.fp
 
 object extensions {
-  export typeclass.extensions._
-  export types.extensions._
+  export typeclass.extensions.{given, _}
+  export types.extensions.{given, _}
 }

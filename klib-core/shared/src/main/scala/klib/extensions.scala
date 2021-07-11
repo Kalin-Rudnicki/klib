@@ -3,8 +3,8 @@ package klib
 import klib.fp.types._
 
 object extensions {
-  export fp.extensions._
-  export utils.extensions._
+  export fp.extensions.{given, _}
+  export utils.extensions.{given, _}
 
   extension (char: Char) {
 

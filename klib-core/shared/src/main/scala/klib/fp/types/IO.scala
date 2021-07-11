@@ -8,7 +8,7 @@ import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.Try
 
-import klib.extensions._
+import klib.extensions.{given, _}
 import klib.fp.typeclass._
 import klib.fp.types.IO.instances.{given, _}
 import klib.fp.utils.ado

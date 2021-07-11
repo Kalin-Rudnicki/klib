@@ -5,7 +5,7 @@ import scala.language.implicitConversions
 
 import org.rogach.scallop._
 
-import klib.extensions._
+import klib.extensions.{given, _}
 import klib.utils.Logger.helpers.extensions.listOfEventsToList
 import klib.fp.types._
 import klib.utils.Logger.{helpers => L}
