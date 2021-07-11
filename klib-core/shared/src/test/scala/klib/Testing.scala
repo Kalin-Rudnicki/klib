@@ -1,6 +1,6 @@
 package klib
 
-import klib.Implicits._
+import klib.extensions.{given, _}
 import klib.fp.types._
 import klib.utils._
 
@@ -16,6 +16,5 @@ object Testing extends App {
 
   val type1_1: Type1 = int.wrap
   val type1_2: Type1 = int.wrap[Type1]
-
 
 }

@@ -8,13 +8,13 @@ object Tagged {
   object extensions {
 
     extension [T](t: T) {
-      def wrap[W <: @@[T, _]]: W = t.asInstanceOf[W]
-      def _wrap[W <: @@[T, _]]: W = t.asInstanceOf[W]
+      inline def wrap[W]: W = t.asInstanceOf[W]
+      inline def _wrap[W]: W = t.asInstanceOf[W]
     }
 
-    extension [T](w: T @@ _) {
+    extension [T, U](w: T @@ U) {
 
-      def unwrap: T = w
+      inline def unwrap: T = w.asInstanceOf[T]
 
     }
 

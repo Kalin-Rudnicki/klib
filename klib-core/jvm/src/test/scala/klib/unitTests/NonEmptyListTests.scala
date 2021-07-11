@@ -4,7 +4,8 @@ import scala.annotation.tailrec
 
 import org.scalatest.funspec.AnyFunSpec
 
-import klib.Implicits._
+import klib.extensions.{given, _}
+import klib.instances.{given, _}
 import klib.fp.types._
 
 class NonEmptyListTests extends AnyFunSpec {

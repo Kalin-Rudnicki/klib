@@ -10,7 +10,7 @@ import scala.util.Try
 
 import klib.extensions.{given, _}
 import klib.fp.typeclass._
-import klib.fp.types.IO.instances.{given, _}
+import klib.fp.types.instances.{given, _}
 import klib.fp.utils.ado
 import klib.utils.Logger
 import klib.utils.Logger.{helpers => L}
@@ -120,10 +120,13 @@ object IO {
 
       extension [A](t: IO[A]) {
 
-        def map[B](f: A => B): IO[B] =
+        def map[B](f: A => B): IO[B] = {
+          import ErrorAccumulator.instances.given
           IO.wrapEffect { t.execute().map(f) }
+        }
 
         def apply[B](f: IO[A => B]): IO[B] = {
+          import ErrorAccumulator.instances.given
           IO.wrapEffect {
             val evaledT = t.execute()
             val evaledF = f.execute()
@@ -139,16 +142,19 @@ object IO {
 
       // TODO (KR) : Can possibly be improved (?)
       extension [A](t: IO[IO[A]])
-        def flatten: IO[A] =
+        def flatten: IO[A] = {
+          import ErrorAccumulator.instances.given
           IO.wrapEffect { t.execute().flatMap(_.execute()) }
+        }
 
     }
 
     given ioTraverseList: Traverse[List, IO] with {
 
-      extension [A](t: List[IO[A]])
-        def traverse: IO[List[A]] =
-          IO.wrapEffect { t.map(_.runSync).traverse }
+      def traverse[A](t: List[IO[A]]): IO[List[A]] = {
+        import ErrorAccumulator.instances.given
+        IO.wrapEffect { t.map(_.runSync).traverse }
+      }
 
     }
 

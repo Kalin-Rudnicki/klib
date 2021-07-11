@@ -109,92 +109,90 @@ object ErrorAccumulator {
 
     given errorAccumulatorTraverseList[E]: Traverse[List, [A] =>> ErrorAccumulator[E, A]] with {
 
-      extension [T](t: List[ErrorAccumulator[E, T]])
-        def traverse: ErrorAccumulator[E, List[T]] = {
-          @tailrec
-          def loop(
-              ea: ErrorAccumulator[E, List[T]],
-              queue: List[ErrorAccumulator[E, T]],
-          ): ErrorAccumulator[E, List[T]] =
-            queue match {
-              case Nil =>
-                ea match {
-                  case Alive(r) =>
-                    Alive(r.reverse)
-                  case d @ Dead(_) =>
-                    d
-                }
-              case h :: tail =>
-                loop(
-                  (ea, h) match {
-                    case (Alive(eaR), Alive(hR)) =>
-                      Alive(hR :: eaR)
-                    case (Dead(eaEs), Dead(hEs)) =>
-                      Dead(eaEs ::: hEs)
-                    case (Alive(_), Dead(hEs)) =>
-                      Dead(hEs)
-                    case (Dead(eaEs), Alive(_)) =>
-                      Dead(eaEs)
-                  },
-                  tail,
-                )
-            }
+      def traverse[T](t: List[ErrorAccumulator[E, T]]): ErrorAccumulator[E, List[T]] = {
+        @tailrec
+        def loop(
+            ea: ErrorAccumulator[E, List[T]],
+            queue: List[ErrorAccumulator[E, T]],
+        ): ErrorAccumulator[E, List[T]] =
+          queue match {
+            case Nil =>
+              ea match {
+                case Alive(r) =>
+                  Alive(r.reverse)
+                case d @ Dead(_) =>
+                  d
+              }
+            case h :: tail =>
+              loop(
+                (ea, h) match {
+                  case (Alive(eaR), Alive(hR)) =>
+                    Alive(hR :: eaR)
+                  case (Dead(eaEs), Dead(hEs)) =>
+                    Dead(eaEs ::: hEs)
+                  case (Alive(_), Dead(hEs)) =>
+                    Dead(hEs)
+                  case (Dead(eaEs), Alive(_)) =>
+                    Dead(eaEs)
+                },
+                tail,
+              )
+          }
 
-          loop(
-            Alive(Nil),
-            t,
-          )
-        }
+        loop(
+          Alive(Nil),
+          t,
+        )
+      }
 
     }
 
     given errorAccumulatorTraverseNonEmptyList[E]: Traverse[NonEmptyList, [A] =>> ErrorAccumulator[E, A]] with {
 
-      extension [A](t: NonEmptyList[ErrorAccumulator[E, A]])
-        def traverse: ErrorAccumulator[E, NonEmptyList[A]] = {
-          @tailrec
-          def loop(
-              ea: ErrorAccumulator[E, NonEmptyList[A]],
-              queue: List[ErrorAccumulator[E, A]],
-          ): ErrorAccumulator[E, NonEmptyList[A]] =
-            // TODO (KR) : duplicated, add trait?
-            queue match {
-              case Nil =>
-                ea match {
-                  case Alive(r) =>
-                    Alive(r.reverse)
-                  case d @ Dead(_) =>
-                    d
-                }
-              case h :: tail =>
-                loop(
-                  (ea, h) match {
-                    case (Alive(eaR), Alive(hR)) =>
-                      Alive(hR :: eaR)
-                    case (Dead(eaEs), Dead(hEs)) =>
-                      Dead(eaEs ::: hEs)
-                    case (Alive(_), Dead(hEs)) =>
-                      Dead(hEs)
-                    case (Dead(eaEs), Alive(_)) =>
-                      Dead(eaEs)
-                  },
-                  tail,
-                )
-            }
-
-          t.head match {
-            case Alive(r) =>
+      def traverse[A](t: NonEmptyList[ErrorAccumulator[E, A]]): ErrorAccumulator[E, NonEmptyList[A]] = {
+        @tailrec
+        def loop(
+            ea: ErrorAccumulator[E, NonEmptyList[A]],
+            queue: List[ErrorAccumulator[E, A]],
+        ): ErrorAccumulator[E, NonEmptyList[A]] =
+          // TODO (KR) : duplicated, add trait?
+          queue match {
+            case Nil =>
+              ea match {
+                case Alive(r) =>
+                  Alive(r.reverse)
+                case d @ Dead(_) =>
+                  d
+              }
+            case h :: tail =>
               loop(
-                Alive(NonEmptyList(r, Nil)),
-                t.tail,
-              )
-            case d @ Dead(_) =>
-              loop(
-                d,
-                t.tail,
+                (ea, h) match {
+                  case (Alive(eaR), Alive(hR)) =>
+                    Alive(hR :: eaR)
+                  case (Dead(eaEs), Dead(hEs)) =>
+                    Dead(eaEs ::: hEs)
+                  case (Alive(_), Dead(hEs)) =>
+                    Dead(hEs)
+                  case (Dead(eaEs), Alive(_)) =>
+                    Dead(eaEs)
+                },
+                tail,
               )
           }
+
+        t.head match {
+          case Alive(r) =>
+            loop(
+              Alive(NonEmptyList(r, Nil)),
+              t.tail,
+            )
+          case d @ Dead(_) =>
+            loop(
+              d,
+              t.tail,
+            )
         }
+      }
 
     }
 

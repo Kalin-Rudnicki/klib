@@ -9,7 +9,7 @@ import klib.extensions.{given, _}
 import klib.utils.Logger.helpers.extensions.listOfEventsToList
 import klib.fp.types._
 import klib.utils.Logger.{helpers => L}
-import klib.utils.Logger.helpers.listOfEventsToList
+import klib.utils.Logger.helpers.given
 
 trait Executable {
 

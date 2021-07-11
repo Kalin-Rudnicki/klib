@@ -2,9 +2,11 @@ package klib
 
 import org.rogach.scallop._
 
-import klib.Implicits._
+import klib.extensions.{given, _}
+import klib.instances.{given, _}
 import klib.fp.types._
-import klib.utils._, Logger.{helpers => L}
+import klib.utils._
+import klib.utils.Logger.{helpers => L}
 
 object TestExec extends Executable.ExecFromConf {
 

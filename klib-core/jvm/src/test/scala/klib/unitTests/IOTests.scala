@@ -4,7 +4,8 @@ import org.scalatest.funspec.AnyFunSpec
 
 import scala.collection.mutable
 
-import klib.Implicits._
+import klib.extensions.{given, _}
+import klib.instances.{given, _}
 import klib.fp.types._
 import klib.fp.utils.ado
 

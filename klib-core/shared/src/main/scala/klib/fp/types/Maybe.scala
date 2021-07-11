@@ -1,7 +1,6 @@
 package klib.fp.types
 
-import klib.fp.extensions.{given, _}
-import klib.instances.{given, _}
+import klib.extensions.{given, _}
 import klib.fp.typeclass._
 
 import scala.annotation.tailrec
@@ -169,35 +168,33 @@ object Maybe {
 
     given maybeTraverseList: Traverse[List, Maybe] with {
 
-      extension [T](t: List[Maybe[T]])
-        def traverse: Maybe[List[T]] = {
-          @tailrec
-          def loop(queue: List[Maybe[T]], stack: List[T]): Maybe[List[T]] =
-            queue match {
-              case head :: tail =>
-                head match {
-                  case Some(h) =>
-                    loop(tail, h :: stack)
-                  case None =>
-                    None
-                }
-              case Nil =>
-                Some(stack.reverse)
-            }
+      def traverse[T](t: List[Maybe[T]]): Maybe[List[T]] = {
+        @tailrec
+        def loop(queue: List[Maybe[T]], stack: List[T]): Maybe[List[T]] =
+          queue match {
+            case head :: tail =>
+              head match {
+                case Some(h) =>
+                  loop(tail, h :: stack)
+                case None =>
+                  None
+              }
+            case Nil =>
+              Some(stack.reverse)
+          }
 
-          loop(t, Nil)
-        }
+        loop(t, Nil)
+      }
 
     }
 
     given applicativeTraverseMaybe[A[_]: Applicative]: Traverse[Maybe, A] with {
 
-      extension [T](t: Maybe[A[T]])
-        def traverse: A[Maybe[T]] =
-          t match {
-            case Some(a) => a.map(Some(_))
-            case None    => None.pure
-          }
+      def traverse[T](t: Maybe[A[T]]): A[Maybe[T]] =
+        t match {
+          case Some(a) => a.map(Some(_))
+          case None    => None.pure
+        }
 
     }
 
