@@ -3,7 +3,6 @@ package klib
 import org.rogach.scallop._
 
 import klib.predefs.common.{given, _}
-import klib.predefs.jvm.{given, _}
 
 object TestExec {
 
