@@ -52,3 +52,7 @@ object extensions {
   }
 
 }
+
+object instances {
+  export fp.instances.{given, _}
+}
