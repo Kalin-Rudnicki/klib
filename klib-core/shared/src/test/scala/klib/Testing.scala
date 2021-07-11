@@ -6,18 +6,63 @@ import klib.utils._
 
 object Testing extends App {
 
-  val color = ColorString.Color(None, Color.Named.Black.some)
-
-  print("123")
-  color.toColorState.colorizeAndDeColorize(ColorString.ColorState.Default) match {
-    case Some((colorize, deColorize)) =>
-      print(colorize)
-      print("456")
-      print(deColorize)
-    case None =>
-      print("456")
+  final case class PreState(map: Map[Char, Int], isValidFinish: Boolean)
+  final case class State(id: Int, map: Map[Char, Lazy[State]], isValidFinish: Boolean) {
+    override def toString: String =
+      s"State($id, ${map.map { case (k, v) => (k, s"State[${v.value.id}, ${v.value.isValidFinish}]") }}, $isValidFinish)"
   }
-  print("789")
+
+  val preStates: List[PreState] =
+    List(
+      PreState(
+        Map(
+          'A' -> 0,
+          'B' -> 1,
+        ),
+        false,
+      ),
+      PreState(
+        Map(
+          'A' -> 0,
+          'C' -> 2,
+        ),
+        false,
+      ),
+      PreState(
+        Map(
+        ),
+        true,
+      ),
+    )
+
+  val states: List[State] =
+    Lazy
+      .selfMap[(PreState, Int), Int, State](preStates.zipWithIndex) {
+        case ((s, i), ef) =>
+          (
+            i,
+            State(
+              id = i,
+              map = s.map.map {
+                case (k, v) =>
+                  (
+                    k,
+                    ef(v),
+                  )
+              },
+              isValidFinish = s.isValidFinish,
+            ),
+          )
+      }
+      .values
+      .toList
+
   println
+  println("=====| PreState |=====")
+  preStates.foreach(println)
+
+  println
+  println("=====| State |=====")
+  states.foreach(println)
 
 }

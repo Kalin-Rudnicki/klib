@@ -14,4 +14,13 @@ object Lazy {
   def apply[T](t: => T): Lazy[T] =
     new Lazy(t)
 
+  def selfMap[I, K, V](input: List[I])(elemF: (I, K => Lazy[V]) => (K, V)): Map[K, V] = {
+    lazy val lazyMap: Map[K, V] = {
+      def ef(k: K): Lazy[V] = Lazy(lazyMap(k))
+      input.map(elemF(_, ef)).toMap
+    }
+
+    lazyMap
+  }
+
 }
