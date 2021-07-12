@@ -56,6 +56,7 @@ final case class Executable(execute: (Logger, List[String]) => IO[Unit]) {
       case Right(loggerConf) =>
         val logger = loggerConf.logger
         for {
+          _ <- loggerConf.clear().maybe(logger(L(L.ansi.cursorPos(1, 1), L.ansi.clearScreen()))).traverse
           res <- execute(logger, programArgs).runSync.pure[IO]
           _ <- logger(
             res match {
@@ -194,6 +195,8 @@ object Executable {
     val flags: ScallopOption[Set[String]] = opt[List[String]](default = Nil.someOpt).map(_.toSet)
     val ignoredPackages: ScallopOption[Set[String]] = opt[List[String]](default = Nil.someOpt).map(_.toSet)
     val idtStr: ScallopOption[String] = opt[String](default = "    ".someOpt)
+
+    val clear: ScallopOption[Boolean] = opt[Boolean]()
 
     verify()
 
