@@ -58,7 +58,10 @@ object IndentedString {
 
   // Helpers
 
-  def inline(children: IndentedString*): IndentedString =
+  def `inline`(children: IndentedString*): IndentedString =
+    Inline(children.toList)
+
+  def group(children: IndentedString*): IndentedString =
     Inline(children.toList)
 
   def indented(children: IndentedString*): IndentedString =
