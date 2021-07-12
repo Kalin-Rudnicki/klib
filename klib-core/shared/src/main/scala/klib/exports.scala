@@ -76,6 +76,7 @@ package predefs {
     export klib.fp.types.Either
     export klib.fp.types.Left
     export klib.fp.types.Right
+    export klib.fp.types.\/
     // ErrorAccumulator.scala
     export klib.fp.types.ErrorAccumulator
     export klib.fp.types.Alive
