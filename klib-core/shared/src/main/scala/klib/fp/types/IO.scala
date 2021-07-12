@@ -108,7 +108,7 @@ object IO {
     IO(new RandomAccessFile(path, "r")).bracket { raf =>
       for {
         len <- raf.length.pure[IO]
-        bb = new Array[Byte](len.toInt) // TODO (KR) : Could be an issue...
+        bb = new Array[Byte](len.toInt) // WARNING (KR) : Could be an issue...
         _ <- raf.readFully(bb).pure[IO]
       } yield bb
     }(_.close().pure[IO])
@@ -117,7 +117,7 @@ object IO {
     ImageIO.read(path).pure[IO]
 
   def writeFile(path: File, contents: String): IO[Unit] =
-    new PrintWriter(path).pure[IO].bracket(_.write(contents).pure[IO])(_.close.pure[IO])
+    new PrintWriter(path).pure[IO].bracket(_.write(contents).pure[IO])(_.close().pure[IO])
 
   // =====|  |=====
 
@@ -125,7 +125,7 @@ object IO {
     new Monad[IO] {
 
       override def map[A, B](t: IO[A], f: A => B): IO[B] =
-        IO.wrapEffect { t.execute().map(f) }
+        IO.wrapEffect { t.execute().map(a => Try(f(a)).to_?).flatten }
 
       override def apply[A, B](t: IO[A], f: IO[A => B]): IO[B] = {
         IO.wrapEffect {
