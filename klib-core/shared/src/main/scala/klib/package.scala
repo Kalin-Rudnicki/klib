@@ -7,6 +7,7 @@ package object klib {
       def unesc: String =
         unesc("'")
 
+      // TODO (KR) : Add more escaped characters here as they become known
       def unesc(_1: String, _2: Option[String] = None): String = {
         val left = _1
         val right = _2.getOrElse(_1)
@@ -17,6 +18,8 @@ package object klib {
             "\\\\"
           case '\t' =>
             "\\t"
+          case '"' =>
+            "\\\""
           case c =>
             c.toString
         }
