@@ -16,6 +16,19 @@ package object utils {
       def unwrap: T = w
     }
 
+    implicit class ThrowableOps(throwable: Throwable) {
+
+      def withMessage(msg: String): Throwable = {
+        val thr = Message(msg)
+        thr.setStackTrace(throwable.getStackTrace)
+        thr
+      }
+
+      def mappedMessage(msgF: String => String): Throwable =
+        withMessage(msgF(throwable.getMessage))
+
+    }
+
   }
   object Implicits extends Implicits
 

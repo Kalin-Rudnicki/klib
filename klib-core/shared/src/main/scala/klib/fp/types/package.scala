@@ -16,10 +16,11 @@ package object types {
     def dead(throwables: Throwable*): ?[Nothing] =
       Dead(throwables.toList)
   }
-  final case class Message(message: String) extends Throwable(message) {
+  final case class Message(message: String, cause: Maybe[Throwable] = None)
+      extends Throwable(message, cause.getOrElse(null)) {
 
     override def toString: String =
-      s"Message($message)"
+      s"Message($message${cause.cata(c => s", cause: $c", "")})"
 
   }
 
