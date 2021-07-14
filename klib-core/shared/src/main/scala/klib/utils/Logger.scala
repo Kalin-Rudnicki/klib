@@ -92,6 +92,8 @@ final class Logger private (
         indent: String,
         event: Logger.Event,
     ): Unit = {
+      import Logger.helpers.Implicits._
+
       def buildString(logLevel: Logger.LogLevel, message: Any): String = {
         val messageString =
           Maybe(message)
@@ -114,20 +116,31 @@ final class Logger private (
           sources.foreach(_.break(printIndent))
         case Logger.Event.Indented(event, by) =>
           handle(indent + idtStr * by.max(0), event)
-        case Logger.Event.LogThrowable(messageLevel, stackTraceLevel, throwable) =>
-          // TODO (KR) : Do something with `cause`
-          handle(
-            indent,
+        case logThrowable @ Logger.Event.LogThrowable(_, _, _, _) =>
+          def expand(event: Logger.Event.LogThrowable): Logger.Event =
             L(
-              L.log(messageLevel, throwable.getMessage),
+              L.log(event.messageLevel, s"${event.throwable.getMessage} (${event.throwable.getClass.getSimpleName})"),
               L.indented(
                 L(
-                  Logger.IgnoreStackTraceElement.trimmedTrace(throwable, ignoreStackTraceElements).map { ste =>
-                    L.log(stackTraceLevel, ste.toString)
-                  }: _*,
+                  L.log(event.stackTraceLevel, "stack-trace:"),
+                  L.indented(
+                    Logger.IgnoreStackTraceElement.trimmedTrace(event.throwable, ignoreStackTraceElements).map { ste =>
+                      L.log(event.stackTraceLevel, ste.toString)
+                    },
+                  ),
+                  event.causeEvent.map { eCause =>
+                    L(
+                      L.log(event.messageLevel, "cause:"),
+                      L.indented(eCause),
+                    )
+                  },
                 ),
               ),
-            ),
+            )
+
+          handle(
+            indent,
+            expand(logThrowable),
           )
         case Logger.Event.Raw(logLevel, str) =>
           def action(): Unit = {
@@ -344,6 +357,7 @@ object Logger {
         messageLevel: LogLevel,
         stackTraceLevel: LogLevel,
         throwable: Throwable,
+        causeEvent: Maybe[LogThrowable],
     ) extends Event
     final case class Raw(logLevel: Maybe[LogLevel], str: String) extends Event
     final case class Indented(event: Event, by: Int) extends Event
@@ -409,7 +423,10 @@ object Logger {
 
     object Implicits {
 
-      implicit def listOfEventsToList(events: List[Event]): Event =
+      implicit def maybeEventToEvent(mEvent: Maybe[Event]): Event =
+        mEvent.cata(identity, helpers())
+
+      implicit def listOfEventsToEvent(events: List[Event]): Event =
         helpers(events)
 
     }
@@ -439,12 +456,17 @@ object Logger {
           throwable: Throwable,
           messageLevel: LogLevel = LogLevel.Fatal,
           stackTraceLevel: LogLevel = LogLevel.Debug,
-      ): Event =
-        Event.LogThrowable(
-          messageLevel,
-          stackTraceLevel,
-          throwable,
-        )
+      ): Event = {
+        def makeEvent(throwable: Throwable): Event.LogThrowable =
+          Event.LogThrowable(
+            messageLevel,
+            stackTraceLevel,
+            throwable,
+            Maybe(throwable.getCause).map(makeEvent),
+          )
+
+        makeEvent(throwable)
+      }
 
     }
 
