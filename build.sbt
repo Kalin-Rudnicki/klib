@@ -8,8 +8,8 @@ lazy val `klib-core` =
     .in(file("klib-core"))
     .settings(
       name := "klib-core",
-      organization := "kalin-rudnicki",
-      version := "0.5.11",
+      organization := "io.github.kalin-rudnicki",
+      version := "0.6.0",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
