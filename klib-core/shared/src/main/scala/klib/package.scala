@@ -1,6 +1,6 @@
 package object klib {
 
-  trait Implicits extends fp.Implicits with utils.Implicits {
+  trait Implicits extends fp.Implicits with utils.Implicits with scalaCompat.Implicits {
 
     implicit class UnescCharOps(char: Char) {
 
