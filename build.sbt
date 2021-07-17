@@ -1,7 +1,7 @@
 //
 
-val MyScalaVersion = "2.13.4"
-val MyScalaCrossVersions = Seq()
+val Scala_2_12 = "2.12.10"
+val Scala_2_13 = "2.13.4"
 
 lazy val `klib-core` =
   crossProject(JSPlatform, JVMPlatform)
@@ -9,20 +9,20 @@ lazy val `klib-core` =
     .settings(
       name := "klib-core",
       organization := "kalin-rudnicki",
-      version := "0.5.9",
+      version := "0.5.11",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
       ),
-      scalaVersion := MyScalaVersion,
-      crossScalaVersions := MyScalaCrossVersions :+ MyScalaVersion,
+      scalaVersion := Scala_2_13,
+      crossScalaVersions := Seq(Scala_2_12, Scala_2_13),
       resolvers += Resolver.mavenLocal,
     )
     .jsSettings()
     .jvmSettings(
       libraryDependencies ++=
         Seq(
-          "org.rogach" %% "scallop" % "4.0.1",
+          "org.rogach" %% "scallop" % "4.0.4",
         ) ++
           Seq(
             "org.scalatest" %% "scalatest" % "3.2.3",

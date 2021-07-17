@@ -11,6 +11,11 @@ object TestExec {
 
   final class Conf(args: Seq[String]) extends Executable.Conf(args) {
     version("This is the version")
+    this.appendDefaultToDescription = true
+    val opt1: ScallopOption[String] = opt(descr = "", default = "opt1".someOpt)
+    val opt2: ScallopOption[String] = opt(descr = "| Line #1", default = "opt2".someOpt)
+    val opt3: ScallopOption[String] = opt(descr = "| Line #1\n| Line #2", default = "opt3".someOpt)
+    val opt4: ScallopOption[String] = opt()
 
     verify()
   }

@@ -112,7 +112,8 @@ object Executable {
         this.builder.bann.toMaybe,
         this.builder.help.some,
         this.builder.foot.toMaybe,
-      ).flatten.mkString("\n")
+      ).flatMap(_.toOption)
+        .mkString("\n")
 
     override def onError(e: Throwable): Unit = {
       import org.rogach.scallop.exceptions._
