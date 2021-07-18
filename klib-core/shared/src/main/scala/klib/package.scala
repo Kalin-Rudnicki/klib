@@ -1,3 +1,5 @@
+import scala.collection.GenTraversableOnce
+
 package object klib {
 
   trait Implicits extends fp.Implicits with utils.Implicits with scalaCompat.Implicits {

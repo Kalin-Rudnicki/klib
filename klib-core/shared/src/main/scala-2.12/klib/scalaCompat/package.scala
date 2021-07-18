@@ -16,6 +16,24 @@ package object scalaCompat {
         )
       }
 
+      def minOption(implicit ordering: Ordering[T]): scala.Option[T] =
+        list match {
+          case Nil => scala.None
+          case _ => scala.Some(list.min)
+        }
+
+      def maxOption(implicit ordering: Ordering[T]): scala.Option[T] =
+        list match {
+          case Nil => scala.None
+          case _ => scala.Some(list.max)
+        }
+
+      def groupMap[K, B](k: T => K)(b: T => B): Map[K, List[B]] =
+        list.groupBy(k).map { case (k, v) => k -> v.map(b) }
+
+      def appended(t: T): List[T] =
+        (t :: list.reverse).reverse
+
     }
 
     implicit class CompatStringOps(string: String) {

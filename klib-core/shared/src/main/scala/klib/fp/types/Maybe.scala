@@ -1,9 +1,9 @@
 package klib.fp.types
 
-import klib.fp.typeclass._
-
 import scala.annotation.tailrec
-import scala.collection.GenTraversableOnce
+import scala.collection._
+
+import klib.fp.typeclass._
 
 sealed trait Maybe[+A] {
 

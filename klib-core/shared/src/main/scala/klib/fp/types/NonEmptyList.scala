@@ -2,7 +2,7 @@ package klib.fp.types
 
 import scala.annotation.tailrec
 
-import klib.fp.typeclass.{Foreach, Monad}
+import klib.fp.typeclass._
 
 final case class NonEmptyList[+A](
     head: A,
