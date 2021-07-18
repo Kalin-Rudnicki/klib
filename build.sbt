@@ -3,13 +3,44 @@
 val Scala_2_12 = "2.12.10"
 val Scala_2_13 = "2.13.4"
 
+val MyOrg = "io.github.kalin-rudnicki"
+val githubUsername = "Kalin-Rudnicki"
+val githubProject = "slyce-fp"
+
+ThisBuild / dynverVTagPrefix := false
+ThisBuild / dynverSonatypeSnapshots := true
+
+ThisBuild / version ~= (_.replace('+', '-'))
+ThisBuild / dynver ~= (_.replace('+', '-'))
+
+// =====|  |=====
+
+inThisBuild(
+  Seq(
+    organization := MyOrg,
+    resolvers += Resolver.mavenLocal,
+    //
+    description := "My personal FP library for scala.",
+    licenses := List("MIT" -> new URL("https://opensource.org/licenses/MIT")),
+    developers := List(
+      Developer(
+        id = "Kalin-Rudnicki",
+        name = "Kalin Rudnicki",
+        email = "kalin.rudnicki@gmail.com",
+        url = url(s"https://github.com/$githubUsername"),
+      ),
+    ),
+  ),
+)
+
+// =====|  |=====
+
 lazy val `klib-core` =
   crossProject(JSPlatform, JVMPlatform)
     .in(file("klib-core"))
     .settings(
       name := "klib-core",
-      organization := "io.github.kalin-rudnicki",
-      version := "0.6.3",
+      organization := MyOrg,
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
