@@ -62,5 +62,14 @@ lazy val `klib-core` =
           ).map(_ % Test),
     )
 
-lazy val `klib-core-js` = `klib-core`.js
-lazy val `klib-core-jvm` = `klib-core`.jvm
+lazy val `project-root` =
+  project
+    .in(file("."))
+    .settings(
+      publish / skip := true,
+      sonatypeCredentialHost := "s01.oss.sonatype.org",
+    )
+    .aggregate(
+      `klib-core`.js,
+      `klib-core`.jvm,
+    )
