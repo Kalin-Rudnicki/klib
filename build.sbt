@@ -53,7 +53,7 @@ lazy val `klib-core` =
     .jvmSettings(
       libraryDependencies ++=
         Seq(
-          "org.rogach" %% "scallop" % "4.0.4",
+          "org.rogach" %% "scallop" % "4.0.3", // TODO (KR) :
         ) ++
           Seq(
             "org.scalatest" %% "scalatest" % "3.2.3",
