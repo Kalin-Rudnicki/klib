@@ -30,6 +30,7 @@ inThisBuild(
         url = url(s"https://github.com/$githubUsername"),
       ),
     ),
+    sonatypeCredentialHost := "s01.oss.sonatype.org",
   ),
 )
 
