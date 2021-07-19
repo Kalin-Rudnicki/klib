@@ -56,7 +56,7 @@ lazy val `klib-core` =
     .jvmSettings(
       libraryDependencies ++=
         Seq(
-          "org.rogach" %% "scallop" % "4.0.3", // TODO (KR) :
+          "org.rogach" %% "scallop" % "4.0.3", // TODO (KR) : revert back to 4.0.4 once on maven-central
         ) ++
           Seq(
             "org.scalatest" %% "scalatest" % "3.2.3",
