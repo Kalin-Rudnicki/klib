@@ -31,26 +31,6 @@ inThisBuild(
       ),
     ),
     sonatypeCredentialHost := "s01.oss.sonatype.org",
-    /*
-    sonatypeRepository := "https://s01.oss.sonatype.org/service/local",
-    sonatypeProfileName := "io.github.kalin-rudnicki",
-    publishTo := {
-      val nexus = "https://s01.oss.sonatype.org/"
-      if (isSnapshot.value) Some("snapshots" at nexus + "content/repositories/snapshots")
-      else Some("releases" at nexus + "service/local/staging/deploy/maven2")
-    },
-    sonatypePublishTo := {
-      val nexus = "https://s01.oss.sonatype.org/"
-      if (isSnapshot.value) Some("snapshots" at nexus + "content/repositories/snapshots")
-      else Some("releases" at nexus + "service/local/staging/deploy/maven2")
-    },
-     */
-    credentials += Credentials(
-      "Sonatype Nexus Repository Manager",
-      "s01.oss.sonatype.org",
-      System.getenv("SONATYPE_USERNAME"),
-      System.getenv("SONATYPE_PASSWORD"),
-    ),
   ),
 )
 
@@ -69,6 +49,7 @@ lazy val `klib-core` =
       scalaVersion := Scala_2_13,
       crossScalaVersions := Seq(Scala_2_12, Scala_2_13),
       resolvers += Resolver.mavenLocal,
+      sonatypeCredentialHost := "s01.oss.sonatype.org",
     )
     .jsSettings()
     .jvmSettings(
