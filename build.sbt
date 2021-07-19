@@ -22,6 +22,7 @@ inThisBuild(
     //
     description := "My personal FP library for scala.",
     licenses := List("MIT" -> new URL("https://opensource.org/licenses/MIT")),
+    homepage := Some(url(s"https://github.com/$githubUsername/$githubProject")),
     developers := List(
       Developer(
         id = "Kalin-Rudnicki",
