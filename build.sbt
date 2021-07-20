@@ -49,14 +49,17 @@ lazy val `klib-core` =
       ),
       scalaVersion := Scala_2_13,
       crossScalaVersions := Seq(Scala_2_12, Scala_2_13),
-      resolvers += Resolver.mavenLocal,
+      resolvers ++= Seq(
+        Resolver.mavenLocal,
+        Resolver.sonatypeRepo("public"),
+      ),
       sonatypeCredentialHost := "s01.oss.sonatype.org",
     )
     .jsSettings()
     .jvmSettings(
       libraryDependencies ++=
         Seq(
-          "org.rogach" %% "scallop" % "4.0.3", // TODO (KR) : revert back to 4.0.4 once on maven-central
+          "org.rogach" %% "scallop" % "4.0.4",
         ) ++
           Seq(
             "org.scalatest" %% "scalatest" % "3.2.3",
