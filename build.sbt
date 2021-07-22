@@ -13,11 +13,6 @@ ThisBuild / dynverSonatypeSnapshots := true
 ThisBuild / version ~= (_.replace('+', '-'))
 ThisBuild / dynver ~= (_.replace('+', '-'))
 
-initialize := {
-  val _ = initialize.value
-  println(System.getProperty("java.version"))
-}
-
 // =====|  |=====
 
 inThisBuild(
