@@ -119,6 +119,9 @@ object IO {
   def writeFile(path: File, contents: String): IO[Unit] =
     new PrintWriter(path).pure[IO].bracket(_.write(contents).pure[IO])(_.close().pure[IO])
 
+  def writeFileBytes(path: File, bytes: Array[Byte]): IO[Unit] =
+    IO(new RandomAccessFile(path, "w")).bracket { _.write(bytes).pure[IO] }(_.close().pure[IO])
+
   // =====|  |=====
 
   implicit val ioMonad: Monad[IO] =

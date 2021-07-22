@@ -5,7 +5,7 @@ val Scala_2_13 = "2.13.4"
 
 val MyOrg = "io.github.kalin-rudnicki"
 val githubUsername = "Kalin-Rudnicki"
-val githubProject = "slyce-fp"
+val githubProject = "klib"
 
 ThisBuild / dynverVTagPrefix := false
 ThisBuild / dynverSonatypeSnapshots := true
@@ -18,7 +18,10 @@ ThisBuild / dynver ~= (_.replace('+', '-'))
 inThisBuild(
   Seq(
     organization := MyOrg,
-    resolvers += Resolver.mavenLocal,
+    resolvers ++= Seq(
+      Resolver.mavenLocal,
+      Resolver.sonatypeRepo("public"),
+    ),
     //
     description := "My personal FP library for scala.",
     licenses := List("MIT" -> new URL("https://opensource.org/licenses/MIT")),
@@ -42,17 +45,12 @@ lazy val `klib-core` =
     .in(file("klib-core"))
     .settings(
       name := "klib-core",
-      organization := MyOrg,
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
       ),
       scalaVersion := Scala_2_13,
       crossScalaVersions := Seq(Scala_2_12, Scala_2_13),
-      resolvers ++= Seq(
-        Resolver.mavenLocal,
-        Resolver.sonatypeRepo("public"),
-      ),
       sonatypeCredentialHost := "s01.oss.sonatype.org",
     )
     .jsSettings()
@@ -66,7 +64,7 @@ lazy val `klib-core` =
           ).map(_ % Test),
     )
 
-lazy val `project-root` =
+lazy val `klib-root` =
   project
     .in(file("."))
     .settings(
