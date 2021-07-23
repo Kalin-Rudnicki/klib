@@ -17,6 +17,7 @@ object DynamicJarLoader {
     val tClass = implicitly[ClassTag[T]].runtimeClass
 
     for {
+      // --- Find all `.class` files ---
       classPaths <- for {
         jarBytes <- IO.readFileBytes(jarFile)
         jarInputStream <- new JarInputStream(new ByteArrayInputStream(jarBytes), true).pure[IO]
@@ -42,6 +43,7 @@ object DynamicJarLoader {
               cp.substring(0, cp.length - 6).replaceAllLiterally("/", ".")
             }
       } yield classPaths
+      // --- Find valid instances of `T` with zero-arg-constructor ---
       validClassPaths <- IO(new URLClassLoader(Array(jarFile.toURI.toURL), getClass.getClassLoader)).bracket { classLoader =>
         classPaths
           .map { cp =>
