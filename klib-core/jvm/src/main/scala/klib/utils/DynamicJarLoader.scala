@@ -13,7 +13,7 @@ object DynamicJarLoader {
 
   // Get all instances of a given trait
   // Must have 0 arg constructor
-  def getClassPathsOfType[T: ClassTag](jarFile: File): IO[List[String]] = {
+  def getClassPathsOfTypeWithExtras[T: ClassTag, E](jarFile: File)(eF: T => E): IO[List[(String, E)]] = {
     val tClass = implicitly[ClassTag[T]].runtimeClass
 
     for {
@@ -56,7 +56,10 @@ object DynamicJarLoader {
                   .toMaybe
                   .map { constructor =>
                     if (constructor.trySetAccessible())
-                      constructor.newInstance().pure[IO].map(tClass.isInstance(_).maybe(cp))
+                      for {
+                        inst <- constructor.newInstance().pure[IO]
+                        isInst = tClass.isInstance(inst)
+                      } yield isInst.maybe((cp, eF(inst.asInstanceOf[T])))
                     else
                       None.pure[IO]
                   }
@@ -70,8 +73,27 @@ object DynamicJarLoader {
     } yield validClassPaths
   }
 
+  def getClassPathsOfType[T: ClassTag](jarFile: File): IO[List[String]] =
+    getClassPathsOfTypeWithExtras[T, Unit](jarFile)(_ => ())
+      .map(_.map(_._1))
+
   // Load the given 0-arg-constructor class
   // Anything in O must already exist in the class-path
+  // TODO (KR) : Possibly de-dupe this
+  def loadClassesFromJar[T, O](jarFile: File, classPaths: List[String])(withInstance: (String, T) => IO[O]): IO[List[O]] =
+    IO(new URLClassLoader(Array(jarFile.toURI.toURL), getClass.getClassLoader)).bracket { classLoader =>
+      def runForClassPath(classPath: String): IO[O] =
+        for {
+          klass <- classLoader.loadClass(classPath).pure[IO]
+          zeroArgConstructor <- klass.getDeclaredConstructor().pure[IO]
+          _ <- zeroArgConstructor.setAccessible(true).pure[IO]
+          inst <- zeroArgConstructor.newInstance().asInstanceOf[T].pure[IO]
+          res <- withInstance(classPath, inst)
+        } yield res
+
+      classPaths.map(runForClassPath).traverse
+    }(_.close().pure[IO])
+
   def loadClassFromJar[T, O](jarFile: File, classPath: String)(withInstance: T => IO[O]): IO[O] =
     IO(new URLClassLoader(Array(jarFile.toURI.toURL), getClass.getClassLoader)).bracket { classLoader =>
       for {
