@@ -102,6 +102,9 @@ object Maybe {
     else
       Some(a)
 
+  def empty[A]: Maybe[A] =
+    None
+
   trait Implicits {
 
     implicit class MaybeIdOps[A](a: A) {
