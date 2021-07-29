@@ -6,13 +6,18 @@ import klib.utils._
 
 object Testing extends App {
 
-  {
+  def stuff(i: Maybe[Int]): ?[Any] =
     for {
-      a <- 5.pure[IO]
-      b <- 0.pure[IO]
-      c = a / b
-      _ <- println(c).pure[IO]
-    } yield c
-  }.runSyncOrDump(Logger(Logger.LogLevel.Info).some)
+      i1 <- i.pure[?]
+      i2 <- i1.pure[?].toMaybeMonad
+    } yield (i1, i2)
+
+  println {
+    stuff(5.some)
+  }
+
+  println {
+    stuff(None)
+  }
 
 }
