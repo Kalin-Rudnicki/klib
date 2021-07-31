@@ -142,6 +142,23 @@ final class ArrayBuffer[T: ClassTag] private (
       _array(aIdx) = f(_array(aIdx))
     }
 
+  def distinctInPlaceBy[T2](f: T => T2): Unit = {
+    val seen = scala.collection.mutable.Set[T2]()
+
+    filterInPlace { elem =>
+      val mapped = f(elem)
+      if (seen.contains(mapped))
+        false
+      else {
+        seen.add(mapped)
+        true
+      }
+    }
+  }
+
+  def distinctInPlace(): Unit =
+    distinctInPlaceBy(identity)
+
   // =====|  |=====
 
   def filterToList(p: T => Boolean): List[T] = {

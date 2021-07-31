@@ -277,4 +277,38 @@ final class ArrayBufferTests extends AnyFunSpec {
 
   }
 
+  describe("distinctInPlace") {
+
+    it("1") {
+      val wab = ArrayBuffer.of(1, 2, 3, 2)
+      wab.distinctInPlace()
+      assertResult(Array(1, 2, 3))(wab.toArray)
+    }
+
+    it("2") {
+      val wab = ArrayBuffer.of(2, 3, 2)
+      wab.prepend(1)
+      wab.distinctInPlace()
+      assertResult(Array(1, 2, 3))(wab.toArray)
+    }
+
+  }
+
+  describe("distinctInPlaceBy") {
+
+    it("1") {
+      val wab = ArrayBuffer.of(1, 2, 3, 2)
+      wab.distinctInPlaceBy(_ % 2)
+      assertResult(Array(1, 2))(wab.toArray)
+    }
+
+    it("2") {
+      val wab = ArrayBuffer.of(2, 3, 2)
+      wab.prepend(1)
+      wab.distinctInPlaceBy(_ % 2)
+      assertResult(Array(1, 2))(wab.toArray)
+    }
+
+  }
+
 }
