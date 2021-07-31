@@ -173,11 +173,14 @@ object ArrayBuffer {
     )
   }
 
-  def wrapFullArray[T: ClassTag](array: Array[T]): ArrayBuffer[T] =
+  def wrapFullArray[T: ClassTag](array: Array[T]): ArrayBuffer[T] = {
+    val dupeArray = array.clone
+
     new ArrayBuffer[T](
-      initialArray = Array.copyOf(array, array.length),
+      initialArray = dupeArray,
       initialOffset = 0,
-      initialSize = array.length,
+      initialSize = dupeArray.length,
     )
+  }
 
 }

@@ -178,4 +178,17 @@ final class ArrayBufferTests extends AnyFunSpec {
 
   }
 
+  describe("does not modify initialArray") {
+
+    it("1") {
+      val array = Array(1, 2, 3)
+      val wab = ArrayBuffer.wrapFullArray(array)
+
+      wab.popHead
+      assertResult(Array(2, 3))(wab.toArray)
+      assertResult(Array(1, 2, 3))(array)
+    }
+
+  }
+
 }
