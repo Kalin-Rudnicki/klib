@@ -9,6 +9,7 @@ val githubProject = "klib"
 
 ThisBuild / dynverVTagPrefix := false
 ThisBuild / dynverSonatypeSnapshots := true
+ThisBuild / watchBeforeCommand := Watch.clearScreen
 
 ThisBuild / version ~= (_.replace('+', '-'))
 ThisBuild / dynver ~= (_.replace('+', '-'))

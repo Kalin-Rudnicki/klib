@@ -114,6 +114,59 @@ final class ArrayBuffer[T: ClassTag] private (
     _size -= delta
   }
 
+  // filter in place, and get removed elements
+  def removedFromFilterInPlace(p: T => Boolean): List[T] = {
+    var list = List.empty[T]
+    var delta = 0
+    0.until(_size).foreach { idx =>
+      val aIdx = unsafeActualIdx(idx)
+      val elem = _array(aIdx)
+      if (p(elem)) {
+        if (delta != 0) {
+          _array(unsafeActualIdx(idx - delta)) = elem
+          _array(aIdx) = null.asInstanceOf[T]
+        }
+      } else {
+        list = elem :: list
+        _array(aIdx) = null.asInstanceOf[T]
+        delta += 1
+      }
+    }
+    _size -= delta
+    list.reverse
+  }
+
+  def mapInPlace(f: T => T): Unit =
+    0.until(_size).foreach { idx =>
+      val aIdx = unsafeActualIdx(idx)
+      _array(aIdx) = f(_array(aIdx))
+    }
+
+  // =====|  |=====
+
+  def filterToList(p: T => Boolean): List[T] = {
+    var list = List.empty[T]
+
+    0.until(_size).reverse.foreach { idx =>
+      val aIdx = unsafeActualIdx(idx)
+      val elem = _array(aIdx)
+      if (p(elem))
+        list = elem :: list
+    }
+
+    list
+  }
+
+  def mapToList[T2](f: T => T2): List[T2] = {
+    var list = List.empty[T2]
+
+    0.until(_size).reverse.foreach { idx =>
+      list = f(_array(unsafeActualIdx(idx))) :: list
+    }
+
+    list
+  }
+
   // =====|  |=====
 
   private def toArray(newSize: Int): Array[T] = {

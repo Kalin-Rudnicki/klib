@@ -176,11 +176,7 @@ final class ArrayBufferTests extends AnyFunSpec {
       )
     }
 
-  }
-
-  describe("does not modify initialArray") {
-
-    it("1") {
+    it("does not modify initialArray") {
       val array = Array(1, 2, 3)
       val wab = ArrayBuffer.wrapFullArray(array)
 
@@ -205,6 +201,78 @@ final class ArrayBufferTests extends AnyFunSpec {
       wab.append(3)
       wab.filterInPlace(_ >= 2)
       assertResult(Array(2, 3))(wab.toArray)
+    }
+
+  }
+
+  describe("removedFromFilterInPlace") {
+
+    it("1") {
+      val wab = ArrayBuffer.of(1, 2, 3)
+      assertResult(List(1, 2))(wab.removedFromFilterInPlace(_ > 2))
+      assertResult(Array(3))(wab.toArray)
+    }
+
+    it("2") {
+      val wab = ArrayBuffer.of(0, 1, 2)
+      wab.popHead
+      wab.append(3)
+      assertResult(List(1, 2))(wab.removedFromFilterInPlace(_ > 2))
+      assertResult(Array(3))(wab.toArray)
+    }
+
+  }
+
+  describe("filterToList") {
+
+    it("1") {
+      val wab = ArrayBuffer.of(1, 2, 3)
+      assertResult(List(2, 3))(wab.filterToList(_ >= 2))
+      assertResult(Array(1, 2, 3))(wab.toArray)
+    }
+
+    it("2") {
+      val wab = ArrayBuffer.of(0, 1, 2)
+      wab.popHead
+      wab.append(3)
+      assertResult(List(2, 3))(wab.filterToList(_ >= 2))
+      assertResult(Array(1, 2, 3))(wab.toArray)
+    }
+
+  }
+
+  describe("mapInPlace") {
+
+    it("1") {
+      val wab = ArrayBuffer.of(1, 2, 3)
+      wab.mapInPlace(_ + 1)
+      assertResult(Array(2, 3, 4))(wab.toArray)
+    }
+
+    it("2") {
+      val wab = ArrayBuffer.of(0, 1, 2)
+      wab.popHead
+      wab.append(3)
+      wab.mapInPlace(_ + 1)
+      assertResult(Array(2, 3, 4))(wab.toArray)
+    }
+
+  }
+
+  describe("mapToList") {
+
+    it("1") {
+      val wab = ArrayBuffer.of(1, 2, 3)
+      assertResult(List(2, 3, 4))(wab.mapToList(_ + 1))
+      assertResult(Array(1, 2, 3))(wab.toArray)
+    }
+
+    it("2") {
+      val wab = ArrayBuffer.of(0, 1, 2)
+      wab.popHead
+      wab.append(3)
+      assertResult(List(2, 3, 4))(wab.mapToList(_ + 1))
+      assertResult(Array(1, 2, 3))(wab.toArray)
     }
 
   }
