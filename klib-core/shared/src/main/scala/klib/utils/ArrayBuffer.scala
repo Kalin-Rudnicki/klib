@@ -32,9 +32,12 @@ final class ArrayBuffer[T: ClassTag] private (
 
   // =====|  |=====
 
+  private def unsafeActualIdx(idx: Int): Int =
+    (idx + _offset) % _array.length
+
   private def actualIdx(idx: Int): Maybe[Int] =
     (idx >= 0 && idx < _size).maybe {
-      (idx + _offset) % _array.length
+      unsafeActualIdx(idx)
     }
 
   private def elemAllocation: (Int, Int) = {
@@ -92,6 +95,26 @@ final class ArrayBuffer[T: ClassTag] private (
     _array((_size + _offset) % _array.length) = elem
     _size += 1
   }
+
+  def filterInPlace(p: T => Boolean): Unit = {
+    var delta = 0
+    0.until(_size).foreach { idx =>
+      val aIdx = unsafeActualIdx(idx)
+      val elem = _array(aIdx)
+      if (p(elem)) {
+        if (delta != 0) {
+          _array(unsafeActualIdx(idx - delta)) = elem
+          _array(aIdx) = null.asInstanceOf[T]
+        }
+      } else {
+        _array(aIdx) = null.asInstanceOf[T]
+        delta += 1
+      }
+    }
+    _size -= delta
+  }
+
+  // =====|  |=====
 
   private def toArray(newSize: Int): Array[T] = {
     val resArray = new Array[T](newSize)

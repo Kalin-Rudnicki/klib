@@ -191,4 +191,22 @@ final class ArrayBufferTests extends AnyFunSpec {
 
   }
 
+  describe("filterInPlace") {
+
+    it("1") {
+      val wab = ArrayBuffer.of(1, 2, 3)
+      wab.filterInPlace(_ >= 2)
+      assertResult(Array(2, 3))(wab.toArray)
+    }
+
+    it("2") {
+      val wab = ArrayBuffer.of(0, 1, 2)
+      wab.popHead
+      wab.append(3)
+      wab.filterInPlace(_ >= 2)
+      assertResult(Array(2, 3))(wab.toArray)
+    }
+
+  }
+
 }
