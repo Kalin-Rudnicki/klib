@@ -3,6 +3,7 @@ package klib.unitTests
 import org.scalatest.funspec.AnyFunSpec
 
 import klib.Implicits._
+import klib.fp.types._
 import klib.utils._
 
 final class ArrayBufferTests extends AnyFunSpec {
@@ -307,6 +308,46 @@ final class ArrayBufferTests extends AnyFunSpec {
       wab.prepend(1)
       wab.distinctInPlaceBy(_ % 2)
       assertResult(Array(1, 2))(wab.toArray)
+    }
+
+  }
+
+  describe("prependFixed") {
+
+    it("1") {
+      val wab = ArrayBuffer.of(1, 2, 3)
+      assertResult(3.some)(wab.prependFixed(0))
+      assertResult(Array(0, 1, 2))(wab.toArray)
+      assertResult(3)(wab.arrayLength)
+    }
+
+    it("2") {
+      val wab = ArrayBuffer.of(1, 2, 3)
+      wab.popLast
+      assertResult(None)(wab.prependFixed(0))
+      assertResult(2.some)(wab.prependFixed(-1))
+      assertResult(Array(-1, 0, 1))(wab.toArray)
+      assertResult(3)(wab.arrayLength)
+    }
+
+  }
+
+  describe("appendFixed") {
+
+    it("1") {
+      val wab = ArrayBuffer.of(1, 2, 3)
+      assertResult(1.some)(wab.appendFixed(4))
+      assertResult(Array(2, 3, 4))(wab.toArray)
+      assertResult(3)(wab.arrayLength)
+    }
+
+    it("2") {
+      val wab = ArrayBuffer.of(1, 2, 3)
+      wab.popHead
+      assertResult(None)(wab.appendFixed(4))
+      assertResult(2.some)(wab.appendFixed(5))
+      assertResult(Array(3, 4, 5))(wab.toArray)
+      assertResult(3)(wab.arrayLength)
     }
 
   }

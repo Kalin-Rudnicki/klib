@@ -89,12 +89,36 @@ final class ArrayBuffer[T: ClassTag] private (
     _array(_offset) = elem
   }
 
+  def prependFixed(elem: T): Maybe[T] =
+    if (_array.length == 0)
+      None
+    else if (_size < _array.length) {
+      prepend(elem)
+      None
+    } else {
+      val r = popLast
+      prepend(elem)
+      r
+    }
+
   def append(elem: T): Unit = {
     growIfFull()
 
     _array((_size + _offset) % _array.length) = elem
     _size += 1
   }
+
+  def appendFixed(elem: T): Maybe[T] =
+    if (_array.length == 0)
+      None
+    else if (_size < _array.length) {
+      append(elem)
+      None
+    } else {
+      val r = popHead
+      append(elem)
+      r
+    }
 
   def filterInPlace(p: T => Boolean): Unit = {
     var delta = 0
