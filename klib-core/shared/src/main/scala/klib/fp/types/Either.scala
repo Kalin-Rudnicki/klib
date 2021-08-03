@@ -85,10 +85,10 @@ object Either {
       override def pure[A](a: => A): Either[L, A] =
         Right(a)
 
-      override def flatten[A](t: Either[L, Either[L, A]]): Either[L, A] =
+      override def flatMap[A, B](t: \/[L, A], f: A => \/[L, B]): \/[L, B] =
         t match {
-          case Right(t)    => t
-          case l @ Left(_) => l
+          case Right(b)       => f(b)
+          case left @ Left(_) => left
         }
 
     }

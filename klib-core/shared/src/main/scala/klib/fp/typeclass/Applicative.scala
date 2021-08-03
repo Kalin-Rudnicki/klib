@@ -6,10 +6,10 @@ trait Applicative[T[_]] extends Functor[T] {
 
   def pure[A](a: => A): T[A]
 
-  def aToF[A, B, C](t: T[A], f: (A, B) => C): T[B => C] =
+  final def aToF[A, B, C](t: T[A], f: (A, B) => C): T[B => C] =
     map[A, B => C](t, t => f(t, _))
 
-  def aJoin[A, B](t: T[A], t2: T[B]): T[(A, B)] =
+  final def aJoin[A, B](t: T[A], t2: T[B]): T[(A, B)] =
     apply[A, (A, B)](
       t,
       aToF[B, A, (A, B)](

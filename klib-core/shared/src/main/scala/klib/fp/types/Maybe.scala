@@ -147,9 +147,9 @@ object Maybe {
       override def pure[A](a: => A): Maybe[A] =
         Some(a)
 
-      override def flatten[A](t: Maybe[Maybe[A]]): Maybe[A] =
+      override def flatMap[A, B](t: Maybe[A], f: A => Maybe[B]): Maybe[B] =
         t match {
-          case Some(t) => t
+          case Some(a) => f(a)
           case None    => None
         }
 

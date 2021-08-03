@@ -32,17 +32,14 @@ object MaybeMonad {
       override def pure[A](a: => A): MaybeMonad[T, A] =
         new MaybeMonad(a.some.pure[T])
 
-      override def flatten[A](t: MaybeMonad[T, MaybeMonad[T, A]]): MaybeMonad[T, A] =
+      override def flatMap[A, B](t: MaybeMonad[T, A], f: A => MaybeMonad[T, B]): MaybeMonad[T, B] =
         new MaybeMonad(
-          t.wrapped
-            .flatMap {
-              case Some(inner) =>
-                inner.wrapped
-              case None =>
-                Maybe
-                  .empty[A]
-                  .pure[T]
-            },
+          t.wrapped.flatMap {
+            case Some(inner) =>
+              f(inner).wrapped
+            case None =>
+              Maybe.empty[B].pure[T]
+          },
         )
 
     }

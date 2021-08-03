@@ -237,11 +237,14 @@ object NonEmptyList {
       override def pure[A](a: => A): NonEmptyList[A] =
         NonEmptyList(a, Nil)
 
-      override def flatten[A](t: NonEmptyList[NonEmptyList[A]]): NonEmptyList[A] =
+      override def flatMap[A, B](t: NonEmptyList[A], f: A => NonEmptyList[B]): NonEmptyList[B] = {
+        val mappedHead = f(t.head)
+        val mappedTail = t.tail.flatMap(f(_).toList)
         NonEmptyList(
-          t.head.head,
-          t.head.tail ::: t.tail.flatMap(_.toList),
+          mappedHead.head,
+          mappedHead.tail ::: mappedTail,
         )
+      }
 
     }
 

@@ -74,17 +74,10 @@ object ErrorAccumulator {
       override def pure[A](a: => A): ErrorAccumulator[E, A] =
         Alive(a)
 
-      override def flatten[A](t: ErrorAccumulator[E, ErrorAccumulator[E, A]]): ErrorAccumulator[E, A] =
+      override def flatMap[A, B](t: ErrorAccumulator[E, A], f: A => ErrorAccumulator[E, B]): ErrorAccumulator[E, B] =
         t match {
-          case Alive(t) =>
-            t match {
-              case Alive(t) =>
-                Alive(t)
-              case d @ Dead(errors) =>
-                d
-            }
-          case d @ Dead(_) =>
-            d
+          case Alive(t)       => f(t)
+          case dead @ Dead(_) => dead
         }
 
     }

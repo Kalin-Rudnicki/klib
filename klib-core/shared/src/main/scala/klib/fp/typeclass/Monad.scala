@@ -2,12 +2,11 @@ package klib.fp.typeclass
 
 trait Monad[T[_]] extends Applicative[T] {
 
-  def flatten[A](t: T[T[A]]): T[A]
+  def flatMap[A, B](t: T[A], f: A => T[B]): T[B]
 
-  def flatMap[A, B](t: T[A], f: A => T[B]): T[B] =
-    flatten(map(t, f))
+  final def flatten[A](t: T[T[A]]): T[A] = flatMap[T[A], A](t, identity)
 
-  def flatApply[A, B](t: T[A], f: T[A => T[B]]): T[B] =
+  final def flatApply[A, B](t: T[A], f: T[A => T[B]]): T[B] =
     flatten(apply(t, f))
 
 }
@@ -76,14 +75,14 @@ object Monad {
         override def pure[A](a: => A): Future[A] =
           Future(a)
 
-        override def flatten[A](t: Future[Future[A]]): Future[A] = {
-          val p: Promise[A] = Promise()
+        override def flatMap[A, B](t: Future[A], f: A => Future[B]): Future[B] = {
+          val p: Promise[B] = Promise()
 
           t.onComplete {
             case Failure(exception) =>
               p.failure(exception)
             case Success(t2) =>
-              t2.onComplete {
+              f(t2).onComplete {
                 case Failure(exception) =>
                   p.failure(exception)
                 case Success(value) =>

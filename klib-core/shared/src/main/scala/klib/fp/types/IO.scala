@@ -142,8 +142,8 @@ object IO {
       override def pure[A](a: => A): IO[A] =
         IO(a)
 
-      override def flatten[A](t: IO[IO[A]]): IO[A] =
-        IO.wrapEffect { t.execute().flatMap(_.execute()) }
+      override def flatMap[A, B](t: IO[A], f: A => IO[B]): IO[B] =
+        IO.wrapEffect { t.execute().flatMap(f(_).execute()) }
 
     }
 
