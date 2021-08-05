@@ -24,7 +24,7 @@ inThisBuild(
       Resolver.sonatypeRepo("public"),
     ),
     //
-    description := "My personal FP library for scala.",
+    description := "FP & misc. utils library for Scala.",
     licenses := List("MIT" -> new URL("https://opensource.org/licenses/MIT")),
     homepage := Some(url(s"https://github.com/$githubUsername/$githubProject")),
     developers := List(
