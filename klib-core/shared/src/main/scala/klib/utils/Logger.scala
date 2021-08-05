@@ -421,7 +421,7 @@ object Logger {
 
   object helpers {
 
-    object Implicits {
+    trait Implicits {
 
       implicit def maybeEventToEvent(mEvent: Maybe[Event]): Event =
         mEvent.cata(identity, helpers())
@@ -430,6 +430,7 @@ object Logger {
         helpers(events)
 
     }
+    object Implicits extends Implicits
 
     def apply(events: List[Event]): Event =
       Event.Compound(events)

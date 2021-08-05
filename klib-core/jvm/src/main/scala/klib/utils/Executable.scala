@@ -6,7 +6,7 @@ import org.rogach.scallop._
 
 import klib.Implicits._
 import klib.fp.types._
-import klib.utils.Logger.{helpers => L}, L.Implicits._
+import klib.utils.Logger.{helpers => L}
 
 final case class Executable(execute: (Logger, List[String]) => IO[Unit]) {
 

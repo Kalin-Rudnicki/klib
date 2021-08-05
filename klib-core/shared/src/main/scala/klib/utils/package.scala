@@ -5,7 +5,7 @@ import klib.fp.types._
 
 package object utils {
 
-  trait Implicits extends ColorString.Implicits {
+  trait Implicits extends ColorString.Implicits with Logger.helpers.Implicits {
 
     implicit class TaggedIdOps[T](t: T) {
       def wrap[W <: @@[T, _]]: W = t.asInstanceOf[W]
