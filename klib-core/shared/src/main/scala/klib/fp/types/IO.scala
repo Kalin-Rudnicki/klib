@@ -3,7 +3,6 @@ package klib.fp.types
 import java.awt.image.BufferedImage
 import java.io.{File, PrintWriter, RandomAccessFile}
 import javax.imageio.ImageIO
-import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.Try
 
@@ -15,8 +14,10 @@ import klib.utils.Logger.{helpers => L}
 
 final class IO[+T](val execute: () => ?[T]) {
 
-  def toAsyncIO: AsyncIO[T] =
+  def toAsyncIO: AsyncIO[T] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
     AsyncIO.wrapIO(this)
+  }
 
   def runSync: ?[T] =
     execute()

@@ -39,6 +39,26 @@ object AsyncIO {
 
   // =====|  |=====
 
+  def runSequentially[T](ts: List[AsyncIO[T]])(implicit ec: ExecutionContext): AsyncIO[List[T]] =
+    ts match {
+      case head :: tail =>
+        for {
+          h <- head
+          t <- runSequentially(tail)
+        } yield h :: t
+      case Nil =>
+        Nil.pure[AsyncIO]
+    }
+
+  def runParallel[T](ts: List[AsyncIO[T]])(implicit ec: ExecutionContext): AsyncIO[List[T]] =
+    AsyncIO.wrapWrappedEffect {
+      Future
+        .traverse(ts)(_.execute())
+        .map(_.traverse)
+    }
+
+  // =====|  |=====
+
   implicit def asyncIOMonad(implicit ec: ExecutionContext): Monad[AsyncIO] =
     new Monad[AsyncIO] {
 
@@ -89,6 +109,14 @@ object AsyncIO {
 
           p.future
         }
+
+    }
+
+  implicit def asyncIOTraverseList(implicit ec: ExecutionContext): Traverse[List, AsyncIO] =
+    new Traverse[List, AsyncIO] {
+
+      override def traverse[T](t: List[AsyncIO[T]]): AsyncIO[List[T]] =
+        AsyncIO.runParallel(t)
 
     }
 
