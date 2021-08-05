@@ -15,6 +15,9 @@ import klib.utils.Logger.{helpers => L}
 
 final class IO[+T](val execute: () => ?[T]) {
 
+  def toAsyncIO: AsyncIO[T] =
+    AsyncIO.wrapIO(this)
+
   def runSync: ?[T] =
     execute()
 
