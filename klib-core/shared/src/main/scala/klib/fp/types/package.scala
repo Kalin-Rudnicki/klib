@@ -26,6 +26,11 @@ package object types {
 
   }
 
+  type Identity[T] = T
+  object Identity {
+    def apply[T](t: T): Identity[T] = t
+  }
+
   final case class Compound(children: List[Throwable]) extends Throwable(children.map(_.getMessage).mkString("\n"))
 
   trait Implicits extends Maybe.Implicits with Either.Implicits with ErrorAccumulator.Implicits with NonEmptyList.Implicits {
@@ -108,6 +113,35 @@ package object types {
         new MaybeMonad(t)
 
     }
+
+    // ---  ---
+
+    implicit val identityMonad: Monad[Identity] =
+      new Monad[Identity] {
+
+        override def map[A, B](t: Identity[A], f: A => B): Identity[B] = f(t)
+
+        override def apply[A, B](t: Identity[A], f: Identity[A => B]): Identity[B] = f(t)
+
+        override def pure[A](a: => A): Identity[A] = a
+
+        override def flatMap[A, B](t: Identity[A], f: A => Identity[B]): Identity[B] = f(t)
+
+      }
+
+    implicit val identityTraverseList: Traverse[List, Identity] =
+      new Traverse[List, Identity] {
+
+        override def traverse[T](t: List[Identity[T]]): Identity[List[T]] = t
+
+      }
+
+    implicit def anythingTraverseIdentity[A[_]]: Traverse[Identity, A] =
+      new Traverse[Identity, A] {
+
+        override def traverse[T](t: Identity[A[T]]): A[Identity[T]] = t
+
+      }
 
   }
   object Implicits extends Implicits
