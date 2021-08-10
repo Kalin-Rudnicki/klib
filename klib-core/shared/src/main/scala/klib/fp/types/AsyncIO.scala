@@ -36,6 +36,12 @@ object AsyncIO {
   def wrapEffect[T](t: => ?[T]): AsyncIO[T] =
     AsyncIO.wrapWrappedEffect(Future(t)(_))
 
+  // NOTE : Wrapping an already created future has unknown behavior
+  //      : bad :
+  //      : val fT: Future[Int] =  Future(5)
+  //      : val aT: AsyncIO[Int] = AsyncIO.wrapFuture(_ => fT)
+  //      : good:
+  //      : val aT: AsyncIO[Int] = AsyncIO.wrapFuture(Future(5)(_))
   def wrapFuture[T](t: ExecutionContext => Future[T]): AsyncIO[T] =
     wrapWrappedEffect { ec =>
       t(ec).map(_.pure[?])(ec)
