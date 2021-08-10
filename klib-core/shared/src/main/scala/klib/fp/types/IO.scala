@@ -15,7 +15,6 @@ import klib.utils.Logger.{helpers => L}
 final class IO[+T](val execute: () => ?[T]) {
 
   def toAsyncIO: AsyncIO[T] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
     AsyncIO.wrapIO(this)
   }
 
