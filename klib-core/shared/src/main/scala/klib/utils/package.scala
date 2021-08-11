@@ -29,6 +29,25 @@ package object utils {
 
     }
 
+    // ---  ---
+
+    implicit class AlignStringOps(str: String) {
+
+      def leftAlign(width: Int, padChar: Char = ' '): String =
+        s"$str${padChar.toString * (width - str.length).max(0)}"
+
+      def rightAlign(width: Int, padChar: Char = ' '): String =
+        s"${padChar.toString * (width - str.length).max(0)}$str"
+
+      def centerAlign(width: Int, padChar: Char = ' '): String = {
+        val extra = (width - str.length).max(0)
+        val left = extra / 2
+        val right = extra - left
+        s"${padChar.toString * left}$str${padChar.toString * right}"
+      }
+
+    }
+
   }
   object Implicits extends Implicits
 
