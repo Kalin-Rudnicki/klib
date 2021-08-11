@@ -68,8 +68,8 @@ final class IO[+T](val execute: () => ?[T]) {
             `try`(self),
             `finally`(self),
           )
+          .map(_._1)
       }
-      .map(_._1)
 
   def timed(withTime: Long => IO[Unit]): IO[T] =
     for {

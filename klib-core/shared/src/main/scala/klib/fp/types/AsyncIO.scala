@@ -5,6 +5,7 @@ import scala.concurrent.duration.Duration
 
 import klib.Implicits._
 import klib.fp.typeclass._
+import klib.fp.utils.ado
 
 final class AsyncIO[+T](val execute: ExecutionContext => Future[?[T]]) {
 
@@ -23,8 +24,21 @@ final class AsyncIO[+T](val execute: ExecutionContext => Future[?[T]]) {
   def toIOGlobal(duration: Maybe[Duration]): IO[T] =
     toIO(duration)(ExecutionContext.global)
 
+  // =====|  |=====
+
   def unLift: AsyncIO[?[T]] =
     AsyncIO.wrapFuture(execute)
+
+  def bracket[T2](`try`: T => AsyncIO[T2])(`finally`: T => AsyncIO[Unit]): AsyncIO[T2] =
+    this
+      .flatMap { self =>
+        ado[AsyncIO](AsyncIO.sequentialAsyncIOMonad)
+          .join(
+            `try`(self),
+            `finally`(self),
+          )
+          .map(_._1)
+      }
 
 }
 
@@ -75,20 +89,48 @@ object AsyncIO {
 
   // =====|  |=====
 
-  implicit val asyncIOMonad: Monad[AsyncIO] =
-    new Monad[AsyncIO] {
+  sealed trait AsyncIOMonad extends Monad[AsyncIO] {
 
-      override def map[A, B](t: AsyncIO[A], f: A => B): AsyncIO[B] =
-        AsyncIO.wrapWrappedEffect { ec =>
-          val p: Promise[?[B]] = Promise()
+    override final def map[A, B](t: AsyncIO[A], f: A => B): AsyncIO[B] =
+      AsyncIO.wrapWrappedEffect { ec =>
+        val p: Promise[?[B]] = Promise()
 
-          t.execute(ec)
-            .onComplete { t =>
-              p.success(t.to_?.flatten.map(f))
-            }(ec)
+        t.execute(ec)
+          .onComplete { t =>
+            p.success(t.to_?.flatten.map(f))
+          }(ec)
 
-          p.future
-        }
+        p.future
+      }
+
+    override final def pure[A](a: => A): AsyncIO[A] =
+      AsyncIO(a)
+
+    override final def flatMap[A, B](t: AsyncIO[A], f: A => AsyncIO[B]): AsyncIO[B] =
+      AsyncIO.wrapWrappedEffect { ec =>
+        val p: Promise[?[B]] = Promise()
+
+        t.execute(ec)
+          .onComplete { t =>
+            t.to_?.flatten match {
+              case Alive(r) =>
+                f(r)
+                  .execute(ec)
+                  .onComplete { f =>
+                    p.success(f.to_?.flatten)
+                  }(ec)
+              case dead @ Dead(_) =>
+                p.success(dead)
+            }
+          }(ec)
+
+        p.future
+      }
+
+  }
+
+  val parallelAsyncIOMonad: Monad[AsyncIO] =
+    new AsyncIOMonad {
 
       override def apply[A, B](t: AsyncIO[A], f: AsyncIO[A => B]): AsyncIO[B] =
         AsyncIO.wrapWrappedEffect { ec =>
@@ -106,31 +148,29 @@ object AsyncIO {
           p.future
         }
 
-      override def pure[A](a: => A): AsyncIO[A] =
-        AsyncIO(a)
+    }
 
-      override def flatMap[A, B](t: AsyncIO[A], f: A => AsyncIO[B]): AsyncIO[B] =
+  val sequentialAsyncIOMonad: Monad[AsyncIO] =
+    new AsyncIOMonad {
+
+      override def apply[A, B](t: AsyncIO[A], f: AsyncIO[A => B]): AsyncIO[B] =
         AsyncIO.wrapWrappedEffect { ec =>
           val p: Promise[?[B]] = Promise()
 
           t.execute(ec)
             .onComplete { t =>
-              t.to_?.flatten match {
-                case Alive(r) =>
-                  f(r)
-                    .execute(ec)
-                    .onComplete { f =>
-                      p.success(f.to_?.flatten)
-                    }(ec)
-                case dead @ Dead(_) =>
-                  p.success(dead)
-              }
+              f.execute(ec)
+                .onComplete { f =>
+                  p.success(t.to_?.flatten.apply(f.to_?.flatten))
+                }(ec)
             }(ec)
 
           p.future
         }
 
     }
+
+  implicit val defaultAsyncIOMonad: Monad[AsyncIO] = parallelAsyncIOMonad
 
   implicit val asyncIOTraverseList: Traverse[List, AsyncIO] =
     new Traverse[List, AsyncIO] {
