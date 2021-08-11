@@ -23,6 +23,9 @@ final class AsyncIO[+T](val execute: ExecutionContext => Future[?[T]]) {
   def toIOGlobal(duration: Maybe[Duration]): IO[T] =
     toIO(duration)(ExecutionContext.global)
 
+  def unLift: AsyncIO[?[T]] =
+    AsyncIO.wrapFuture(execute)
+
 }
 
 object AsyncIO {
