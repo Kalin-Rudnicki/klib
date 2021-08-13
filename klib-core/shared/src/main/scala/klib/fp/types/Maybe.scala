@@ -190,6 +190,20 @@ object Maybe {
 
     }
 
+  implicit val maybeTraverseNonEmptyList: Traverse[NonEmptyList, Maybe] =
+    new Traverse[NonEmptyList, Maybe] {
+
+      override def traverse[T](t: NonEmptyList[Maybe[T]]): Maybe[NonEmptyList[T]] = {
+        import klib.Implicits._
+
+        for {
+          head <- t.head
+          tail <- t.tail.traverse
+        } yield NonEmptyList(head, tail)
+      }
+
+    }
+
   implicit def applicativeTraverseMaybe[A[_]](implicit aApplicative: Applicative[A]): Traverse[Maybe, A] =
     new Traverse[Maybe, A] {
 
