@@ -158,4 +158,12 @@ object IO {
 
     }
 
+  implicit val ioTraverseNonEmptyList: Traverse[NonEmptyList, IO] =
+    new Traverse[NonEmptyList, IO] {
+
+      override def traverse[T](t: NonEmptyList[IO[T]]): IO[NonEmptyList[T]] =
+        IO.wrapEffect { t.map(_.runSync).traverse }
+
+    }
+
 }
