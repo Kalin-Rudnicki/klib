@@ -197,6 +197,9 @@ object NonEmptyList {
   def nel[A](head: A, tails: A*): NonEmptyList[A] =
     NonEmptyList(head, tails.toList)
 
+  def nelJoin[A](_1: Maybe[A]*)(_2: A)(_3: Maybe[A]*): NonEmptyList[A] =
+    _1.toList.flatMap(_.toOption) ::: NonEmptyList(_2, _3.toList.flatMap(_.toOption))
+
   trait Implicits {
 
     implicit class NonEmptyListListOps[A](list: List[A]) {
