@@ -11,6 +11,7 @@ final class Logger private (
     defaultFlags: Set[String],
     defaultIgnoredPackages: Set[String],
     defaultIndentString: String,
+    defaultColorMode: Logger.ColorMode,
     sources: List[Logger.Source],
 ) {
 
@@ -21,6 +22,7 @@ final class Logger private (
       defaultFlags: Set[String] = this.defaultFlags,
       defaultIgnoredPackages: Set[String] = this.defaultIgnoredPackages,
       defaultIndentString: String = this.defaultIndentString,
+      defaultColorMode: Logger.ColorMode = this.defaultColorMode,
       sources: List[Logger.Source] = this.sources,
   ): Logger =
     new Logger(
@@ -28,6 +30,7 @@ final class Logger private (
       defaultFlags = defaultFlags,
       defaultIndentString = defaultIndentString,
       defaultIgnoredPackages = defaultIgnoredPackages,
+      defaultColorMode = defaultColorMode,
       sources = sources,
     )
 
@@ -71,6 +74,7 @@ final class Logger private (
       additionalFlags: Maybe[Set[String]] = None,
       additionalIgnoredPackages: Maybe[Set[String]] = None, // TODO (KR) : Possibly tweak how this is done (?)
       indentString: Maybe[String] = None,
+      colorMode: Maybe[Logger.ColorMode] = None,
   ): Unit = {
     val logTol: Logger.LogLevel =
       logTolerance.getOrElse(this.defaultLogTolerance)
@@ -80,6 +84,8 @@ final class Logger private (
       additionalIgnoredPackages.cata(this.defaultIgnoredPackages ++ _, this.defaultIgnoredPackages)
     val idtStr: String =
       indentString.getOrElse(this.defaultIndentString)
+    val colMode: Logger.ColorMode =
+      colorMode.getOrElse(this.defaultColorMode)
 
     val ignoreStackTraceElements: List[Logger.IgnoreStackTraceElement] =
       ignoredPackages.toList.map(Logger.IgnoreStackTraceElement.ignorePackage)
@@ -101,7 +107,7 @@ final class Logger private (
               _.toString.replaceAll("\n", s"${Logger.LogLevel.DisplayNameNewLine}:$indent"),
               "null",
             )
-        s"${logLevel.tag}:$indent$messageString"
+        s"${logLevel.tag(colMode)}:$indent$messageString"
       }
 
       event match {
@@ -184,11 +190,19 @@ final class Logger private (
 
 object Logger {
 
+  sealed trait ColorMode
+  object ColorMode {
+    case object Extended extends ColorMode
+    case object Simple extends ColorMode
+    case object Colorless extends ColorMode
+  }
+
   def apply(
       defaultLogTolerance: LogLevel with LogLevel.Tolerance,
       defaultFlags: Set[String] = Set.empty,
       defaultIgnorePackages: Set[String] = Set.empty,
       defaultIndentStr: String = "    ",
+      defaultColorMode: ColorMode = ColorMode.Extended,
   ): Logger =
     new Logger(
       defaultLogTolerance = defaultLogTolerance,
@@ -199,6 +213,7 @@ object Logger {
         "scala.util.Try",
       ) ++ defaultIgnorePackages,
       defaultIndentString = defaultIndentStr,
+      defaultColorMode = defaultColorMode,
       sources = List(
         new Source(
           printlnF = Console.out.println(_),
@@ -212,22 +227,33 @@ object Logger {
       val priority: Int,
       val name: String,
       val displayName: String,
-      val color: Color,
+      val extendedColor: Color,
+      val simpleColor: Color,
   ) {
 
-    def tag: String = {
+    private def color(colorMode: ColorMode): Color =
+      colorMode match {
+        case ColorMode.Extended  => extendedColor
+        case ColorMode.Simple    => simpleColor
+        case ColorMode.Colorless => Color.Default
+      }
+
+    def tag(colorMode: ColorMode): String = {
       val paddedName = displayName.padTo(LogLevel.MaxDisplayNameLength, ' ')
-      color match {
+      color(colorMode) match {
         case Color.Default =>
           s"[$paddedName]"
-        case _ =>
+        case cmColor =>
           def ansi(color: Color): String = s"\u001b[${color.fgMod}m"
-          s"[${ansi(color)}$paddedName${ansi(Color.Default)}]"
+          s"[${ansi(cmColor)}$paddedName${ansi(Color.Default)}]"
       }
     }
 
+    def toString(colorMode: ColorMode): String =
+      s"$name${tag(colorMode)}($priority)"
+
     override def toString: String =
-      s"$name$tag($priority)"
+      toString(ColorMode.Extended)
 
   }
   object LogLevel {
@@ -238,7 +264,8 @@ object Logger {
           priority = 0,
           name = "Never",
           displayName = "NEVER",
-          color = Color.Default, // TODO (KR) :
+          extendedColor = Color.Default, // TODO (KR) :
+          simpleColor = Color.Default, // TODO (KR) :
         )
 
     case object Debug
@@ -246,7 +273,8 @@ object Logger {
           priority = 1,
           name = "Debug",
           displayName = "DEBUG",
-          color = Color.RGB.fromHex(0x0277bd),
+          extendedColor = Color.RGB.fromHex(0x0277bd),
+          simpleColor = Color.Named.Cyan,
         )
         with Tolerance
 
@@ -255,7 +283,8 @@ object Logger {
           priority = 2,
           name = "Detailed",
           displayName = "DETLD",
-          color = Color.RGB.fromHex(0x66bb6a),
+          extendedColor = Color.RGB.fromHex(0x66bb6a),
+          simpleColor = Color.Named.Blue,
         )
         with Tolerance
 
@@ -264,7 +293,8 @@ object Logger {
           priority = 3,
           name = "Info",
           displayName = "INFO",
-          color = Color.RGB.fromHex(0x1b5e20),
+          extendedColor = Color.RGB.fromHex(0x1b5e20),
+          simpleColor = Color.Named.Green,
         )
         with Tolerance
 
@@ -273,7 +303,8 @@ object Logger {
           priority = 4,
           name = "Important",
           displayName = "IMPRT",
-          color = Color.RGB.fromHex(0x880e4f),
+          extendedColor = Color.RGB.fromHex(0x880e4f),
+          simpleColor = Color.Named.Yellow,
         )
         with Tolerance
 
@@ -282,7 +313,8 @@ object Logger {
           priority = 5,
           name = "Warning",
           displayName = "WARN",
-          color = Color.RGB.fromHex(0xffff00),
+          extendedColor = Color.RGB.fromHex(0xffff00),
+          simpleColor = Color.Named.Yellow,
         )
         with Tolerance
 
@@ -291,7 +323,8 @@ object Logger {
           priority = 6,
           name = "Error",
           displayName = "ERROR",
-          color = Color.RGB.fromHex(0xff3d00),
+          extendedColor = Color.RGB.fromHex(0xff3d00),
+          simpleColor = Color.Named.Red,
         )
         with Tolerance
 
@@ -300,7 +333,8 @@ object Logger {
           priority = 7,
           name = "Fatal",
           displayName = "FATAL",
-          color = Color.RGB.fromHex(0xd50000),
+          extendedColor = Color.RGB.fromHex(0xd50000),
+          simpleColor = Color.Named.Red,
         )
         with Tolerance
 
@@ -309,7 +343,8 @@ object Logger {
           priority = 8,
           name = "Always",
           displayName = "ALWYS",
-          color = Color.Default, // TODO (KR) :
+          extendedColor = Color.Default, // TODO (KR) :
+          simpleColor = Color.Default,
         )
         with Tolerance
 
