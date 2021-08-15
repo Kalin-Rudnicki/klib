@@ -66,6 +66,11 @@ final class Logger private (
   def withDefaultIndentString(defaultIndentString: String): Logger =
     copy(defaultIndentString = defaultIndentString)
 
+  // --- Color Mode ---
+
+  def withColorMode(colorMode: Logger.ColorMode): Logger =
+    copy(defaultColorMode = colorMode)
+
   // =====|  |=====
 
   def unsafeLog(
