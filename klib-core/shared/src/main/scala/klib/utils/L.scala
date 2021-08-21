@@ -126,7 +126,8 @@ object L {
     Logger.Event.Indented(event, by)
 
   def requireFlags(flags: String*)(event: => Logger.Event): Logger.Event =
-    Logger.Event.RequireFlags(flags.toSet, () => event)
+    if (flags.isEmpty) event
+    else Logger.Event.RequireFlags(flags.toSet, () => event)
 
   def break(printIndent: Boolean = true): Logger.Event =
     Logger.Event.Break(printIndent)

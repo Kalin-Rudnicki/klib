@@ -174,18 +174,18 @@ final class Logger private (
 
     // ---  ---
 
-    def simple(logLevel: Logger.LogLevel, message: Any): Unit =
-      apply(Logger.Event.Log(logLevel, message))
+    def simple(logLevel: Logger.LogLevel, message: Any, flags: String*): Unit =
+      apply(L.requireFlags(flags: _*)(L.log(logLevel, message)))
 
-    def never(message: Any): Unit = simple(Logger.LogLevel.Never, message)
-    def debug(message: Any): Unit = simple(Logger.LogLevel.Debug, message)
-    def detailed(message: Any): Unit = simple(Logger.LogLevel.Detailed, message)
-    def info(message: Any): Unit = simple(Logger.LogLevel.Info, message)
-    def important(message: Any): Unit = simple(Logger.LogLevel.Important, message)
-    def warning(message: Any): Unit = simple(Logger.LogLevel.Warning, message)
-    def error(message: Any): Unit = simple(Logger.LogLevel.Error, message)
-    def fatal(message: Any): Unit = simple(Logger.LogLevel.Fatal, message)
-    def always(message: Any): Unit = simple(Logger.LogLevel.Always, message)
+    def never(message: Any, flags: String*): Unit = simple(Logger.LogLevel.Never, message, flags: _*)
+    def debug(message: Any, flags: String*): Unit = simple(Logger.LogLevel.Debug, message, flags: _*)
+    def detailed(message: Any, flags: String*): Unit = simple(Logger.LogLevel.Detailed, message, flags: _*)
+    def info(message: Any, flags: String*): Unit = simple(Logger.LogLevel.Info, message, flags: _*)
+    def important(message: Any, flags: String*): Unit = simple(Logger.LogLevel.Important, message, flags: _*)
+    def warning(message: Any, flags: String*): Unit = simple(Logger.LogLevel.Warning, message, flags: _*)
+    def error(message: Any, flags: String*): Unit = simple(Logger.LogLevel.Error, message, flags: _*)
+    def fatal(message: Any, flags: String*): Unit = simple(Logger.LogLevel.Fatal, message, flags: _*)
+    def always(message: Any, flags: String*): Unit = simple(Logger.LogLevel.Always, message, flags: _*)
 
     def throwable(
         throwable: Throwable,
@@ -227,18 +227,18 @@ final class Logger private (
 
     // ---  ---
 
-    def simple(logLevel: Logger.LogLevel, message: Any): IO[Unit] =
-      apply(Logger.Event.Log(logLevel, message))
+    def simple(logLevel: Logger.LogLevel, message: Any, flags: String*): IO[Unit] =
+      apply(L.requireFlags(flags: _*)(L.log(logLevel, message)))
 
-    def never(message: Any): IO[Unit] = simple(Logger.LogLevel.Never, message)
-    def debug(message: Any): IO[Unit] = simple(Logger.LogLevel.Debug, message)
-    def detailed(message: Any): IO[Unit] = simple(Logger.LogLevel.Detailed, message)
-    def info(message: Any): IO[Unit] = simple(Logger.LogLevel.Info, message)
-    def important(message: Any): IO[Unit] = simple(Logger.LogLevel.Important, message)
-    def warning(message: Any): IO[Unit] = simple(Logger.LogLevel.Warning, message)
-    def error(message: Any): IO[Unit] = simple(Logger.LogLevel.Error, message)
-    def fatal(message: Any): IO[Unit] = simple(Logger.LogLevel.Fatal, message)
-    def always(message: Any): IO[Unit] = simple(Logger.LogLevel.Always, message)
+    def never(message: Any, flags: String*): IO[Unit] = simple(Logger.LogLevel.Never, message, flags: _*)
+    def debug(message: Any, flags: String*): IO[Unit] = simple(Logger.LogLevel.Debug, message, flags: _*)
+    def detailed(message: Any, flags: String*): IO[Unit] = simple(Logger.LogLevel.Detailed, message, flags: _*)
+    def info(message: Any, flags: String*): IO[Unit] = simple(Logger.LogLevel.Info, message, flags: _*)
+    def important(message: Any, flags: String*): IO[Unit] = simple(Logger.LogLevel.Important, message, flags: _*)
+    def warning(message: Any, flags: String*): IO[Unit] = simple(Logger.LogLevel.Warning, message, flags: _*)
+    def error(message: Any, flags: String*): IO[Unit] = simple(Logger.LogLevel.Error, message, flags: _*)
+    def fatal(message: Any, flags: String*): IO[Unit] = simple(Logger.LogLevel.Fatal, message, flags: _*)
+    def always(message: Any, flags: String*): IO[Unit] = simple(Logger.LogLevel.Always, message, flags: _*)
 
     def throwable(
         throwable: Throwable,
@@ -459,7 +459,12 @@ object Logger {
 
   }
 
-  sealed trait Event
+  sealed trait Event {
+
+    def requireFlags(flags: String*): Event =
+      L.requireFlags(flags: _*)(this)
+
+  }
   object Event {
 
     final case class Compound(events: List[Event]) extends Event
