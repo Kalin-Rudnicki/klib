@@ -9,8 +9,7 @@ import scala.util.Try
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.utils.ado
-import klib.utils.Logger
-import klib.utils.Logger.{helpers => L}
+import klib.utils._
 
 final class IO[+T](val execute: () => ?[T]) {
 
@@ -36,7 +35,7 @@ final class IO[+T](val execute: () => ?[T]) {
           }
 
         def attemptWriteToLogger(logger: Logger): Unit =
-          logger(L(runSyncErrors.map(L.log.throwable(_)))).runSync match {
+          logger.log(L(runSyncErrors.map(L.log.throwable(_)))).runSync match {
             case Alive(_) =>
             case Dead(logErrors) =>
               writeToConsoleErr(runSyncErrors ::: logErrors)

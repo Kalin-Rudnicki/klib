@@ -6,7 +6,6 @@ import org.rogach.scallop._
 
 import klib.Implicits._
 import klib.fp.types._
-import klib.utils.Logger.{helpers => L}
 
 final case class Executable(execute: (Logger, List[String]) => IO[Unit]) {
 
@@ -20,35 +19,12 @@ final case class Executable(execute: (Logger, List[String]) => IO[Unit]) {
           split_--(tail, head :: stack)
         case Nil =>
           /*
-              TODO (KR) : Decide how this should be handled
-                        : ["A", "B"] => ([], ["A", "B"])
-                        : ["A", "B"] => (["A", "B"], [])
-                        : Update banner in LoggerConf if this changes
+              NOTE : ["A", "B"] => ([], ["A", "B"])
+                   : ["A", "B"] => (["A", "B"], [])
+                   : Update banner in LoggerConf if this changes
            */
           (Nil, stack.reverse)
       }
-
-    def throwablesEvent(
-        label: String,
-        messageLevel: Logger.LogLevel,
-        throwables: List[Throwable],
-    ): Logger.Event =
-      if (throwables.nonEmpty)
-        L(
-          L.log(messageLevel, s"=====| $label${(throwables.size == 1) ? "" | "s"} [${throwables.size}] |====="),
-          L.indented(
-            throwables.map(L.log.throwable(_, messageLevel)),
-          ),
-        )
-      else
-        L()
-
-    def resEvent(res: Maybe[Unit]): Logger.Event =
-      L.log.always(
-        res.isEmpty ?
-          "<Failure>".toColorString.red |
-          "<Success>".toColorString.green,
-      )
 
     val (loggerArgs, programArgs) = split_--(args.toList, Nil)
 
@@ -56,22 +32,23 @@ final case class Executable(execute: (Logger, List[String]) => IO[Unit]) {
       case Right(loggerConf) =>
         val logger = loggerConf.logger
         for {
-          _ <- loggerConf.clear().maybe(logger(L(L.ansi.cursorPos(1, 1), L.ansi.clearScreen()))).traverse
+          _ <- loggerConf.clear().maybe(logger.log(L(L.ansi.cursorPos(1, 1), L.ansi.clearScreen()))).traverse
           res <- execute(logger, programArgs).runSync.pure[IO]
-          _ <- logger(
+          _ <- logger.log(
             res match {
               case Alive(r) =>
-                resEvent(r.some)
+                L.log.always("<Success>".toColorString.green) // TODO (KR) : Only include with flag (?)
               case Dead(errors) =>
                 L(
-                  throwablesEvent("Error", Logger.LogLevel.Fatal, errors),
-                  resEvent(None),
+                  L.log.fatal(s"=====| Error${(errors.size == 1) ? "" | "s"} [${errors.size}] |====="),
+                  errors.map(L.log.throwable(_)),
+                  L.log.always("<Failure>".toColorString.red), // TODO (KR) : Only include with flag (?)
                 )
             },
           )
         } yield ()
       case Left(logEvent) =>
-        Logger(Logger.LogLevel.Info)(logEvent)
+        Logger(Logger.LogLevel.Info).log(logEvent)
     }
   }
 
@@ -148,7 +125,7 @@ object Executable {
         case Right(conf) =>
           run(logger, conf)
         case Left(logEvent) =>
-          logger(logEvent)
+          logger.log(logEvent)
       }
     }
 

@@ -15,25 +15,19 @@ sealed trait Maybe[+A] {
 
   def orElse[A2 >: A](a: Maybe[A2]): Maybe[A2] =
     this match {
-      case Some(_) =>
-        this
-      case None =>
-        a
+      case Some(_) => this
+      case None    => a
     }
 
   def filter(f: A => Boolean): Maybe[A] =
     this match {
-      case Some(a) if !f(a) =>
-        None
-      case _ =>
-        this
+      case Some(a) if !f(a) => None
+      case _                => this
     }
   def filterNot(f: A => Boolean): Maybe[A] =
     this match {
-      case Some(a) if f(a) =>
-        None
-      case _ =>
-        this
+      case Some(a) if f(a) => None
+      case _               => this
     }
 
   def toOption: Option[A] =
@@ -56,18 +50,14 @@ sealed trait Maybe[+A] {
 
   def cata[B](mapF: A => B, orElse: => B): B =
     this match {
-      case Some(a) =>
-        mapF(a)
-      case None =>
-        orElse
+      case Some(a) => mapF(a)
+      case None    => orElse
     }
 
   def toEA[E](errs: E*): ErrorAccumulator[E, A] =
     this match {
-      case Some(a) =>
-        Alive(a)
-      case None =>
-        Dead(errs.toList)
+      case Some(a) => Alive(a)
+      case None    => Dead(errs.toList)
     }
 
   def <<?[E](errs: E*): ErrorAccumulator[E, A] =
@@ -75,19 +65,37 @@ sealed trait Maybe[+A] {
 
   def isEmpty: Boolean =
     this match {
-      case Some(_) =>
-        false
-      case None =>
-        true
+      case Some(_) => false
+      case None    => true
     }
 
   def nonEmpty: Boolean =
     this match {
-      case Some(_) =>
-        true
-      case None =>
-        false
+      case Some(_) => true
+      case None    => false
     }
+
+  // =====|  |=====
+
+  def toString(
+      beforeSome: String = "",
+      afterSome: String = "",
+      mapSome: A => String = _.toString,
+      none: String = "null",
+  ): String =
+    this match {
+      case Some(a) => s"$beforeSome${mapSome(a)}$afterSome"
+      case None    => none
+    }
+
+  override def toString: String =
+    toString(beforeSome = "Some(", afterSome = ")", none = "None")
+
+  def toStringNull(f: A => String): String = toString(mapSome = f)
+  def toStringNull: String = toString()
+
+  def toStringEmpty(f: A => String): String = toString(mapSome = f, none = "")
+  def toStringEmpty: String = toString(none = "")
 
 }
 

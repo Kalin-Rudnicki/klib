@@ -4,7 +4,6 @@ import scala.language.implicitConversions
 
 import klib.Implicits._
 import klib.fp.types._
-import klib.utils.Logger.{helpers => L}
 
 final class Logger private (
     defaultLogTolerance: Logger.LogLevel with Logger.LogLevel.Tolerance,
@@ -13,7 +12,7 @@ final class Logger private (
     defaultIndentString: String,
     defaultColorMode: Logger.ColorMode,
     sources: List[Logger.Source],
-) {
+) { logger =>
 
   // =====| Create new logger with changes |=====
 
@@ -68,128 +67,199 @@ final class Logger private (
 
   // --- Color Mode ---
 
-  def withColorMode(colorMode: Logger.ColorMode): Logger =
+  def withDefaultColorMode(colorMode: Logger.ColorMode): Logger =
     copy(defaultColorMode = colorMode)
 
   // =====|  |=====
 
-  def unsafeLog(
-      event: Logger.Event,
-      logTolerance: Maybe[Logger.LogLevel with Logger.LogLevel.Tolerance] = None,
-      additionalFlags: Maybe[Set[String]] = None,
-      additionalIgnoredPackages: Maybe[Set[String]] = None, // TODO (KR) : Possibly tweak how this is done (?)
-      indentString: Maybe[String] = None,
-      colorMode: Maybe[Logger.ColorMode] = None,
-  ): Unit = {
-    val logTol: Logger.LogLevel =
-      logTolerance.getOrElse(this.defaultLogTolerance)
-    val flags: Set[String] =
-      additionalFlags.cata(this.defaultFlags ++ _, this.defaultFlags)
-    val ignoredPackages: Set[String] =
-      additionalIgnoredPackages.cata(this.defaultIgnoredPackages ++ _, this.defaultIgnoredPackages)
-    val idtStr: String =
-      indentString.getOrElse(this.defaultIndentString)
-    val colMode: Logger.ColorMode =
-      colorMode.getOrElse(this.defaultColorMode)
+  object unsafeLog {
 
-    val ignoreStackTraceElements: List[Logger.IgnoreStackTraceElement] =
-      ignoredPackages.toList.map(Logger.IgnoreStackTraceElement.ignorePackage)
-
-    def conditionally(logLevel: Logger.LogLevel)(f: => Unit): Unit =
-      if (logLevel.priority >= logTol.priority)
-        f
-
-    def handle(
-        indent: String,
+    def apply(
         event: Logger.Event,
+        logTolerance: Maybe[Logger.LogLevel with Logger.LogLevel.Tolerance] = None,
+        additionalFlags: Maybe[Set[String]] = None,
+        additionalIgnoredPackages: Maybe[Set[String]] = None, // TODO (KR) : Possibly tweak how this is done (?)
+        indentString: Maybe[String] = None,
+        colorMode: Maybe[Logger.ColorMode] = None,
     ): Unit = {
-      import Logger.helpers.Implicits._
+      val logTol: Logger.LogLevel =
+        logTolerance.getOrElse(logger.defaultLogTolerance)
+      val flags: Set[String] =
+        additionalFlags.cata(logger.defaultFlags ++ _, logger.defaultFlags)
+      val ignoredPackages: Set[String] =
+        additionalIgnoredPackages.cata(logger.defaultIgnoredPackages ++ _, logger.defaultIgnoredPackages)
+      val idtStr: String =
+        indentString.getOrElse(logger.defaultIndentString)
+      val colMode: Logger.ColorMode =
+        colorMode.getOrElse(logger.defaultColorMode)
 
-      def buildString(logLevel: Logger.LogLevel, message: Any): String = {
-        val messageString =
-          Maybe(message)
-            .cata(
-              _.toString.replaceAll("\n", s"${Logger.LogLevel.DisplayNameNewLine}:$indent"),
-              "null",
-            )
-        s"${logLevel.tag(colMode)}:$indent$messageString"
-      }
+      val ignoreStackTraceElements: List[Logger.IgnoreStackTraceElement] =
+        ignoredPackages.toList.map(Logger.IgnoreStackTraceElement.ignorePackage)
 
-      event match {
-        case Logger.Event.Compound(events) =>
-          events.foreach(handle(indent, _))
-        case Logger.Event.Log(logLevel, message) =>
-          conditionally(logLevel) {
-            val str = buildString(logLevel, message)
-            sources.foreach(_.println(str))
-          }
-        case Logger.Event.Break(printIndent) =>
-          sources.foreach(_.break(printIndent))
-        case Logger.Event.Indented(event, by) =>
-          handle(indent + idtStr * by.max(0), event)
-        case logThrowable @ Logger.Event.LogThrowable(_, _, _, _) =>
-          def expand(event: Logger.Event.LogThrowable): Logger.Event =
-            L(
-              L.log(event.messageLevel, s"${event.throwable.getMessage} (${event.throwable.getClass.getSimpleName})"),
-              L.indented(
-                L(
-                  L.log(event.stackTraceLevel, "stack-trace:"),
-                  L.indented(
-                    Logger.IgnoreStackTraceElement.trimmedTrace(event.throwable, ignoreStackTraceElements).map { ste =>
-                      L.log(event.stackTraceLevel, ste.toString)
+      def conditionally(logLevel: Logger.LogLevel)(f: => Unit): Unit =
+        if (logLevel.priority >= logTol.priority)
+          f
+
+      def handle(
+          indent: String,
+          event: Logger.Event,
+      ): Unit = {
+        def buildString(logLevel: Logger.LogLevel, message: Any): String = {
+          val messageString =
+            Maybe(message)
+              .cata(
+                _.toString.replaceAll("\n", s"${Logger.LogLevel.DisplayNameNewLine}:$indent"),
+                "null",
+              )
+          s"${logLevel.tag(colMode)}:$indent$messageString"
+        }
+
+        event match {
+          case Logger.Event.Compound(events) =>
+            events.foreach(handle(indent, _))
+          case Logger.Event.Log(logLevel, message) =>
+            conditionally(logLevel) {
+              val str = buildString(logLevel, message)
+              sources.foreach(_.println(str))
+            }
+          case Logger.Event.Break(printIndent) =>
+            sources.foreach(_.break(printIndent))
+          case Logger.Event.Indented(event, by) =>
+            handle(indent + idtStr * by.max(0), event)
+          case event @ Logger.Event.LogThrowable(_, _, _, _) =>
+            handle(
+              indent,
+              L(
+                L.log(event.messageLevel, Maybe(event.throwable.getMessage).getOrElse(event.throwable.toString)),
+                L.indented(
+                  L(
+                    L.log(event.stackTraceLevel, "stack-trace:"),
+                    L.indented(
+                      Logger.IgnoreStackTraceElement.trimmedTrace(event.throwable, ignoreStackTraceElements).map { ste =>
+                        L.log(event.stackTraceLevel, ste.toString)
+                      },
+                    ),
+                    event.causeEvent.map { eCause =>
+                      L(
+                        L.log(event.messageLevel, "cause:"),
+                        L.indented(eCause),
+                      )
                     },
                   ),
-                  event.causeEvent.map { eCause =>
-                    L(
-                      L.log(event.messageLevel, "cause:"),
-                      L.indented(eCause),
-                    )
-                  },
                 ),
               ),
             )
+          case Logger.Event.Raw(logLevel, str) =>
+            def action(): Unit = {
+              sources.foreach(_.print(str))
+            }
 
-          handle(
-            indent,
-            expand(logThrowable),
-          )
-        case Logger.Event.Raw(logLevel, str) =>
-          def action(): Unit = {
-            sources.foreach(_.print(str))
-          }
-
-          logLevel match {
-            case Some(logLevel) =>
-              conditionally(logLevel) {
+            logLevel match {
+              case Some(logLevel) =>
+                conditionally(logLevel) {
+                  action()
+                }
+              case None =>
                 action()
-              }
-            case None =>
-              action()
-          }
-        case Logger.Event.RequireFlags(requiredFlags, event) =>
-          if ((requiredFlags -- flags).isEmpty) {
-            handle(indent, event())
-          }
+            }
+          case Logger.Event.RequireFlags(requiredFlags, event) =>
+            if ((requiredFlags -- flags).isEmpty) {
+              handle(indent, event())
+            }
+        }
       }
+
+      handle(" ", event)
     }
 
-    handle(" ", event)
+    // ---  ---
+
+    def simple(logLevel: Logger.LogLevel, message: Any): Unit =
+      apply(Logger.Event.Log(logLevel, message))
+
+    def never(message: Any): Unit = simple(Logger.LogLevel.Never, message)
+    def debug(message: Any): Unit = simple(Logger.LogLevel.Debug, message)
+    def detailed(message: Any): Unit = simple(Logger.LogLevel.Detailed, message)
+    def info(message: Any): Unit = simple(Logger.LogLevel.Info, message)
+    def important(message: Any): Unit = simple(Logger.LogLevel.Important, message)
+    def warning(message: Any): Unit = simple(Logger.LogLevel.Warning, message)
+    def error(message: Any): Unit = simple(Logger.LogLevel.Error, message)
+    def fatal(message: Any): Unit = simple(Logger.LogLevel.Fatal, message)
+    def always(message: Any): Unit = simple(Logger.LogLevel.Always, message)
+
+    def throwable(
+        throwable: Throwable,
+        messageLevel: Logger.LogLevel = Logger.LogLevel.Fatal,
+        stackTraceLevel: Logger.LogLevel = Logger.LogLevel.Debug,
+    ): Unit = {
+      def makeEvent(throwable: Throwable): Logger.Event.LogThrowable =
+        Logger.Event.LogThrowable(
+          messageLevel,
+          stackTraceLevel,
+          throwable,
+          Maybe(throwable.getCause).map(makeEvent),
+        )
+
+      apply(makeEvent(throwable))
+    }
+
+    def break(printIndent: Boolean = true): Unit =
+      apply(L.break(printIndent))
+
   }
 
-  def apply(
-      event: Logger.Event,
-      logTolerance: Maybe[Logger.LogLevel with Logger.LogLevel.Tolerance] = None,
-      additionalFlags: Maybe[Set[String]] = None,
-      additionalIgnoredPackages: Maybe[Set[String]] = None, // TODO (KR) : Possibly tweak how this is done (?)
-      indentString: Maybe[String] = None,
-  ): IO[Unit] =
-    unsafeLog(
-      event = event,
-      logTolerance = logTolerance,
-      additionalFlags = additionalFlags,
-      additionalIgnoredPackages = additionalIgnoredPackages,
-      indentString = indentString,
-    ).pure[IO]
+  object log {
+
+    def apply(
+        event: Logger.Event,
+        logTolerance: Maybe[Logger.LogLevel with Logger.LogLevel.Tolerance] = None,
+        additionalFlags: Maybe[Set[String]] = None,
+        additionalIgnoredPackages: Maybe[Set[String]] = None, // TODO (KR) : Possibly tweak how this is done (?)
+        indentString: Maybe[String] = None,
+    ): IO[Unit] =
+      unsafeLog(
+        event = event,
+        logTolerance = logTolerance,
+        additionalFlags = additionalFlags,
+        additionalIgnoredPackages = additionalIgnoredPackages,
+        indentString = indentString,
+      ).pure[IO]
+
+    // ---  ---
+
+    def simple(logLevel: Logger.LogLevel, message: Any): IO[Unit] =
+      apply(Logger.Event.Log(logLevel, message))
+
+    def never(message: Any): IO[Unit] = simple(Logger.LogLevel.Never, message)
+    def debug(message: Any): IO[Unit] = simple(Logger.LogLevel.Debug, message)
+    def detailed(message: Any): IO[Unit] = simple(Logger.LogLevel.Detailed, message)
+    def info(message: Any): IO[Unit] = simple(Logger.LogLevel.Info, message)
+    def important(message: Any): IO[Unit] = simple(Logger.LogLevel.Important, message)
+    def warning(message: Any): IO[Unit] = simple(Logger.LogLevel.Warning, message)
+    def error(message: Any): IO[Unit] = simple(Logger.LogLevel.Error, message)
+    def fatal(message: Any): IO[Unit] = simple(Logger.LogLevel.Fatal, message)
+    def always(message: Any): IO[Unit] = simple(Logger.LogLevel.Always, message)
+
+    def throwable(
+        throwable: Throwable,
+        messageLevel: Logger.LogLevel = Logger.LogLevel.Fatal,
+        stackTraceLevel: Logger.LogLevel = Logger.LogLevel.Debug,
+    ): IO[Unit] = {
+      def makeEvent(throwable: Throwable): Logger.Event.LogThrowable =
+        Logger.Event.LogThrowable(
+          messageLevel,
+          stackTraceLevel,
+          throwable,
+          Maybe(throwable.getCause).map(makeEvent),
+        )
+
+      apply(makeEvent(throwable))
+    }
+
+    def break(printIndent: Boolean = true): IO[Unit] =
+      apply(L.break(printIndent))
+
+  }
 
 }
 
@@ -391,6 +461,7 @@ object Logger {
 
   sealed trait Event
   object Event {
+
     final case class Compound(events: List[Event]) extends Event
     final case class Log(logLevel: LogLevel, message: Any) extends Event
     final case class LogThrowable(
@@ -403,6 +474,18 @@ object Logger {
     final case class Indented(event: Event, by: Int) extends Event
     final case class RequireFlags(flags: Set[String], event: () => Event) extends Event
     final case class Break(printIndent: Boolean) extends Event
+
+    trait Implicits {
+
+      implicit def maybeEventToEvent(mEvent: Maybe[Event]): Event =
+        mEvent.cata(identity, L())
+
+      implicit def listOfEventsToEvent(events: List[Event]): Event =
+        L(events)
+
+    }
+    object Implicits extends Implicits
+
   }
 
   final class Source private[Logger] (
@@ -456,147 +539,6 @@ object Logger {
 
     def ignorePackage(pkg: String): IgnoreStackTraceElement =
       _.getClassName.startsWith(pkg)
-
-  }
-
-  object helpers {
-
-    trait Implicits {
-
-      implicit def maybeEventToEvent(mEvent: Maybe[Event]): Event =
-        mEvent.cata(identity, helpers())
-
-      implicit def listOfEventsToEvent(events: List[Event]): Event =
-        helpers(events)
-
-    }
-    object Implicits extends Implicits
-
-    def apply(events: List[Event]): Event =
-      Event.Compound(events)
-
-    def apply(events: Event*): Event =
-      helpers(events.toList)
-
-    object log {
-
-      def apply(logLevel: LogLevel, message: Any): Event =
-        Event.Log(logLevel, message)
-
-      def never(message: Any): Event = log(LogLevel.Never, message)
-      def debug(message: Any): Event = log(LogLevel.Debug, message)
-      def detailed(message: Any): Event = log(LogLevel.Detailed, message)
-      def info(message: Any): Event = log(LogLevel.Info, message)
-      def important(message: Any): Event = log(LogLevel.Important, message)
-      def warning(message: Any): Event = log(LogLevel.Warning, message)
-      def error(message: Any): Event = log(LogLevel.Error, message)
-      def fatal(message: Any): Event = log(LogLevel.Fatal, message)
-      def always(message: Any): Event = log(LogLevel.Always, message)
-
-      def throwable(
-          throwable: Throwable,
-          messageLevel: LogLevel = LogLevel.Fatal,
-          stackTraceLevel: LogLevel = LogLevel.Debug,
-      ): Event = {
-        def makeEvent(throwable: Throwable): Event.LogThrowable =
-          Event.LogThrowable(
-            messageLevel,
-            stackTraceLevel,
-            throwable,
-            Maybe(throwable.getCause).map(makeEvent),
-          )
-
-        makeEvent(throwable)
-      }
-
-    }
-
-    def raw(str: String, logLevel: Maybe[LogLevel] = None): Event =
-      Event.Raw(logLevel, str)
-
-    object ansi {
-
-      def apply(afterEscape: String, logLevel: Maybe[LogLevel] = None): Event =
-        raw(s"$AnsiEscapeString$afterEscape", logLevel)
-
-      /**
-        * NOTE : (row, column) is 1-based, so (1,1) is the top-left
-        */
-      def cursorPos(row: Int, column: Int, logLevel: Maybe[LogLevel] = None): Event =
-        ansi(s"$row;${column}H", logLevel)
-
-      object cursor {
-
-        def up(numLines: Int, logLevel: Maybe[LogLevel] = None): Event =
-          ansi(s"${numLines}A", logLevel)
-
-        def down(numLines: Int, logLevel: Maybe[LogLevel] = None): Event =
-          ansi(s"${numLines}B", logLevel)
-
-        def forward(numLines: Int, logLevel: Maybe[LogLevel] = None): Event =
-          ansi(s"${numLines}C", logLevel)
-
-        def back(numLines: Int, logLevel: Maybe[LogLevel] = None): Event =
-          ansi(s"${numLines}D", logLevel)
-
-        def nextLine(numLines: Int = 1, logLevel: Maybe[LogLevel] = None): Event =
-          ansi(s"${numLines}E", logLevel)
-
-        def previousLine(numLines: Int = 1, logLevel: Maybe[LogLevel] = None): Event =
-          ansi(s"${numLines}F", logLevel)
-
-      }
-
-      object scroll {
-
-        def up(numLines: Int, logLevel: Maybe[LogLevel] = None): Event =
-          ansi(s"${numLines}S", logLevel)
-
-        def down(numLines: Int, logLevel: Maybe[LogLevel] = None): Event =
-          ansi(s"${numLines}T", logLevel)
-
-      }
-
-      object clearLine {
-
-        sealed abstract class Mod(private[clearLine] val i: Int)
-        object Mod {
-          case object CursorToEndOfLine extends Mod(0)
-          case object CursorToBeginningOfLine extends Mod(1)
-          case object EntireLine extends Mod(2)
-        }
-
-        def apply(mod: Mod = Mod.EntireLine, logLevel: Maybe[LogLevel] = None): Event =
-          ansi(s"${mod.i}K", logLevel)
-
-      }
-
-      object clearScreen {
-
-        sealed abstract class Mod(private[clearScreen] val i: Int)
-        object Mod {
-          case object CursorToEndOfScreen extends Mod(0)
-          case object CursorToBeginningOfScreen extends Mod(1)
-          case object EntireScreenAndMoveCursorToTopLeft extends Mod(2)
-          case object EntireScreenAndClearScrollbackBuffer extends Mod(3)
-        }
-
-        def apply(mod: Mod = Mod.EntireScreenAndMoveCursorToTopLeft, logLevel: Maybe[LogLevel] = None): Event =
-          ansi(s"${mod.i}J", logLevel)
-      }
-
-      // TODO (KR) : Device Status Report (?)
-
-    }
-
-    def indented(event: Event, by: Int = 1): Event =
-      Event.Indented(event, by)
-
-    def requireFlags(flags: String*)(event: => Event): Event =
-      Event.RequireFlags(flags.toSet, () => event)
-
-    def break(printIndent: Boolean = true): Event =
-      Event.Break(printIndent)
 
   }
 

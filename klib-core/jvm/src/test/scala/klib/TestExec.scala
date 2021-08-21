@@ -5,10 +5,10 @@ import org.rogach.scallop._
 import klib.Implicits._
 import klib.fp.types._
 import klib.utils._
-import klib.utils.Logger.{helpers => L}
 
 object TestExec {
 
+  /*
   final class Conf(args: Seq[String]) extends Executable.Conf(args) {
     version("This is the version")
     this.appendDefaultToDescription = true
@@ -20,19 +20,32 @@ object TestExec {
     verify()
   }
   object Conf extends Executable.ConfBuilder(new Conf(_))
+   */
 
   val executable: Executable =
-    Executable.fromConf(Conf) { (logger, conf) =>
+    Executable { (logger, _) =>
       for {
-        _ <- logger(L.log.info("Testing!"))
-        myVar = Var.`null`[String]
-        _ <- logger(L.log.info(myVar))
-        assign1 = myVar.value = "Assign1"
-        _ <- logger(L.log.info(myVar))
-        _ <- assign1
-        _ <- logger(L.log.info(myVar))
-        _ <- myVar.value = "Assign2"
-        _ <- logger(L.log.info(myVar))
+        _ <- logger.log.detailed("Test!")
+        _ <- logger.log(
+          L(
+            L.log.detailed("Test-2"),
+            L.log.detailed("Test-3"),
+          ),
+        )
+        _ <- logger.log(
+          L(
+            L.requireFlags("flag-1")(
+              L.log.detailed("flag-1"),
+            ),
+            L.requireFlags("flag-2")(
+              L.log.detailed("flag-2"),
+            ),
+            L.requireFlags("flag-1", "flag-2")(
+              L.log.detailed("flag-1 & flag-2"),
+            ),
+          ),
+        )
+        _ <- IO.error(Message("Oops...")): IO[Unit]
       } yield ()
     }
 

@@ -12,18 +12,14 @@ sealed trait Either[+A, +B] {
 
   def toEA: ErrorAccumulator[A, B] =
     this match {
-      case Right(b) =>
-        Alive(b)
-      case Left(a) =>
-        Dead(a :: Nil)
+      case Right(b) => Alive(b)
+      case Left(a)  => Dead(a :: Nil)
     }
 
   def toSEither: scala.Either[A, B] =
     this match {
-      case Right(b) =>
-        scala.Right(b)
-      case Left(a) =>
-        scala.Left(a)
+      case Right(b) => scala.Right(b)
+      case Left(a)  => scala.Left(a)
     }
 
   def toMaybe: Maybe[B] =

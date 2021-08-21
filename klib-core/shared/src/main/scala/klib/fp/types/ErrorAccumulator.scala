@@ -8,10 +8,14 @@ sealed trait ErrorAccumulator[+E, +R] {
 
   def mapErrors[E2](mapE: E => E2): ErrorAccumulator[E2, R] =
     this match {
-      case alive @ Alive(_) =>
-        alive
-      case Dead(errors) =>
-        Dead(errors.map(mapE))
+      case alive @ Alive(_) => alive
+      case Dead(errors)     => Dead(errors.map(mapE))
+    }
+
+  def to_\/ : List[E] \/ R =
+    this match {
+      case Alive(r)     => Right(r)
+      case Dead(errors) => Left(errors)
     }
 
 }
