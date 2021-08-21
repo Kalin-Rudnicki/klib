@@ -151,9 +151,6 @@ final class Logger private (
       val ignoreStackTraceElements: List[Logger.IgnoreStackTraceElement] =
         ignoredPackages.toList.map(Logger.IgnoreStackTraceElement.ignorePackage)
 
-      // REMOVE : ...
-      println(s"flags: $flags")
-
       def conditionally(logLevel: Logger.LogLevel)(f: => Unit): Unit =
         if (logLevel.priority >= logTol.priority)
           f
