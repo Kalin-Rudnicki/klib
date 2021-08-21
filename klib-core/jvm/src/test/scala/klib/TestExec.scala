@@ -23,15 +23,25 @@ object TestExec {
    */
 
   val executable: Executable =
-    Executable { (logger, _) =>
+    Executable { (_logger, _) =>
+      val logger =
+        _logger
+          .withMappedFlag("flags", "flag-1", "flag-2")
+          .withMappedFlag("flags", "flag-3")
+          .withMappedFlag("flag-3", "flag-4")
+          .withMappedFlag("flag-4", "flags")
+
       for {
+        _ <- logger.log.indent.by(1)
         _ <- logger.log.detailed("Test!")
+        _ <- logger.log.indent.by(2)
         _ <- logger.log(
           L(
             L.log.detailed("Test-2"),
             L.log.detailed("Test-3"),
           ),
         )
+        _ <- logger.log.indent.to(0)
         _ <- logger.log(
           L(
             L.requireFlags("flag-1")(

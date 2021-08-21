@@ -59,6 +59,12 @@ final class IO[+T](val execute: () => ?[T]) {
   def runSyncOrExit(logger: Maybe[Logger]): T =
     runSyncOr[T](logger) { identity } { System.exit(1).asInstanceOf[Nothing] }
 
+  // =====|  |=====
+
+  // rename? (do AsyncIO as well)
+  def unLift: IO[?[T]] =
+    IO { execute() }
+
   def bracket[T2](`try`: T => IO[T2])(`finally`: T => IO[Unit]): IO[T2] =
     this
       .flatMap { self =>

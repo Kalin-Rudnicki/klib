@@ -132,4 +132,28 @@ object L {
   def break(printIndent: Boolean = true): Logger.Event =
     Logger.Event.Break(printIndent)
 
+  /*
+    NOTE : Using this sort of indent in a combined call will not affect the rest of the same call
+         : I am intentionally not fixing this, as it would increase the complexity of everything else,
+         : and I believe this trade-off is not worth it, for something so niche.
+         :
+         : Example:
+         : logger.log(
+         :   L.log.info("1"),
+         :   L.indent(1),
+         :   L.log.info("2"),
+         : )
+         : Here, the 2 will not be indented.
+         : Do this instead...
+         : for {
+         :   _ <- L.log.info("1")
+         :   _ <- L.indent(1)
+         :   _ <- L.log.info("2")
+         : } yield ()
+   */
+  object indent {
+    def by(delta: Int): Logger.Event = Logger.Event.IndentBy(delta)
+    def to(to: Int): Logger.Event = Logger.Event.SetIndent(to)
+  }
+
 }

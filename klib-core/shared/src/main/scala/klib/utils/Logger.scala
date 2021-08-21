@@ -1,5 +1,7 @@
 package klib.utils
 
+import scala.annotation.tailrec
+import scala.language.dynamics
 import scala.language.implicitConversions
 
 import klib.Implicits._
@@ -11,8 +13,12 @@ final class Logger private (
     defaultIgnoredPackages: Set[String],
     defaultIndentString: String,
     defaultColorMode: Logger.ColorMode,
-    sources: List[Logger.Source],
+    sources: List[(Maybe[String], Logger.Source)],
+    flagMap: Map[String, Set[String]],
+    initialIndent: Int,
 ) { logger =>
+
+  private var currentIndent: Int = initialIndent
 
   // =====| Create new logger with changes |=====
 
@@ -22,7 +28,9 @@ final class Logger private (
       defaultIgnoredPackages: Set[String] = this.defaultIgnoredPackages,
       defaultIndentString: String = this.defaultIndentString,
       defaultColorMode: Logger.ColorMode = this.defaultColorMode,
-      sources: List[Logger.Source] = this.sources,
+      sources: List[(Maybe[String], Logger.Source)] = this.sources,
+      flagMap: Map[String, Set[String]] = this.flagMap,
+      initialIndent: Int = this.currentIndent,
   ): Logger =
     new Logger(
       defaultLogTolerance = defaultLogTolerance,
@@ -31,6 +39,8 @@ final class Logger private (
       defaultIgnoredPackages = defaultIgnoredPackages,
       defaultColorMode = defaultColorMode,
       sources = sources,
+      flagMap = flagMap,
+      initialIndent = initialIndent,
     )
 
   // --- Log Tolerance ---
@@ -70,10 +80,36 @@ final class Logger private (
   def withDefaultColorMode(colorMode: Logger.ColorMode): Logger =
     copy(defaultColorMode = colorMode)
 
+  // --- Flag Map ---
+
+  def withMappedFlag(flag: String, mapsTo: String*): Logger =
+    copy(
+      flagMap = flagMap.updated(
+        flag,
+        flagMap.get(flag).toMaybe match {
+          case Some(prevFlags) => prevFlags | mapsTo.toSet
+          case None            => mapsTo.toSet
+        },
+      ),
+    )
+
+  // --- Sources ---
+
+  def withSource(source: Logger.Source, name: Maybe[String] = None): Logger =
+    copy(
+      sources = this.sources.appended((name, source)),
+    )
+
+  def withoutSources(sourceNames: String*): Logger =
+    copy(
+      sources = sources.filter(_._1.cata(sourceNames.contains, true)),
+    )
+
   // =====|  |=====
 
   object unsafeLog {
 
+    // NOTE : Make sure if parameters are added here, they are added to log.apply as well
     def apply(
         event: Logger.Event,
         logTolerance: Maybe[Logger.LogLevel with Logger.LogLevel.Tolerance] = None,
@@ -82,10 +118,27 @@ final class Logger private (
         indentString: Maybe[String] = None,
         colorMode: Maybe[Logger.ColorMode] = None,
     ): Unit = {
+      @tailrec
+      def expandFlags(
+          current: Set[String],
+          seen: Set[String] = Set.empty,
+      ): Set[String] = {
+        val unseen = current &~ seen
+        if (unseen.isEmpty)
+          seen
+        else
+          expandFlags(
+            unseen.flatMap(flagMap.getOrElse(_, Set.empty)),
+            current | seen,
+          )
+      }
+
       val logTol: Logger.LogLevel =
         logTolerance.getOrElse(logger.defaultLogTolerance)
-      val flags: Set[String] =
+      val baseFlags: Set[String] =
         additionalFlags.cata(logger.defaultFlags ++ _, logger.defaultFlags)
+      val flags: Set[String] =
+        expandFlags(baseFlags)
       val ignoredPackages: Set[String] =
         additionalIgnoredPackages.cata(logger.defaultIgnoredPackages ++ _, logger.defaultIgnoredPackages)
       val idtStr: String =
@@ -107,10 +160,7 @@ final class Logger private (
         def buildString(logLevel: Logger.LogLevel, message: Any): String = {
           val messageString =
             Maybe(message)
-              .cata(
-                _.toString.replaceAll("\n", s"${Logger.LogLevel.DisplayNameNewLine}:$indent"),
-                "null",
-              )
+              .toStringNull(_.toString.replaceAll("\n", s"${Logger.LogLevel.DisplayNameNewLine}:$indent"))
           s"${logLevel.tag(colMode)}:$indent$messageString"
         }
 
@@ -120,10 +170,10 @@ final class Logger private (
           case Logger.Event.Log(logLevel, message) =>
             conditionally(logLevel) {
               val str = buildString(logLevel, message)
-              sources.foreach(_.println(str))
+              sources.foreach(_._2.println(str))
             }
           case Logger.Event.Break(printIndent) =>
-            sources.foreach(_.break(printIndent))
+            sources.foreach(_._2.break(printIndent))
           case Logger.Event.Indented(event, by) =>
             handle(indent + idtStr * by.max(0), event)
           case event @ Logger.Event.LogThrowable(_, _, _, _) =>
@@ -151,7 +201,7 @@ final class Logger private (
             )
           case Logger.Event.Raw(logLevel, str) =>
             def action(): Unit = {
-              sources.foreach(_.print(str))
+              sources.foreach(_._2.print(str))
             }
 
             logLevel match {
@@ -166,10 +216,14 @@ final class Logger private (
             if ((requiredFlags -- flags).isEmpty) {
               handle(indent, event())
             }
+          case Logger.Event.IndentBy(delta) =>
+            logger.currentIndent = (logger.currentIndent + delta).max(0)
+          case Logger.Event.SetIndent(to) =>
+            logger.currentIndent = to.max(0)
         }
       }
 
-      handle(" ", event)
+      handle(" " + idtStr * logger.currentIndent, event)
     }
 
     // ---  ---
@@ -206,6 +260,17 @@ final class Logger private (
     def break(printIndent: Boolean = true): Unit =
       apply(L.break(printIndent))
 
+    object indent {
+      def by(delta: Int): Unit = apply(L.indent.by(delta))
+      def to(to: Int): Unit = apply(L.indent.to(to))
+
+      def byFor(delta: Int = 1)(exec: => Unit): Unit = {
+        indent.by(delta)
+        exec
+        indent.by(-delta)
+      }
+    }
+
   }
 
   object log {
@@ -216,6 +281,7 @@ final class Logger private (
         additionalFlags: Maybe[Set[String]] = None,
         additionalIgnoredPackages: Maybe[Set[String]] = None, // TODO (KR) : Possibly tweak how this is done (?)
         indentString: Maybe[String] = None,
+        colorMode: Maybe[Logger.ColorMode] = None,
     ): IO[Unit] =
       unsafeLog(
         event = event,
@@ -223,6 +289,7 @@ final class Logger private (
         additionalFlags = additionalFlags,
         additionalIgnoredPackages = additionalIgnoredPackages,
         indentString = indentString,
+        colorMode = colorMode,
       ).pure[IO]
 
     // ---  ---
@@ -259,6 +326,20 @@ final class Logger private (
     def break(printIndent: Boolean = true): IO[Unit] =
       apply(L.break(printIndent))
 
+    object indent {
+      def by(delta: Int): IO[Unit] = apply(L.indent.by(delta))
+      def to(to: Int): IO[Unit] = apply(L.indent.to(to))
+
+      def byFor(delta: Int = 1)(exec: IO[Unit]): IO[Unit] =
+        indent
+          .by(delta)
+          .bracket { _ =>
+            exec
+          } { _ =>
+            indent.by(-delta)
+          }
+    }
+
   }
 
 }
@@ -278,6 +359,8 @@ object Logger {
       defaultIgnorePackages: Set[String] = Set.empty,
       defaultIndentStr: String = "    ",
       defaultColorMode: ColorMode = ColorMode.Extended,
+      flagMap: Map[String, Set[String]] = Map.empty,
+      initialIndent: Int = 0,
   ): Logger =
     new Logger(
       defaultLogTolerance = defaultLogTolerance,
@@ -290,12 +373,17 @@ object Logger {
       defaultIndentString = defaultIndentStr,
       defaultColorMode = defaultColorMode,
       sources = List(
-        new Source(
-          printlnF = Console.out.println(_),
-          printF = Console.out.print(_),
-          breakManager = new Source.BreakManager,
+        (
+          "STDOUT".some,
+          new Source(
+            printlnF = Console.out.println(_),
+            printF = Console.out.print(_),
+            sourceState = new Source.SourceState,
+          ),
         ),
       ),
+      flagMap = flagMap,
+      initialIndent = initialIndent,
     )
 
   sealed abstract class LogLevel(
@@ -479,6 +567,8 @@ object Logger {
     final case class Indented(event: Event, by: Int) extends Event
     final case class RequireFlags(flags: Set[String], event: () => Event) extends Event
     final case class Break(printIndent: Boolean) extends Event
+    final case class IndentBy(delta: Int) extends Event
+    final case class SetIndent(to: Int) extends Event
 
     trait Implicits {
 
@@ -496,7 +586,7 @@ object Logger {
   final class Source private[Logger] (
       printlnF: String => Unit,
       printF: String => Unit,
-      breakManager: Source.BreakManager,
+      sourceState: Source.SourceState,
   ) {
 
     def println(str: String): Unit = {
@@ -510,24 +600,24 @@ object Logger {
     }
 
     private def checkForBreak(): Unit = {
-      if (breakManager.wantsToBreak) {
-        printlnF(breakManager.printIndent ? s"${LogLevel.BreakDisplayName}:" | "")
+      if (sourceState.wantsToBreak) {
+        printlnF(sourceState.printIndent ? s"${LogLevel.BreakDisplayName}:" | "")
 
-        breakManager.wantsToBreak = false
-        breakManager.printIndent = false
+        sourceState.wantsToBreak = false
+        sourceState.printIndent = false
       }
     }
 
     def break(printIndent: Boolean): Unit = {
-      breakManager.wantsToBreak = true
-      breakManager.printIndent = printIndent || breakManager.printIndent
+      sourceState.wantsToBreak = true
+      sourceState.printIndent = printIndent || sourceState.printIndent
     }
 
   }
 
   object Source {
 
-    private[Logger] class BreakManager {
+    private[Logger] class SourceState {
       var wantsToBreak: Boolean = false
       var printIndent: Boolean = false
     }

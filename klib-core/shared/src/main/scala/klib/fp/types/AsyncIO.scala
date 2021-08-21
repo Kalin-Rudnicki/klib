@@ -26,6 +26,7 @@ final class AsyncIO[+T](val execute: ExecutionContext => Future[?[T]]) {
 
   // =====|  |=====
 
+  // rename? (do IO as well)
   def unLift: AsyncIO[?[T]] =
     AsyncIO.wrapFuture(execute)
 
