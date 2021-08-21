@@ -13,12 +13,11 @@ import klib.utils._
 
 final class IO[+T](val execute: () => ?[T]) {
 
-  def toAsyncIO: AsyncIO[T] = {
-    AsyncIO.wrapIO(this)
-  }
-
   def runSync: ?[T] =
     execute()
+
+  def toAsyncIO: AsyncIO[T] =
+    AsyncIO.wrapIO(this)
 
   private def runSyncOr[R](logger: Maybe[Logger])(onSuccess: T => R)(onFail: => R): R =
     runSync match {

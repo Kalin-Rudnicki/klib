@@ -14,11 +14,14 @@ final class Logger private (
     defaultIndentString: String,
     defaultColorMode: Logger.ColorMode,
     sources: List[(Maybe[String], Logger.Source)],
-    flagMap: Map[String, Set[String]],
+    flagMap: Map[String, InfiniteSet[String]],
     initialIndent: Int,
 ) { logger =>
 
   private var currentIndent: Int = initialIndent
+
+  private val baseFlags: InfiniteSet[String] =
+    Logger.expandFlags(defaultFlags, flagMap)
 
   // =====| Create new logger with changes |=====
 
@@ -29,7 +32,7 @@ final class Logger private (
       defaultIndentString: String = this.defaultIndentString,
       defaultColorMode: Logger.ColorMode = this.defaultColorMode,
       sources: List[(Maybe[String], Logger.Source)] = this.sources,
-      flagMap: Map[String, Set[String]] = this.flagMap,
+      flagMap: Map[String, InfiniteSet[String]] = this.flagMap,
       initialIndent: Int = this.currentIndent,
   ): Logger =
     new Logger(
@@ -82,16 +85,32 @@ final class Logger private (
 
   // --- Flag Map ---
 
-  def withMappedFlag(flag: String, mapsTo: String*): Logger =
+  def withFlagMap(flagMap: Map[String, InfiniteSet[String]]): Logger =
+    copy(
+      flagMap = (this.flagMap.toList ++ flagMap.toList)
+        .groupMap(_._1)(_._2)
+        .map {
+          case (key, value) =>
+            key -> InfiniteSet.union(value: _*)
+        },
+    )
+
+  def withMappedFlag(flag: String, mapsTo: InfiniteSet[String]): Logger =
     copy(
       flagMap = flagMap.updated(
         flag,
         flagMap.get(flag).toMaybe match {
-          case Some(prevFlags) => prevFlags | mapsTo.toSet
-          case None            => mapsTo.toSet
+          case Some(prevFlags) => prevFlags | mapsTo
+          case None            => mapsTo
         },
       ),
     )
+
+  def withMappedFlagInclusive(flag: String, flags: String*): Logger =
+    withMappedFlag(flag, InfiniteSet.Inclusive(flags.toSet))
+
+  def withMappedFlagExclusive(flag: String, flags: String*): Logger =
+    withMappedFlag(flag, InfiniteSet.Exclusive(flags.toSet))
 
   // --- Sources ---
 
@@ -118,27 +137,10 @@ final class Logger private (
         indentString: Maybe[String] = None,
         colorMode: Maybe[Logger.ColorMode] = None,
     ): Unit = {
-      @tailrec
-      def expandFlags(
-          current: Set[String],
-          seen: Set[String] = Set.empty,
-      ): Set[String] = {
-        val unseen = current &~ seen
-        if (unseen.isEmpty)
-          seen
-        else
-          expandFlags(
-            unseen.flatMap(flagMap.getOrElse(_, Set.empty)),
-            current | seen,
-          )
-      }
-
       val logTol: Logger.LogLevel =
         logTolerance.getOrElse(logger.defaultLogTolerance)
-      val baseFlags: Set[String] =
-        additionalFlags.cata(logger.defaultFlags ++ _, logger.defaultFlags)
-      val flags: Set[String] =
-        expandFlags(baseFlags)
+      val flags: InfiniteSet[String] =
+        additionalFlags.cata(flags => Logger.expandFlags(logger.defaultFlags | flags, flagMap), baseFlags)
       val ignoredPackages: Set[String] =
         additionalIgnoredPackages.cata(logger.defaultIgnoredPackages ++ _, logger.defaultIgnoredPackages)
       val idtStr: String =
@@ -148,6 +150,9 @@ final class Logger private (
 
       val ignoreStackTraceElements: List[Logger.IgnoreStackTraceElement] =
         ignoredPackages.toList.map(Logger.IgnoreStackTraceElement.ignorePackage)
+
+      // REMOVE : ...
+      println(s"flags: $flags")
 
       def conditionally(logLevel: Logger.LogLevel)(f: => Unit): Unit =
         if (logLevel.priority >= logTol.priority)
@@ -213,9 +218,8 @@ final class Logger private (
                 action()
             }
           case Logger.Event.RequireFlags(requiredFlags, event) =>
-            if ((requiredFlags -- flags).isEmpty) {
+            if (requiredFlags.forall(flags.contains))
               handle(indent, event())
-            }
           case Logger.Event.IndentBy(delta) =>
             logger.currentIndent = (logger.currentIndent + delta).max(0)
           case Logger.Event.SetIndent(to) =>
@@ -359,7 +363,7 @@ object Logger {
       defaultIgnorePackages: Set[String] = Set.empty,
       defaultIndentStr: String = "    ",
       defaultColorMode: ColorMode = ColorMode.Extended,
-      flagMap: Map[String, Set[String]] = Map.empty,
+      flagMap: Map[String, InfiniteSet[String]] = Map.empty,
       initialIndent: Int = 0,
   ): Logger =
     new Logger(
@@ -635,6 +639,93 @@ object Logger {
     def ignorePackage(pkg: String): IgnoreStackTraceElement =
       _.getClassName.startsWith(pkg)
 
+  }
+
+  // =====|  |=====
+
+  private[klib] def expandFlags(
+      flags: Set[String],
+      flagMap: Map[String, InfiniteSet[String]],
+  ): InfiniteSet[String] = {
+    def lookupFlag(flag: String): InfiniteSet[String] =
+      flagMap.getOrElse(flag, InfiniteSet.empty) | InfiniteSet(flag)
+
+    def expandInclusive(flags: Set[String]): InfiniteSet[String] = {
+      @tailrec
+      def loop(
+          current: Set[String],
+          seen: Set[String],
+          track: InfiniteSet[String],
+      ): InfiniteSet[String] = {
+        val unseen = current &~ seen
+        if (unseen.isEmpty)
+          track
+        else {
+          val split =
+            unseen.partitionMap { f =>
+              lookupFlag(f) match {
+                case InfiniteSet.Inclusive(explicit) => scala.Right(explicit)
+                case InfiniteSet.Exclusive(explicit) => scala.Left(expandExclusive(explicit))
+              }
+            }
+
+          // ...
+          loop(
+            split._2.flatten,
+            seen | current,
+            InfiniteSet.union(
+              List(
+                track :: Nil,
+                split._1.toList.map(InfiniteSet.Exclusive(_)),
+                split._2.toList.map(InfiniteSet.Inclusive(_)),
+              ).flatten: _*,
+            ),
+          )
+        }
+      }
+
+      loop(
+        flags,
+        Set.empty,
+        InfiniteSet.empty,
+      )
+    }
+
+    def expandExclusive(flags: Set[String]): Set[String] = {
+      @tailrec
+      def loop(
+          current: Set[String],
+          seen: Set[String],
+          exclusive: Set[String],
+      ): Set[String] = {
+        val unseen = current &~ seen
+        if (unseen.isEmpty)
+          exclusive
+        else {
+          val filtered =
+            current.flatMap { f =>
+              lookupFlag(f) match {
+                case InfiniteSet.Inclusive(explicit) => (f, explicit).someOpt
+                case InfiniteSet.Exclusive(_)        => scala.None
+              }
+            }
+
+          loop(
+            filtered.flatMap(_._2),
+            seen | current,
+            exclusive | filtered.map(_._1),
+          )
+        }
+      }
+
+      loop(
+        flags,
+        Set.empty,
+        Set.empty,
+      )
+    }
+
+    expandInclusive(flags)
   }
 
 }

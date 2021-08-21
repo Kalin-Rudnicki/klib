@@ -28,6 +28,12 @@ sealed trait Either[+A, +B] {
       case _        => None
     }
 
+  def flip: Either[B, A] =
+    this match {
+      case Right(b) => Left(b)
+      case Left(a)  => Right(a)
+    }
+
 }
 
 final case class Right[+B](b: B) extends Either[Nothing, B]

@@ -7,7 +7,10 @@ import org.rogach.scallop._
 import klib.Implicits._
 import klib.fp.types._
 
-final case class Executable(execute: (Logger, List[String]) => IO[Unit]) {
+final case class Executable(
+    execute: (Logger, List[String]) => IO[Unit],
+    mapLoggerF: Logger => Logger = identity,
+) {
 
   def apply(args: Array[String]): IO[Unit] = {
     @tailrec
@@ -30,13 +33,13 @@ final case class Executable(execute: (Logger, List[String]) => IO[Unit]) {
 
     Executable.LoggerConf(loggerArgs) match {
       case Right(loggerConf) =>
-        val logger = loggerConf.logger
+        val logger = mapLoggerF(loggerConf.logger)
         for {
           _ <- loggerConf.clear().maybe(logger.log(L(L.ansi.cursorPos(1, 1), L.ansi.clearScreen()))).traverse
           res <- execute(logger, programArgs).runSync.pure[IO]
           _ <- logger.log(
             res match {
-              case Alive(r) =>
+              case Alive(_) =>
                 L.log.always("<Success>".toColorString.green) // TODO (KR) : Only include with flag (?)
               case Dead(errors) =>
                 L(
@@ -51,6 +54,9 @@ final case class Executable(execute: (Logger, List[String]) => IO[Unit]) {
         Logger(Logger.LogLevel.Info).log(logEvent)
     }
   }
+
+  def mapLogger(f: Logger => Logger): Executable =
+    Executable(execute = execute, mapLoggerF = logger => f(mapLoggerF(logger)))
 
 }
 object Executable {

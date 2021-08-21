@@ -36,6 +36,15 @@ package object scalaCompat {
 
     }
 
+    implicit class CompatSetOps[T](set: Set[T]) {
+
+      def partitionMap[A1, A2](f: T => scala.Either[A1, A2]): (Set[A1], Set[A2]) = {
+        val (left, right) = set.toList.partitionMap(f)
+        (left.toSet, right.toSet)
+      }
+
+    }
+
     implicit class CompatStringOps(string: String) {
 
       private def toOptionCompat[T](f: String => T): Option[T] =

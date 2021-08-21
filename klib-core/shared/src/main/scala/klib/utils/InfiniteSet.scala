@@ -23,11 +23,17 @@ sealed trait InfiniteSet[T] {
   @inline def &~(that: InfiniteSet[T]): InfiniteSet[T] = disjunction(that)
 
   override def toString: String =
-    s"$name(${explicit.mkString(", ")})"
+    explicit.mkString(s"$name(", ",", ")")
+
+  def toStringOrdered: String =
+    explicit.toList.map(_.toString).sorted.mkString(s"$name(", ",", ")")
 
 }
 
 object InfiniteSet {
+
+  def apply[T](elems: T*): InfiniteSet[T] =
+    InfiniteSet.Inclusive(elems.toSet)
 
   // =====| Constants |=====
 
@@ -54,13 +60,8 @@ object InfiniteSet {
         queue: List[InfiniteSet[T]],
     ): InfiniteSet[T] =
       queue match {
-        case head :: tail =>
-          loop(
-            current | head,
-            tail,
-          )
-        case Nil =>
-          current
+        case head :: tail => loop(current | head, tail)
+        case Nil          => current
       }
 
     loop(
@@ -76,13 +77,8 @@ object InfiniteSet {
         queue: List[InfiniteSet[T]],
     ): InfiniteSet[T] =
       queue match {
-        case head :: tail =>
-          loop(
-            current & head,
-            tail,
-          )
-        case Nil =>
-          current
+        case head :: tail => loop(current & head, tail)
+        case Nil          => current
       }
 
     loop(
