@@ -1,5 +1,8 @@
 package klib
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration
+
 import org.rogach.scallop._
 
 import klib.Implicits._
@@ -23,39 +26,11 @@ object TestExec {
    */
 
   val executable: Executable =
-    Executable { (_logger, _) =>
-      val logger =
-        _logger
-          .withMappedFlag("flags", "flag-1", "flag-2")
-          .withMappedFlag("flags", "flag-3")
-          .withMappedFlag("flag-3", "flag-4")
-          .withMappedFlag("flag-4", "flags")
-
+    Executable { (logger, _) =>
       for {
-        _ <- logger.log.indent.by(1)
-        _ <- logger.log.detailed("Test!")
-        _ <- logger.log.indent.by(2)
-        _ <- logger.log(
-          L(
-            L.log.detailed("Test-2"),
-            L.log.detailed("Test-3"),
-          ),
-        )
-        _ <- logger.log.indent.to(0)
-        _ <- logger.log(
-          L(
-            L.requireFlags("flag-1")(
-              L.log.detailed("flag-1"),
-            ),
-            L.requireFlags("flag-2")(
-              L.log.detailed("flag-2"),
-            ),
-            L.requireFlags("flag-1", "flag-2")(
-              L.log.detailed("flag-1 & flag-2"),
-            ),
-          ),
-        )
-        _ <- IO.error(Message("Oops...")): IO[Unit]
+        _ <- logger.log.detailed("Sleeping...")
+        _ <- IO { Thread.sleep(2500) }.toAsyncIO.toIO(Duration(1, "s").some)
+        _ <- logger.log.detailed("Done!")
       } yield ()
     }
 

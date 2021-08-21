@@ -19,7 +19,12 @@ final class AsyncIO[+T](val execute: ExecutionContext => Future[?[T]]) {
   // TODO (KR) : Make sure this catches any sort of exception thrown by Await
   def toIO(duration: Maybe[Duration])(implicit ec: ExecutionContext): IO[T] =
     IO.wrapEffect {
-      Await.result(execute(ec), duration.getOrElse(Duration.Inf))
+      try {
+        Await.result(execute(ec), duration.getOrElse(Duration.Inf))
+      } catch {
+        case timeout: TimeoutException =>
+          ?.dead(timeout)
+      }
     }
   def toIOGlobal(duration: Maybe[Duration]): IO[T] =
     toIO(duration)(ExecutionContext.global)

@@ -1,18 +1,18 @@
 package klib
 
-import java.io.File
+import scala.concurrent._
+import scala.concurrent.duration.Duration
 
 import klib.Implicits._
-import klib.fp.typeclass._
 import klib.fp.types._
 import klib.utils._
 
 object Testing extends App {
 
-  val file = new File("/home/kalin/Desktop/PhotosToUpload/Camera/20161223_154323.jpg")
+  val io1: IO[Unit] = IO { Thread.sleep(2500) }
+  val asyncIO: AsyncIO[Unit] = io1.toAsyncIO
+  val io2: IO[Unit] = asyncIO.toIOGlobal(Duration(3, "s").some)
 
-  ImageUtils
-    .getMetaData(file)
-    .runSyncOrExit(None)
+  println(io2.runSync)
 
 }
