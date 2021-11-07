@@ -25,6 +25,14 @@ final case class Dead[+E](errors: List[E]) extends ErrorAccumulator[E, Nothing]
 
 object ErrorAccumulator {
 
+  def alive[A](a: A): ErrorAccumulator[Nothing, A] =
+    Alive(a)
+
+  def dead[E](e1: E, eN: E*): ErrorAccumulator[E, Nothing] =
+    Dead(e1 :: eN.toList)
+
+  // =====|  |=====
+
   trait Implicits {
 
     implicit class ErrorAccumulatorIdOps[A](a: A) {

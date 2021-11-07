@@ -204,6 +204,8 @@ object NonEmptyList {
 
     implicit class NonEmptyListListOps[A](list: List[A]) {
 
+      private val DefaultEmptyListMessage: String = "Tried to convert empty-List to NonEmptyList"
+
       def toNel: Maybe[NonEmptyList[A]] =
         list match {
           case head :: tail =>
@@ -211,6 +213,28 @@ object NonEmptyList {
           case Nil =>
             None
         }
+
+      def toNelOr[B](b: => B): Either[B, NonEmptyList[A]] =
+        toNel match {
+          case Some(a) => Right(a)
+          case None    => Left(b)
+        }
+
+      def toNelEA[E](e: => E): ErrorAccumulator[E, NonEmptyList[A]] =
+        toNel match {
+          case Some(a) => ErrorAccumulator.alive(a)
+          case None    => ErrorAccumulator.dead(e)
+        }
+
+      def toNel_?(emptyMessage: String): ?[NonEmptyList[A]] =
+        toNelEA(Message(emptyMessage))
+      def toNel_? : ?[NonEmptyList[A]] =
+        toNel_?(DefaultEmptyListMessage)
+
+      def toNelIO(emptyMessage: String): IO[NonEmptyList[A]] =
+        IO.wrapEffect { toNel_?(emptyMessage) }
+      def toNelIO: IO[NonEmptyList[A]] =
+        toNelIO(DefaultEmptyListMessage)
 
     }
 
