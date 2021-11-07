@@ -187,6 +187,21 @@ final case class NonEmptyList[+A](
     )
   }
 
+  def unsafeListTransform[A2](f: List[A] => List[A2]): NonEmptyList[A2] =
+    f(toList) match {
+      case head :: tail => NonEmptyList(head, tail)
+      case Nil          => throw new RuntimeException("unsafeListTransform : mapped NonEmptyList to empty-List")
+    }
+
+  def sorted[A2 >: A](implicit ord: Ordering[A2]): NonEmptyList[A] =
+    unsafeListTransform(_.sorted(ord))
+
+  def sortBy[B](f: A => B)(implicit ord: Ordering[B]): NonEmptyList[A] =
+    unsafeListTransform(_.sortBy(f)(ord))
+
+  def sortWith(lt: (A, A) => Boolean): NonEmptyList[A] =
+    unsafeListTransform(_.sortWith(lt))
+
   override def toString: String =
     s"NonEmptyList(${(head :: tail).mkString(", ")})"
 

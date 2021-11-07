@@ -176,6 +176,82 @@ class NonEmptyListTests extends AnyFunSpec {
 
     }
 
+    val sortCases: List[(NonEmptyList[Int], NonEmptyList[Int])] =
+      List(
+        (
+          NonEmptyList.nel(1),
+          NonEmptyList.nel(1),
+        ),
+        (
+          NonEmptyList.nel(1, 2),
+          NonEmptyList.nel(1, 2),
+        ),
+        (
+          NonEmptyList.nel(2, 1),
+          NonEmptyList.nel(1, 2),
+        ),
+        (
+          NonEmptyList.nel(1, 2, 3),
+          NonEmptyList.nel(1, 2, 3),
+        ),
+        (
+          NonEmptyList.nel(3, 2, 1),
+          NonEmptyList.nel(1, 2, 3),
+        ),
+        (
+          NonEmptyList.nel(2, 1, 4, 3),
+          NonEmptyList.nel(1, 2, 3, 4),
+        ),
+        (
+          NonEmptyList.nel(3, 4, 1, 2),
+          NonEmptyList.nel(1, 2, 3, 4),
+        ),
+      )
+
+    describe("sorted") {
+
+      sortCases.zipWithIndex.foreach {
+        case ((initial, expected), i) =>
+          it((i + 1).toString) {
+            assertResult(expected)(initial.sorted)
+          }
+      }
+
+    }
+
+    describe("sorted - reversed") {
+
+      sortCases.zipWithIndex.foreach {
+        case ((initial, expected), i) =>
+          it((i + 1).toString) {
+            assertResult(expected.reverse)(initial.sorted(implicitly[Ordering[Int]].reverse))
+          }
+      }
+
+    }
+
+    describe("sortBy - identity") {
+
+      sortCases.zipWithIndex.foreach {
+        case ((initial, expected), i) =>
+          it((i + 1).toString) {
+            assertResult(expected)(initial.sortBy(identity))
+          }
+      }
+
+    }
+
+    describe("sortBy - 1 / x") {
+
+      sortCases.zipWithIndex.foreach {
+        case ((initial, expected), i) =>
+          it((i + 1).toString) {
+            assertResult(expected.reverse)(initial.sortBy(i => 1 / i.toDouble))
+          }
+      }
+
+    }
+
   }
 
   describe("Monad") {
