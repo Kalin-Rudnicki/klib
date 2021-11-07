@@ -75,6 +75,14 @@ object AsyncIO {
 
   // =====|  |=====
 
+  def error(error0: Throwable, errorN: Throwable*): AsyncIO[Nothing] =
+    AsyncIO.wrapEffect { Dead(error0 :: errorN.toList) }
+
+  def ??? : AsyncIO[Nothing] =
+    ?.???.toAsyncIO
+
+  // =====|  |=====
+
   def runSequentially[T](ts: List[AsyncIO[T]]): AsyncIO[List[T]] =
     ts match {
       case head :: tail =>

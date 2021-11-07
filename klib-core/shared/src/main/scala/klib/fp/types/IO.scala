@@ -105,6 +105,9 @@ object IO {
   def error(error0: Throwable, errorN: Throwable*): IO[Nothing] =
     IO.wrapEffect { Dead(error0 :: errorN.toList) }
 
+  def ??? : IO[Nothing] =
+    ?.???.toIO
+
   def now: IO[Long] =
     System.currentTimeMillis.pure[IO]
 

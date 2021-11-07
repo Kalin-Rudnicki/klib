@@ -45,6 +45,9 @@ object ErrorAccumulator {
       def toIO: IO[T] =
         IO.wrapEffect { t }
 
+      def toAsyncIO: AsyncIO[T] =
+        AsyncIO.wrapEffect { t }
+
     }
 
   }

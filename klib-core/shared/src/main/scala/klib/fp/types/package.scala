@@ -13,10 +13,18 @@ package object types {
 
   type ?[+R] = ErrorAccumulator[Throwable, R]
   object ? {
+
     def apply[R](r: => R): ?[R] = r.pure[?]
 
     def dead(throwables: Throwable*): ?[Nothing] =
       Dead(throwables.toList)
+
+    def error(throwables: Throwable*): ?[Nothing] =
+      Dead(throwables.toList)
+
+    def ??? : ?[Nothing] =
+      error(Message("??? (Unimplemented)"))
+
   }
   final case class Message(message: String, cause: Maybe[Throwable] = None)
       extends Throwable(message, cause.getOrElse(null)) {
