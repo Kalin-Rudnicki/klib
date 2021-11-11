@@ -223,4 +223,12 @@ object Maybe {
 
     }
 
+  implicit def maybeOrdering[A](implicit ordering: Ordering[A]): Ordering[Maybe[A]] =
+    Ordering.fromLessThan {
+      case (Some(a), Some(b)) => ordering.lt(a, b)
+      case (Some(_), None)    => false
+      case (None, Some(_))    => true
+      case (None, None)       => false
+    }
+
 }
