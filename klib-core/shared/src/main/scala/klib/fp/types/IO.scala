@@ -3,8 +3,10 @@ package klib.fp.types
 import java.awt.image.BufferedImage
 import java.io.{File, PrintWriter, RandomAccessFile}
 import javax.imageio.ImageIO
+
 import scala.io.Source
 import scala.util.Try
+import scala.sys.process._
 
 import klib.Implicits._
 import klib.fp.typeclass._
@@ -105,6 +107,10 @@ object IO {
   def error(error0: Throwable, errorN: Throwable*): IO[Nothing] =
     IO.wrapEffect { Dead(error0 :: errorN.toList) }
 
+  def errorIf(pred: Boolean)(error0: Throwable, errorN: Throwable*): IO[Unit] =
+    if (pred) error(error0, errorN: _*)
+    else ().pure[IO]
+
   def ??? : IO[Nothing] =
     ?.???.toIO
 
@@ -131,6 +137,25 @@ object IO {
 
   def writeFileBytes(path: File, bytes: Array[Byte]): IO[Unit] =
     IO(new RandomAccessFile(path, "rw")).bracket { _.write(bytes).pure[IO] }(_.close().pure[IO])
+
+  object syscall {
+
+    def exitCode0(args: List[String]): IO[Unit] =
+      for {
+        res <- args.!.pure[IO]
+        _ <- IO.errorIf(res != 0)(Message(s"syscall [${args.mkString(", ")}] returned non-0 exit-code"))
+      } yield ()
+
+    def exitCode0(arg: String): IO[Unit] =
+      for {
+        res <- arg.!.pure[IO]
+        _ <- IO.errorIf(res != 0)(Message(s"syscall [$arg] returned non-0 exit-code"))
+      } yield ()
+
+    def exitCode0(arg0: String, arg1: String, argN: String*): IO[Unit] =
+      exitCode0(arg0 :: arg1 :: argN.toList)
+
+  }
 
   // =====|  |=====
 
