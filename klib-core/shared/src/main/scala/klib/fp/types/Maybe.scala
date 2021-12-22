@@ -3,6 +3,8 @@ package klib.fp.types
 import scala.annotation.tailrec
 import scala.collection._
 
+import io.circe._
+
 import klib.fp.typeclass._
 
 sealed trait Maybe[+A] {
@@ -223,12 +225,25 @@ object Maybe {
 
     }
 
-  implicit def maybeOrdering[A](implicit ordering: Ordering[A]): Ordering[Maybe[A]] =
-    Ordering.fromLessThan {
-      case (Some(a), Some(b)) => ordering.lt(a, b)
-      case (Some(_), None)    => false
-      case (None, Some(_))    => true
-      case (None, None)       => false
-    }
+  def maybeOrdering[A](
+      noneFirst: Boolean,
+      reverseOrdering: Boolean,
+  )(implicit ordering: Ordering[A]): Ordering[Maybe[A]] = {
+    case (Some(x), Some(y)) => if (reverseOrdering) -ordering.compare(x, y) else ordering.compare(x, y)
+    case (Some(_), None)    => if (noneFirst) 1 else -1
+    case (None, Some(_))    => if (noneFirst) -1 else 1
+    case (None, None)       => 0
+  }
+
+  implicit def defaultMaybeOrdering[A](implicit ordering: Ordering[A]): Ordering[Maybe[A]] =
+    maybeOrdering(true, false)
+
+  implicit def maybeEncoder[T: Encoder]: Encoder[Maybe[T]] =
+    Encoder.encodeOption[T].contramap[Maybe[T]](_.toOption)
+
+  implicit def maybeDecoder[T: Decoder]: Decoder[Maybe[T]] = {
+    import klib.Implicits.OptionOps
+    Decoder.decodeOption[T].map(_.toMaybe)
+  }
 
 }

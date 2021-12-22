@@ -2,6 +2,8 @@ package klib.fp.types
 
 import scala.annotation.tailrec
 
+import io.circe._
+
 import klib.fp.typeclass._
 
 final case class NonEmptyList[+A](
@@ -297,5 +299,13 @@ object NonEmptyList {
         t.tail.foreach(f)
       }
     }
+
+  implicit def nonEmptyListEncoder[T: Encoder]: Encoder[NonEmptyList[T]] =
+    Encoder.encodeList[T].contramap[NonEmptyList[T]](_.toList)
+
+  implicit def nonEmptyListDecoder[T: Decoder]: Decoder[NonEmptyList[T]] = {
+    import klib.Implicits.NonEmptyListListOps
+    Decoder.decodeList[T].emap(_.toNelOr("List is Empty").toSEither)
+  }
 
 }

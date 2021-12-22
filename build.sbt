@@ -2,6 +2,7 @@
 
 val Scala_2_12 = "2.12.10"
 val Scala_2_13 = "2.13.4"
+val CirceVersion = "0.15.0-M1"
 
 val MyOrg = "io.github.kalin-rudnicki"
 val githubUsername = "Kalin-Rudnicki"
@@ -49,6 +50,9 @@ lazy val `klib-core` =
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
+        "io.circe" %%% "circe-core" % CirceVersion,
+        "io.circe" %%% "circe-generic" % CirceVersion,
+        "io.circe" %%% "circe-parser" % CirceVersion,
       ),
       scalaVersion := Scala_2_13,
       crossScalaVersions := Seq(Scala_2_12, Scala_2_13),
