@@ -22,6 +22,11 @@ object EncodeToString {
   }
   object Implicits extends Implicits
 
+  // =====|  |=====
+
+  def apply[T: EncodeToString]: EncodeToString[T] =
+    implicitly[EncodeToString[T]]
+
   def fromCirceEncoder[T: Encoder](toString: Json => String): EncodeToString[T] =
     t => toString(t.asJson)
 
