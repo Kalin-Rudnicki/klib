@@ -2,6 +2,9 @@ package klib.fp.typeclass
 
 import java.util.UUID
 
+import io.circe._
+import io.circe.syntax._
+
 trait EncodeToString[-T] {
   def encode(t: T): String
 }
@@ -18,6 +21,12 @@ object EncodeToString {
 
   }
   object Implicits extends Implicits
+
+  def fromCirceEncoder[T: Encoder](toString: Json => String): EncodeToString[T] =
+    t => toString(t.asJson)
+
+  def fromCirceEncoder[T: Encoder]: EncodeToString[T] =
+    fromCirceEncoder[T]((json: Json) => json.noSpaces)
 
   def usingToString[T]: EncodeToString[T] = _.toString
 
