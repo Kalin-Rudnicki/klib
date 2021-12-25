@@ -1,5 +1,9 @@
 package klib.fp.typeclass
 
+import java.util.UUID
+
+import scala.util.Try
+
 import klib.Implicits._
 import klib.fp.types._
 
@@ -44,5 +48,8 @@ object DecodeString {
 
   implicit def decodeStringList[R: DecodeString]: DecodeString[List[R]] =
     s => s.split(",").toList.map(implicitly[DecodeString[R]].decode).traverse
+
+  implicit val uuidDecodeString: DecodeString[UUID] =
+    str => Try { UUID.fromString(str) }.to_?
 
 }
