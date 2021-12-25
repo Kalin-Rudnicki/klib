@@ -28,6 +28,11 @@ object DecodeFromString {
   }
   object Implicits extends Implicits
 
+  // =====|  |=====
+
+  def apply[T: DecodeFromString]: DecodeFromString[T] =
+    implicitly[DecodeFromString[T]]
+
   def fromCirceDecoder[T: Decoder]: DecodeFromString[T] =
     decode[T](_).toErrorAccumulator
 
