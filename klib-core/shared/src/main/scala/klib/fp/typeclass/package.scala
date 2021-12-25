@@ -8,7 +8,7 @@ package object typeclass {
       with Monad.Implicits
       with Foreach.Implicits
       with Traverse.Implicits
-      with DecodeString.Implicits
+      with DecodeFromString.Implicits
       with EncodeToString.Implicits
   object Implicits extends Implicits
 
