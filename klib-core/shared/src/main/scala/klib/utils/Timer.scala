@@ -60,9 +60,11 @@ object Timer {
       val (secs, rMs) = split(ms, 1000)
       val (mins, rSecs) = split(secs, 60)
       val (hrs, rMins) = split(mins, 60)
-      val rHrs = hrs
+      val (days, rHrs) = split(hrs, 24)
+      val rDays = days
 
       build(
+        (rDays, "day", "s"),
         (rHrs, "hr", "s"),
         (rMins, "min", "s"),
         (rSecs, "sec", "s"),
