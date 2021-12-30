@@ -104,6 +104,9 @@ object IO {
 
   // =====|  |=====
 
+  def errorMessage(error0: String, errorN: String*): IO[Nothing] =
+    IO.wrapEffect { Dead((error0 :: errorN.toList).map(Message(_))) }
+
   def error(error0: Throwable, errorN: Throwable*): IO[Nothing] =
     IO.wrapEffect { Dead(error0 :: errorN.toList) }
 
@@ -116,27 +119,6 @@ object IO {
 
   def now: IO[Long] =
     System.currentTimeMillis.pure[IO]
-
-  def readFile(path: File): IO[String] =
-    IO(Source.fromFile(path)).bracket(_.mkString.pure[IO])(_.close.pure[IO])
-
-  def readFileBytes(path: File): IO[Array[Byte]] =
-    IO(new RandomAccessFile(path, "r")).bracket { raf =>
-      for {
-        len <- raf.length.pure[IO]
-        bb = new Array[Byte](len.toInt) // WARNING (KR) : Could be an issue...
-        _ <- raf.readFully(bb).pure[IO]
-      } yield bb
-    }(_.close().pure[IO])
-
-  def readImage(path: File): IO[BufferedImage] =
-    ImageIO.read(path).pure[IO]
-
-  def writeFile(path: File, contents: String): IO[Unit] =
-    new PrintWriter(path).pure[IO].bracket(_.write(contents).pure[IO])(_.close().pure[IO])
-
-  def writeFileBytes(path: File, bytes: Array[Byte]): IO[Unit] =
-    IO(new RandomAccessFile(path, "rw")).bracket { _.write(bytes).pure[IO] }(_.close().pure[IO])
 
   object syscall {
 

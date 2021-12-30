@@ -8,6 +8,7 @@ import scala.reflect.ClassTag
 
 import klib.Implicits._
 import klib.fp.types._
+import klib.utils._
 
 object DynamicJarLoader {
 
@@ -19,7 +20,7 @@ object DynamicJarLoader {
     for {
       // --- Find all `.class` files ---
       classPaths <- for {
-        jarBytes <- IO.readFileBytes(jarFile)
+        jarBytes <- FileUtils.readFileBytes(jarFile)
         jarInputStream <- new JarInputStream(new ByteArrayInputStream(jarBytes), true).pure[IO]
         jarEntries <- {
           def getJarEntries(stack: List[JarEntry]): IO[List[JarEntry]] =

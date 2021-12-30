@@ -4,8 +4,6 @@ import scala.util.Try
 
 import klib.fp.typeclass.Implicits._
 import klib.fp.typeclass._
-import klib.fp.utils.ado
-import klib.utils.@@
 
 package object types {
 
@@ -21,6 +19,9 @@ package object types {
 
     def error(throwables: Throwable*): ?[Nothing] =
       Dead(throwables.toList)
+
+    def errorMessage(messages: String*): ?[Nothing] =
+      Dead(messages.toList.map(Message(_)))
 
     def ??? : ?[Nothing] =
       error(Message("??? (Unimplemented)"))
