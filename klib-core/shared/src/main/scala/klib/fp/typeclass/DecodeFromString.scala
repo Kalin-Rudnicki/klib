@@ -11,7 +11,15 @@ import klib.Implicits._
 import klib.fp.types._
 
 trait DecodeFromString[+T] {
+
   def decode(string: String): ?[T]
+
+  final def map[T2](f: T => T2): DecodeFromString[T2] =
+    decode(_).map(f)
+
+  final def fMap[T2](f: T => ?[T2]): DecodeFromString[T2] =
+    decode(_).flatMap(f)
+
 }
 
 object DecodeFromString {
