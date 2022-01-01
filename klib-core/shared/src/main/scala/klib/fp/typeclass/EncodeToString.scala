@@ -6,7 +6,12 @@ import io.circe._
 import io.circe.syntax._
 
 trait EncodeToString[-T] {
+
   def encode(t: T): String
+
+  final def map[T2](f: T2 => T): EncodeToString[T2] =
+    t2 => encode(f(t2))
+
 }
 object EncodeToString {
 
