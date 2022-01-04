@@ -68,6 +68,9 @@ final class File private (val wrapped: JavaFile) {
       case true  => IO.errorMessage(s"File already exists: $wrapped")
     }
 
+  def delete: IO[Boolean] =
+    wrapped.delete.pure[IO]
+
   def isFile: IO[Boolean] =
     wrapped.isFile.pure[IO]
 
