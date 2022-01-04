@@ -1,6 +1,6 @@
 package klib.utils
 
-import java.io._
+import java.io.{File => _, _}
 import java.net.URLClassLoader
 import java.util.jar._
 
@@ -8,7 +8,6 @@ import scala.reflect.ClassTag
 
 import klib.Implicits._
 import klib.fp.types._
-import klib.utils._
 
 object DynamicJarLoader {
 
@@ -20,7 +19,7 @@ object DynamicJarLoader {
     for {
       // --- Find all `.class` files ---
       classPaths <- for {
-        jarBytes <- FileUtils.readFileBytes(jarFile)
+        jarBytes <- jarFile.readBytes
         jarInputStream <- new JarInputStream(new ByteArrayInputStream(jarBytes), true).pure[IO]
         jarEntries <- {
           def getJarEntries(stack: List[JarEntry]): IO[List[JarEntry]] =
@@ -45,7 +44,8 @@ object DynamicJarLoader {
             }
       } yield classPaths
       // --- Find valid instances of `T` with zero-arg-constructor ---
-      validClassPaths <- IO(new URLClassLoader(Array(jarFile.toURI.toURL), getClass.getClassLoader)).bracket { classLoader =>
+      url <- jarFile.url
+      validClassPaths <- IO(new URLClassLoader(Array(url), getClass.getClassLoader)).bracket { classLoader =>
         classPaths
           .map { cp =>
             for {
@@ -82,28 +82,34 @@ object DynamicJarLoader {
   // Anything in O must already exist in the class-path
   // TODO (KR) : Possibly de-dupe this
   def loadClassesFromJar[T, O](jarFile: File, classPaths: List[String])(withInstance: (String, T) => IO[O]): IO[List[O]] =
-    IO(new URLClassLoader(Array(jarFile.toURI.toURL), getClass.getClassLoader)).bracket { classLoader =>
-      def runForClassPath(classPath: String): IO[O] =
+    for {
+      url <- jarFile.url
+      res <- IO(new URLClassLoader(Array(url), getClass.getClassLoader)).bracket { classLoader =>
+        def runForClassPath(classPath: String): IO[O] =
+          for {
+            klass <- classLoader.loadClass(classPath).pure[IO]
+            zeroArgConstructor <- klass.getDeclaredConstructor().pure[IO]
+            _ <- zeroArgConstructor.setAccessible(true).pure[IO]
+            inst <- zeroArgConstructor.newInstance().asInstanceOf[T].pure[IO]
+            res <- withInstance(classPath, inst)
+          } yield res
+
+        classPaths.map(runForClassPath).traverse
+      }(_.close().pure[IO])
+    } yield res
+
+  def loadClassFromJar[T, O](jarFile: File, classPath: String)(withInstance: T => IO[O]): IO[O] =
+    for {
+      url <- jarFile.url
+      res <- IO(new URLClassLoader(Array(url), getClass.getClassLoader)).bracket { classLoader =>
         for {
           klass <- classLoader.loadClass(classPath).pure[IO]
           zeroArgConstructor <- klass.getDeclaredConstructor().pure[IO]
           _ <- zeroArgConstructor.setAccessible(true).pure[IO]
           inst <- zeroArgConstructor.newInstance().asInstanceOf[T].pure[IO]
-          res <- withInstance(classPath, inst)
+          res <- withInstance(inst)
         } yield res
-
-      classPaths.map(runForClassPath).traverse
-    }(_.close().pure[IO])
-
-  def loadClassFromJar[T, O](jarFile: File, classPath: String)(withInstance: T => IO[O]): IO[O] =
-    IO(new URLClassLoader(Array(jarFile.toURI.toURL), getClass.getClassLoader)).bracket { classLoader =>
-      for {
-        klass <- classLoader.loadClass(classPath).pure[IO]
-        zeroArgConstructor <- klass.getDeclaredConstructor().pure[IO]
-        _ <- zeroArgConstructor.setAccessible(true).pure[IO]
-        inst <- zeroArgConstructor.newInstance().asInstanceOf[T].pure[IO]
-        res <- withInstance(inst)
-      } yield res
-    }(_.close().pure[IO])
+      }(_.close().pure[IO])
+    } yield res
 
 }
