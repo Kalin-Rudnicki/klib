@@ -71,6 +71,9 @@ final class File private (val wrapped: JavaFile) {
   def length: IO[Long] =
     wrapped.length.pure[IO]
 
+  def renameTo(other: File): IO[Boolean] =
+    wrapped.renameTo(other.wrapped).pure[IO]
+
   def delete: IO[Boolean] =
     wrapped.delete.pure[IO]
 
