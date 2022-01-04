@@ -71,6 +71,12 @@ final class File private (val wrapped: JavaFile) {
   def delete: IO[Boolean] =
     wrapped.delete.pure[IO]
 
+  def mkdir: IO[Boolean] =
+    wrapped.mkdir.pure[IO]
+
+  def mkdirs: IO[Boolean] =
+    wrapped.mkdirs.pure[IO]
+
   def isFile: IO[Boolean] =
     wrapped.isFile.pure[IO]
 
