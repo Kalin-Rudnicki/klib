@@ -16,11 +16,30 @@ object Monad {
   trait Implicits {
 
     implicit class MonadOps[T[_]: Monad, A](t: T[A]) { // extends Applicative.Implicits.ApplicativeOps(t) {
+      import Functor.Implicits._
 
       private val monad: Monad[T] = implicitly[Monad[T]]
 
       def flatMap[B](f: A => T[B]): T[B] =
         monad.flatMap(t, f)
+
+      def <*[B](t2: T[B]): T[A] =
+        flatMap { a => t2.map { _ => a } }
+
+      def *>[B](t2: T[B]): T[B] =
+        flatMap { _ => t2 }
+
+      def <*>[B](t2: T[B]): T[(A, B)] =
+        flatMap { a => t2.map((a, _)) }
+
+      def <**[B](f: A => T[B]): T[A] =
+        flatMap { a => f(a).map { _ => a } }
+
+      def **>[B](f: A => T[B]): T[B] =
+        flatMap(f)
+
+      def <**>[B](f: A => T[B]): T[(A, B)] =
+        flatMap { a => f(a).map((a, _)) }
 
     }
 

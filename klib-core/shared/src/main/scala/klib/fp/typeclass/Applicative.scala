@@ -25,6 +25,7 @@ object Applicative {
   trait Implicits {
 
     implicit class ApplicativeOps[T[_]: Applicative, A](t: T[A]) { // extends Functor.Implicits.FunctorOps(t) {
+      import Functor.Implicits._
 
       private val applicative: Applicative[T] = implicitly[Applicative[T]]
 
@@ -36,6 +37,15 @@ object Applicative {
 
       def aJoin[B](t2: T[B]): T[(A, B)] =
         applicative.aJoin(t, t2)
+
+      def <#[B](t2: T[B]): T[A] =
+        aJoin(t2).map(_._1)
+
+      def #>[B](t2: T[B]): T[B] =
+        aJoin(t2).map(_._2)
+
+      def <#>[B](t2: T[B]): T[(A, B)] =
+        aJoin(t2)
 
     }
 

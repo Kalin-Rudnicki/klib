@@ -17,6 +17,14 @@ object Functor {
       def map[B](f: A => B): T[B] =
         functor.map(t, f)
 
+      def +>[B](b: => B): T[B] =
+        map { _ => b }
+
+      def ++>[B](f: A => B): T[B] =
+        functor.map(t, f)
+
+      def unit: T[Unit] = this +> ()
+
     }
 
   }
