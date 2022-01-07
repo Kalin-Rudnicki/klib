@@ -104,6 +104,9 @@ final class File private (val wrapped: JavaFile) {
   def child(p0: String, pN: String*): File =
     child(NonEmptyList(p0, pN.toList))
 
+  def children: IO[Array[File]] =
+    wrapped.listFiles.map(File.fromJavaFile).pure[IO]
+
   def uri: IO[URI] =
     wrapped.toURI.pure[IO]
 

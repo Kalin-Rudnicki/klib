@@ -1,10 +1,5 @@
 package klib.fp.types
 
-import java.awt.image.BufferedImage
-import java.io.{File, PrintWriter, RandomAccessFile}
-import javax.imageio.ImageIO
-
-import scala.io.Source
 import scala.util.Try
 import scala.sys.process._
 
