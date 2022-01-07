@@ -87,7 +87,7 @@ final class File private (val wrapped: JavaFile) {
     wrapped.isFile.pure[IO]
 
   def isDirectory: IO[Boolean] =
-    wrapped.isFile.pure[IO]
+    wrapped.isDirectory.pure[IO]
 
   def isHidden: IO[Boolean] =
     wrapped.isHidden.pure[IO]
