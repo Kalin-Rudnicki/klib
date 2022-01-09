@@ -2,7 +2,8 @@
 
 val Scala_2_12 = "2.12.10"
 val Scala_2_13 = "2.13.4"
-val CirceVersion = "0.15.0-M1"
+val Scala_3 = "3.1.0"
+val CirceVersion = "0.15.0-M1" // REMOVE : ...
 
 val MyOrg = "io.github.kalin-rudnicki"
 val githubUsername = "Kalin-Rudnicki"
@@ -69,6 +70,31 @@ lazy val `klib-core` =
           ).map(_ % Test),
     )
 
+lazy val `klib-core-2` =
+  crossProject(JSPlatform, JVMPlatform)
+    .in(file("klib-core-2"))
+    .settings(
+      name := "klib-core-2",
+      Compile / unmanagedSourceDirectories +=
+        baseDirectory.value / "shared" / "main" / "scala",
+      scalaVersion := Scala_3,
+      // TODO (KR) : Cross Version?
+      sonatypeCredentialHost := "s01.oss.sonatype.org",
+      // Dependencies
+      Dependencies.`dev.zio`.zio,
+      Dependencies.`dev.zio`.`zio-test`,
+      Dependencies.`io.circe`.`circe-core`,
+      Dependencies.`io.circe`.`circe-generic`,
+      Dependencies.`io.circe`.`circe-parser`,
+      Dependencies.`org.typelevel`.`cats-effect`,
+    )
+    .jsSettings()
+    .jvmSettings(
+      // Dependencies
+      Dependencies.`org.rogach`.scallop,
+      Dependencies.`com.google.jimfs`.jimfs,
+    )
+
 lazy val `klib-root` =
   project
     .in(file("."))
@@ -79,4 +105,6 @@ lazy val `klib-root` =
     .aggregate(
       `klib-core`.js,
       `klib-core`.jvm,
+      `klib-core-2`.js,
+      `klib-core-2`.jvm,
     )
