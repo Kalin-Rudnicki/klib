@@ -27,27 +27,7 @@ final class Logger private (
           logLevel: Option[Logger.LogLevel],
           ops: Logger.Source.Ops,
           event: Logger.Event,
-      ): UIO[Any] = {
-        def output(f: String => UIO[Unit]): UIO[Unit] =
-          withIndent { indent =>
-            for {
-              _ <- source.queuedBreak.get.flatMap {
-                case Some(break) =>
-                  break.print match {
-                    case Logger.Event.Break.Print.Nothing =>
-                      ops.println("")
-                    case Logger.Event.Break.Print.Tag =>
-                      ops.println(Logger.formatMessage(colorMode, logLevel, "", ""))
-                    case Logger.Event.Break.Print.TagAndIndent =>
-                      ops.println(Logger.formatMessage(colorMode, logLevel, indent, ""))
-                  }
-                case None =>
-                  UIO.unit
-              }
-              _ <- f(indent)
-            } yield ()
-          }
-
+      ): UIO[Any] =
         event match {
           case Logger.Event.Compound(events) =>
             ZIO.foreach(events)(handle(logLevel, ops, _))
@@ -69,15 +49,30 @@ final class Logger private (
               case None =>
                 newBreak.some
             }
-          case Logger.Event.Bracket(_1, _2, _3) =>
-            handle(logLevel, ops, _1).bracket(release = _ => handle(logLevel, ops, _3))(use = _ => handle(logLevel, ops, _2))
           case Logger.Event.Output(_type, message) =>
-            output { indent =>
-              _type match {
-                case Logger.Event.Output.Type.Print   => ops.print(Logger.formatMessage(colorMode, logLevel, indent, message))
-                case Logger.Event.Output.Type.Println => ops.println(Logger.formatMessage(colorMode, logLevel, indent, message))
-                case Logger.Event.Output.Type.Log     => ops.log(message)
-              }
+            withIndent { indent =>
+              for {
+                _ <- source.queuedBreak.get.flatMap {
+                  case Some(break) =>
+                    {
+                      break.print match {
+                        case Logger.Event.Break.Print.Nothing =>
+                          ops.println("")
+                        case Logger.Event.Break.Print.Tag =>
+                          ops.println(Logger.formatMessage(colorMode, logLevel, "", ""))
+                        case Logger.Event.Break.Print.TagAndIndent =>
+                          ops.println(Logger.formatMessage(colorMode, logLevel, indent, ""))
+                      }
+                    } *> source.queuedBreak.set(None)
+                  case None =>
+                    UIO.unit
+                }
+                _ <- _type match {
+                  case Logger.Event.Output.Type.Print   => ops.print(Logger.formatMessage(colorMode, logLevel, indent, message))
+                  case Logger.Event.Output.Type.Println => ops.println(Logger.formatMessage(colorMode, logLevel, indent, message))
+                  case Logger.Event.Output.Type.Log     => ops.log(message)
+                }
+              } yield ()
             }
           case Logger.Event.PushIndent(indent) =>
             indents.update { currentIndents =>
@@ -92,7 +87,6 @@ final class Logger private (
             if (logLevel.priority >= source.logTolerance.priority) handle(logLevel.some, ops, event())
             else UIO.unit
         }
-      }
 
       source.withOps(handle(None, _, event).unit)
     }
@@ -125,93 +119,139 @@ object Logger {
 
   // =====| API |=====
 
-  object evt {
+  object execute {
 
-    def apply(events: List[Event]): Event =
-      Event.Compound(events)
-    def apply(event0: Event, event1: Event, eventN: Event*): Event =
-      Event.Compound(event0 :: event1 :: eventN.toList)
+    def apply(event: Event): URIO[Logger, Unit] =
+      ZIO.service[Logger].flatMap(_.execute(event))
+    def apply(event0: Event, event1: Event, eventN: Event*): URIO[Logger, Unit] =
+      execute(Event.Compound(event0 :: event1 :: eventN.toList))
+    def all(events: List[Event]): URIO[Logger, Unit] =
+      execute(Event.Compound(events))
 
-    sealed abstract class EvtOut(`type`: Event.Output.Type) { output =>
+  }
+
+  // --- Output ---
+
+  sealed abstract class Out(`type`: Event.Output.Type) { o =>
+
+    object event {
 
       def apply(message: Any): Event =
         Event.Output(`type`, message)
       def apply(message0: Any, message1: Any, messageN: Any*): Event =
-        Event.Compound((message0 :: message1 :: messageN.toList).map(output(_)))
+        Event.Compound((message0 :: message1 :: messageN.toList).map(Event.Output(`type`, _)))
       def all(messages: List[Any]): Event =
-        Event.Compound(messages.map(output(_)))
-
-      sealed abstract class EvtWithLogLevel(logLevel: LogLevel) {
-
-        def apply(message: Any): Event =
-          output(message).requireLogLevel(logLevel)
-        def apply(message0: Any, message1: Any, messageN: Any*): Event =
-          Event.Compound((message0 :: message1 :: messageN.toList).map(output(_))).requireLogLevel(logLevel)
-        def all(messages: List[Any]): Event =
-          Event.Compound(messages.map(output(_))).requireLogLevel(logLevel)
-
-      }
-
-      object never extends EvtWithLogLevel(LogLevel.Never)
-      object debug extends EvtWithLogLevel(LogLevel.Debug)
-      object detailed extends EvtWithLogLevel(LogLevel.Detailed)
-      object info extends EvtWithLogLevel(LogLevel.Info)
-      object important extends EvtWithLogLevel(LogLevel.Important)
-      object warning extends EvtWithLogLevel(LogLevel.Warning)
-      object error extends EvtWithLogLevel(LogLevel.Error)
-      object fatal extends EvtWithLogLevel(LogLevel.Fatal)
-      object always extends EvtWithLogLevel(LogLevel.Always)
+        Event.Compound(messages.map(Event.Output(`type`, _)))
 
     }
 
-    object print extends EvtOut(Event.Output.Type.Print)
-    object println extends EvtOut(Event.Output.Type.Println)
-    object log extends EvtOut(Event.Output.Type.Log)
+    def apply(message: Any): URIO[Logger, Unit] =
+      execute(o.event(message))
+    def apply(message0: Any, message1: Any, messageN: Any*): URIO[Logger, Unit] =
+      execute(o.event.all(message0 :: message1 :: messageN.toList))
+    def all(messages: List[Any]): URIO[Logger, Unit] =
+      execute(o.event.all(messages))
+
+    sealed abstract class WithLogLevel(logLevel: LogLevel) { wll =>
+
+      object event {
+
+        def apply(message: Any): Event =
+          Event.Output(`type`, message).requireLogLevel(logLevel)
+        def apply(message0: Any, message1: Any, messageN: Any*): Event =
+          Event.Compound((message0 :: message1 :: messageN.toList).map(Event.Output(`type`, _))).requireLogLevel(logLevel)
+        def all(messages: List[Any]): Event =
+          Event.Compound(messages.map(Event.Output(`type`, _))).requireLogLevel(logLevel)
+
+      }
+
+      def apply(message: Any): URIO[Logger, Unit] =
+        execute(wll.event(message))
+      def apply(message0: Any, message1: Any, messageN: Any*): URIO[Logger, Unit] =
+        execute(wll.event.all(message0 :: message1 :: messageN.toList))
+      def all(messages: List[Any]): URIO[Logger, Unit] =
+        execute(wll.event.all(messages))
+
+    }
+
+    object never extends WithLogLevel(LogLevel.Never)
+    object debug extends WithLogLevel(LogLevel.Debug)
+    object detailed extends WithLogLevel(LogLevel.Detailed)
+    object info extends WithLogLevel(LogLevel.Info)
+    object important extends WithLogLevel(LogLevel.Important)
+    object warning extends WithLogLevel(LogLevel.Warning)
+    object error extends WithLogLevel(LogLevel.Error)
+    object fatal extends WithLogLevel(LogLevel.Fatal)
+    object always extends WithLogLevel(LogLevel.Always)
 
   }
 
-  object execute {
+  object print extends Out(Event.Output.Type.Print)
+  object println extends Out(Event.Output.Type.Println)
+  object log extends Out(Event.Output.Type.Log)
 
-    def apply(event: Event): RIO[Logger, Unit] =
-      ZIO.service[Logger].flatMap(_.execute(event))
-    def apply(event0: Event, event1: Event, eventN: Event*): RIO[Logger, Unit] =
-      execute(Event.Compound(event0 :: event1 :: eventN.toList))
+  // --- Indent ---
 
-    sealed abstract class ExecuteOut(evtOut: evt.EvtOut) {
+  object indent {
 
-      def apply(message: Any): RIO[Logger, Unit] =
-        execute(evtOut(message))
-      def apply(message0: Any, message1: Any, messageN: Any*): RIO[Logger, Unit] =
-        execute(evtOut.all(message0 :: message1 :: messageN.toList))
-      def all(messages: List[Any]): RIO[Logger, Unit] =
-        execute(evtOut.all(messages))
+    object event {
 
-      sealed abstract class ExecuteWithLogLevel(evtWithLogLevel: evt.EvtOut#EvtWithLogLevel) {
-
-        def apply(message: Any): RIO[Logger, Unit] =
-          execute(evtWithLogLevel(message))
-        def apply(message0: Any, message1: Any, messageN: Any*): RIO[Logger, Unit] =
-          execute(evtWithLogLevel.all(message0 :: message1 :: messageN.toList))
-        def all(messages: List[Any]): RIO[Logger, Unit] =
-          execute(evtWithLogLevel.all(messages))
-
-      }
-
-      object never extends ExecuteWithLogLevel(evtOut.never)
-      object debug extends ExecuteWithLogLevel(evtOut.debug)
-      object detailed extends ExecuteWithLogLevel(evtOut.detailed)
-      object info extends ExecuteWithLogLevel(evtOut.info)
-      object important extends ExecuteWithLogLevel(evtOut.important)
-      object warning extends ExecuteWithLogLevel(evtOut.warning)
-      object error extends ExecuteWithLogLevel(evtOut.error)
-      object fatal extends ExecuteWithLogLevel(evtOut.fatal)
-      object always extends ExecuteWithLogLevel(evtOut.always)
+      def apply(by: Int): Event =
+        Event.PushIndent(Left(by))
+      def apply(idt: String): Event =
+        Event.PushIndent(Right(idt))
 
     }
 
-    object print extends ExecuteOut(evt.print)
-    object println extends ExecuteOut(evt.println)
-    object log extends ExecuteOut(evt.log)
+    def apply(by: Int): URIO[Logger, Unit] =
+      execute(event(by))
+    def apply(idt: String): URIO[Logger, Unit] =
+      execute(event(idt))
+
+  }
+
+  object popIndent {
+
+    val event: Event = Event.PopIndent
+    def apply(): URIO[Logger, Unit] =
+      execute(event)
+
+  }
+
+  object withIndent {
+
+    def apply[R, E, A](by: Int)(zio: ZIO[R, E, A]): ZIO[Logger with R, E, A] =
+      indent(by).bracket(_ => popIndent())(_ => zio)
+    def apply[R, E, A](idt: String)(zio: ZIO[R, E, A]): ZIO[Logger with R, E, A] =
+      indent(idt).bracket(_ => popIndent())(_ => zio)
+
+  }
+
+  object break {
+
+    def event(
+        `type`: Event.Break.Type = Event.Break.Type.Normal,
+        print: Event.Break.Print = Event.Break.Print.TagAndIndent,
+    ): Event =
+      Event.Break(`type`, print)
+    def apply(
+        `type`: Event.Break.Type = Event.Break.Type.Normal,
+        print: Event.Break.Print = Event.Break.Print.TagAndIndent,
+    ): URIO[Logger, Unit] =
+      execute(Event.Break(`type`, print))
+
+    sealed abstract class Brk(`type`: Event.Break.Type) {
+
+      def event(print: Event.Break.Print = Event.Break.Print.TagAndIndent): Event =
+        Event.Break(`type`, print)
+      def apply(print: Event.Break.Print = Event.Break.Print.TagAndIndent): URIO[Logger, Unit] =
+        execute(event(print))
+
+    }
+
+    object open extends Brk(Event.Break.Type.Open)
+    object normal extends Brk(Event.Break.Type.Normal)
+    object close extends Brk(Event.Break.Type.Close)
 
   }
 
@@ -444,7 +484,6 @@ object Logger {
   sealed trait Event
   object Event {
     final case class Compound(events: List[Event]) extends Event
-    final case class Bracket(_1: Event, _2: Event, _3: Event) extends Event
     final case class Break(`type`: Break.Type, print: Break.Print) extends Event
     object Break {
       enum Type { case Open, Normal, Close }
@@ -459,8 +498,12 @@ object Logger {
     final case class PushIndent(indent: Either[Int, String]) extends Event
     case object PopIndent extends Event
 
-    final case class RequireFlags(flags: Set[String], event: () => Event) extends Event
-    final case class RequireLogLevel(logLevel: LogLevel, event: () => Event) extends Event
+    final case class RequireFlags(flags: Set[String], event: () => Event) extends Event {
+      override def toString: String = s"RequireFlags($flags,${event()})"
+    }
+    final case class RequireLogLevel(logLevel: LogLevel, event: () => Event) extends Event {
+      override def toString: String = s"RequireLogLevel($logLevel,${event()})"
+    }
   }
 
   // =====| Helpers |=====
