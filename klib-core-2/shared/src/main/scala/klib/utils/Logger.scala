@@ -8,10 +8,10 @@ import cats.syntax.list.*
 import zio.*
 
 final class Logger private (
-    flags: InfiniteSet[String],
     defaultIndent: String,
-    colorMode: Logger.ColorMode,
     sources: List[Logger.Source],
+    flags: InfiniteSet[String],
+    colorMode: Logger.ColorMode,
     indents: Ref[List[String]], // TODO (KR) : Maybe this should be on the Source (?)
 ) { logger =>
 
@@ -99,11 +99,11 @@ final class Logger private (
 object Logger {
 
   def apply(
+      defaultIndent: String,
       flags: Set[String],
       flagMap: Map[String, InfiniteSet[String]],
-      defaultIndent: String,
+      sources: List[UIO[Logger.Source]],
       colorMode: Logger.ColorMode,
-      sources: List[UIO[Source]],
       initialIndents: List[String],
   ): UIO[Logger] =
     for {
@@ -115,6 +115,25 @@ object Logger {
       colorMode = colorMode,
       sources = sources,
       indents = indents,
+    )
+
+  def layer(
+      defaultIndent: String,
+      flags: Set[String],
+      flagMap: Map[String, InfiniteSet[String]],
+      sources: List[UIO[Logger.Source]],
+      colorMode: Logger.ColorMode,
+      initialIndents: List[String],
+  ): ZLayer[Any, Nothing, Logger] =
+    ZLayer.fromZIO(
+      Logger(
+        defaultIndent = defaultIndent,
+        flags = flags,
+        flagMap = flagMap,
+        sources = sources,
+        colorMode = colorMode,
+        initialIndents = initialIndents,
+      ),
     )
 
   // =====| API |=====
