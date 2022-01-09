@@ -6,34 +6,29 @@ import zio.Console
 
 import klib.utils._
 
-object Main extends ZIOAppDefault {
+object Main extends ZIOApp {
+
+  override type Environment = ZEnv with Logger
+
+  override def layer: ZLayer[ZIOAppArgs, Any, Environment] =
+    ZEnv.live ++
+      ZLayer.fromZIO(
+        Logger(
+          flags = Set.empty,
+          flagMap = Map.empty,
+          defaultIndent = "    ",
+          colorMode = Logger.ColorMode.Extended,
+          sources = List(Logger.Source.stdOut(Logger.LogLevel.Info)),
+          initialIndents = Nil,
+        ),
+      )
+
+  override implicit def tag: Tag[Environment] = Tag[Environment]
 
   override def run: RIO[Environment, Any] =
     for {
-      logger <- Logger(
-        flags = Set.empty,
-        flagMap = Map.empty,
-        defaultIndent = "    ",
-        colorMode = Logger.ColorMode.Extended,
-        sources = List(Logger.Source.stdOut(Logger.LogLevel.Info)),
-        initialIndents = Nil,
-      )
-      events = Logger.Event.Compound(
-        (None :: Logger.LogLevel.All.map(_.some)).map { logLevel =>
-          def event: Logger.Event = Logger.Event.Println(logLevel.fold("(None)")(_.displayName))
-
-          logLevel match {
-            case Some(logLevel) => Logger.Event.RequireLogLevel(logLevel, () => event)
-            case None           => event
-          }
-        },
-      )
-      (duration, _) <- logger
-        .execute(events)
-        .timed
-      _ <- logger.execute(
-        Logger.Event.Println(duration.toNanos),
-      )
+      _ <- Logger.execute.println("A", "B", "C")
+      _ <- Logger.execute.println.info("D", "E", "F")
     } yield ()
 
 }
