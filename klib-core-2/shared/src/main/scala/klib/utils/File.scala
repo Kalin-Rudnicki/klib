@@ -65,7 +65,7 @@ final class File(val path: Path) {
   def size: Task[Long] =
     ZIO.attempt(Files.size(this.path))
 
-  def children: RIO[FileSystem, Array[File]] =
+  def children: Task[Array[File]] =
     ZIO.attempt(Files.list(this.path)).map(_.iterator().asScala.toArray.map(File(_)))
   def walk[R, E >: Throwable, A: ClassTag](withFile: File => ZIO[R, E, A]): ZIO[R, E, Array[A]] =
     for {
@@ -79,7 +79,8 @@ final class File(val path: Path) {
       acquire: => Task[C],
       use: C => ZIO[R, E, A],
   ): ZIO[R, E, A] =
-    new ZIO.Acquire[R, E, C](() => acquire)
+    ZIO
+      .acquireReleaseWith[R, E, C](acquire)
       .apply(s => ZIO.attempt(s.close()).orDie)
       .apply(use)
   def withOutputStream[R, E >: Throwable, A](use: OutputStream => ZIO[R, E, A]): ZIO[R, E, A] =
@@ -96,7 +97,7 @@ final class File(val path: Path) {
   def writeString(string: String): Task[Unit] =
     withOutputStream(s => ZIO.attempt(s.write(string.getBytes)))
 
-  def readBytes: RIO[FileSystem, Array[Byte]] =
+  def readBytes: Task[Array[Byte]] =
     withInputStream(s => ZIO.attempt(s.readAllBytes()))
   def readString: Task[String] =
     withInputStream(s => ZIO.attempt(new String(s.readAllBytes())))
@@ -116,5 +117,8 @@ object File {
 
   def fromPath(path: String): RIO[FileSystem, File] =
     ZIO.service[FileSystem].flatMap(_.createFileObject(path))
+
+  def homeDirectory: RIO[FileSystem, File] =
+    ZIO.attempt(java.lang.System.getProperty("user.home")).flatMap(fromPath)
 
 }
