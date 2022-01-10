@@ -2,7 +2,6 @@ package klib.test
 
 import cats.syntax.option._
 import zio._
-import zio.Console
 
 import klib.utils._
 
@@ -27,7 +26,7 @@ object SharedMain extends ZIOApp {
 
   override def run: RIO[Environment, Any] =
     for {
-      _ <- Console.printLine("=====| Shared Main |=====")
+      _ <- Logger.println("=====| Shared Main |=====")
     } yield ()
 
 }
