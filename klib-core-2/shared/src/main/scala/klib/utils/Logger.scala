@@ -125,16 +125,14 @@ object Logger {
       colorMode: Logger.ColorMode,
       initialIndents: List[String],
   ): ZLayer[Any, Nothing, Logger] =
-    ZLayer.fromZIO(
-      Logger(
-        defaultIndent = defaultIndent,
-        flags = flags,
-        flagMap = flagMap,
-        sources = sources,
-        colorMode = colorMode,
-        initialIndents = initialIndents,
-      ),
-    )
+    Logger(
+      defaultIndent = defaultIndent,
+      flags = flags,
+      flagMap = flagMap,
+      sources = sources,
+      colorMode = colorMode,
+      initialIndents = initialIndents,
+    ).toLayer
 
   // =====| API |=====
 

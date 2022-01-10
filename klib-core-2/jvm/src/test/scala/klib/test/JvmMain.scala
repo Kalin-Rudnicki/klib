@@ -9,19 +9,20 @@ import klib.utils.*
 
 object JvmMain extends ZIOApp {
 
-  override type Environment = ZEnv with Logger with FileSystem
+  override type Environment = ZEnv with Logger
 
   override def layer: ZLayer[ZIOAppArgs, Any, Environment] =
     ZEnv.live ++
-      Logger.live(Logger.LogLevel.Detailed) ++
-      FileSystem.live
+      Logger.live(Logger.LogLevel.Detailed)
 
   override implicit def tag: Tag[Environment] = Tag[Environment]
 
   override def run: RIO[Environment, Any] =
     for {
       _ <- Logger.println("=====| Shared Main |=====")
-      roots <- FileSystem.roots
+      (roots, homeDirectory) <- FileSystem.live.toRuntime(RuntimeConfig.global).use {
+        _.run(FileSystem.roots <*> File.homeDirectory)
+      }
       _ <- ZIO.foreach(roots) { file =>
         Logger.println.info(file) *>
           Logger
@@ -31,7 +32,7 @@ object JvmMain extends ZIOApp {
             .unit
       }
       _ <- Logger.break()
-      _ <- File.homeDirectory >>= (_.exists) >>= (Logger.println.info(_))
+      _ <- homeDirectory.exists >>= (Logger.println.info(_))
     } yield ()
 
 }

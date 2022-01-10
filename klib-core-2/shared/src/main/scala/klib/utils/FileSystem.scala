@@ -25,7 +25,7 @@ object FileSystem {
     }
 
   def layer(fileSystem: => java.nio.file.FileSystem): ZLayer[Any, Throwable, FileSystem] =
-    ZLayer.fromZIO(ZIO.attempt(fileSystem).map(FileSystem.fromJavaFileSystem))
+    ZIO.attempt(fileSystem).map(FileSystem.fromJavaFileSystem).toLayer
 
   def live: ZLayer[Any, Throwable, FileSystem] =
     layer(java.nio.file.FileSystems.getDefault)
