@@ -121,14 +121,10 @@ object FileSystem {
   def defaultJavaFileSystem: FileSystem =
     fromJavaFileSystem(FileSystems.getDefault)
 
-  def layer(fileSystem: FileSystem): ZLayer[Any, Nothing, FileSystem] =
-    ZLayer.succeed(fileSystem)
-
   def layer(fileSystem: => java.nio.file.FileSystem): ZLayer[Any, Throwable, FileSystem] =
     ZLayer.fromZIO(ZIO.attempt(fileSystem).map(FileSystem.fromJavaFileSystem))
 
-  // =====| API |=====
-
-  // TODO (KR) :
+  def live: ZLayer[Any, Throwable, FileSystem] =
+    layer(FileSystems.getDefault)
 
 }
