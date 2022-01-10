@@ -14,8 +14,7 @@ object JvmMain extends ZIOApp {
   override def layer: ZLayer[ZIOAppArgs, Any, Environment] =
     ZEnv.live ++
       Logger.live(Logger.LogLevel.Detailed) ++
-      FileSystem.live
-  // FileSystem.layer(Jimfs.newFileSystem(Configuration.forCurrentPlatform()))
+      FileSystem.currentPlatformJIMFS
 
   override implicit def tag: Tag[Environment] = Tag[Environment]
 
