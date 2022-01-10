@@ -1,5 +1,7 @@
 package klib.utils
 
+import java.io.BufferedWriter
+
 import scala.annotation.tailrec
 
 import cats.data.*
@@ -11,7 +13,7 @@ final class Logger private (
     defaultIndent: String,
     sources: List[Logger.Source],
     flags: InfiniteSet[String],
-    colorMode: Logger.ColorMode,
+    colorMode: Logger.ColorMode, // TODO (KR) : Move to Source
     indents: Ref[List[String]], // TODO (KR) : Maybe this should be on the Source (?)
 ) { logger =>
 
@@ -291,11 +293,11 @@ object Logger {
   }
   object Source {
 
-    final case class Ops(
-        print: Any => UIO[Unit],
-        println: Any => UIO[Unit],
-        log: Any => UIO[Unit],
-    )
+    trait Ops {
+      def print(message: Any): UIO[Unit]
+      def println(message: Any): UIO[Unit]
+      def log(message: Any): UIO[Unit]
+    }
 
     // ---  ---
 
@@ -305,16 +307,39 @@ object Logger {
     ): UIO[Source] =
       for {
         queuedBreak <- Ref.make(initialQueuedBreak)
-        ops = Ops(
-          print = msg => ZIO { scala.Console.print(msg) }.orDie,
-          println = msg => ZIO { scala.Console.println(msg) }.orDie,
-          log = msg => ZIO { scala.Console.println(msg) }.orDie,
-        )
+        ops = new Ops {
+          def print(message: Any): UIO[Unit] = ZIO { scala.Console.print(message) }.orDie
+          def println(message: Any): UIO[Unit] = ZIO { scala.Console.println(message) }.orDie
+          def log(message: Any): UIO[Unit] = ZIO { scala.Console.println(message) }.orDie
+        }
       } yield new Source("StdOut", logTolerance, queuedBreak) {
         override type Src = ops.type
         override val acquire: UIO[Src] = UIO(ops)
         override def release(src: Src): UIO[Unit] = UIO.unit
       }
+
+    def file(
+        file: File,
+        logTolerance: LogLevel with LogLevel.Tolerance,
+        initialQueuedBreak: Option[Event.Break] = None,
+    ): UIO[Source] = {
+      final class BufferedWriterOps(val bw: BufferedWriter) extends Ops {
+        override def print(message: Any): UIO[Unit] =
+          ZIO.attempt(bw.write(message.toString)).orDie
+        override def println(message: Any): UIO[Unit] =
+          (ZIO.attempt(bw.write(message.toString)) *> ZIO.attempt(bw.write('\n'))).orDie
+        override def log(message: Any): UIO[Unit] =
+          (ZIO.attempt(bw.write(message.toString)) *> ZIO.attempt(bw.write('\n'))).orDie
+      }
+
+      for {
+        queuedBreak <- Ref.make(initialQueuedBreak)
+      } yield new Source(file.toString, logTolerance, queuedBreak) {
+        override type Src = BufferedWriterOps
+        override protected val acquire: UIO[Src] = file.bufferedWriter().map(BufferedWriterOps(_)).orDie
+        override protected def release(src: Src): UIO[Unit] = ZIO.attempt(src.bw.close()).orDie
+      }
+    }
 
   }
 

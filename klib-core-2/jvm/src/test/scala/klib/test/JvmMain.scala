@@ -9,11 +9,35 @@ import klib.utils.*
 
 object JvmMain extends ZIOApp {
 
-  override type Environment = ZEnv & Logger
+  private val fileSystemLayer: ZLayer[Any, Throwable, FileSystem] =
+    FileSystem.live
+
+  private val logFile: RIO[FileSystem, File] =
+    File.fromPath("log-file.txt")
+
+  private val loggerLayer: ZLayer[FileSystem, Throwable, Logger] = {
+    for {
+      logFile <- logFile
+      logger <- Logger(
+        defaultIndent = "    ",
+        flags = Set.empty,
+        flagMap = Map.empty,
+        sources = List(
+          Logger.Source.stdOut(Logger.LogLevel.Info),
+          Logger.Source.file(logFile, Logger.LogLevel.Debug),
+        ),
+        colorMode = Logger.ColorMode.Extended,
+        initialIndents = Nil,
+      )
+    } yield logger
+  }.toLayer
+
+  override type Environment = ZEnv & Logger & FileSystem
 
   override def layer: ZLayer[ZIOAppArgs, Any, Environment] =
     ZEnv.live ++
-      Logger.live(Logger.LogLevel.Detailed)
+      fileSystemLayer >+>
+      loggerLayer
 
   override implicit def tag: Tag[Environment] = Tag[Environment]
 
@@ -52,22 +76,13 @@ object JvmMain extends ZIOApp {
   override def run: RIO[Environment, Any] =
     for {
       _ <- Logger.println("=====| Shared Main |=====")
-      (roots, homeDirectory) <-
-        (FileSystem.roots <*> File.homeDirectory <*> Logger.println("Test")).provideSomeLayer(FileSystem.live)
-      _ <- ZIO.foreach(roots) { file =>
-        Logger.println.info(file) *>
-          Logger
-            .withIndent(1) {
-              file.children >>= (ZIO.foreach(_)(Logger.println.info(_)))
-            }
-            .unit
-      }
-      _ <- Logger.break()
-      _ <- homeDirectory.exists >>= (Logger.println.info(_))
-      runtime <- ZIO.runtime[Environment]
-      res1 = runtime.unsafeRunSync(ZIO.succeed(5)).toEither
-      res2 = runtime.unsafeRunSync(ZIO.fail(new RuntimeException("Fail....."))).toEither
-      _ <- Logger.println.info((res1, res2))
+      _ <- Logger.execute.all(
+        Logger.LogLevel.All.map(ll => Logger.println.event(ll.displayName).requireLogLevel(ll)),
+      )
+      logFile <- logFile
+      _ <- zio.Console.printLine("log-file contents:")
+      fc <- logFile.readString
+      _ <- zio.Console.printLine(fc)
     } yield ()
 
 }
