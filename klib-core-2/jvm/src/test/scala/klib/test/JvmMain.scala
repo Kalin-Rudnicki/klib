@@ -10,7 +10,7 @@ import klib.utils.*
 object JvmMain extends ZIOApp {
 
   private val fileSystemLayer: ZLayer[Any, Throwable, FileSystem] =
-    FileSystem.live
+    FileSystem.currentPlatformJIMFS
 
   private val logFile: RIO[FileSystem, File] =
     File.fromPath("log-file.txt")

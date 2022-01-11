@@ -1,6 +1,8 @@
 package klib.utils
 
 import java.io.BufferedWriter
+import java.nio.file.OpenOption
+import java.nio.file.StandardOpenOption
 
 import scala.annotation.tailrec
 
@@ -333,10 +335,11 @@ object Logger {
       }
 
       for {
+        _ <- file.createIfDNE.orDie
         queuedBreak <- Ref.make(initialQueuedBreak)
       } yield new Source(file.toString, logTolerance, queuedBreak) {
         override type Src = BufferedWriterOps
-        override protected val acquire: UIO[Src] = file.bufferedWriter().map(BufferedWriterOps(_)).orDie
+        override protected val acquire: UIO[Src] = file.bufferedWriter(StandardOpenOption.APPEND).map(BufferedWriterOps(_)).orDie
         override protected def release(src: Src): UIO[Unit] = ZIO.attempt(src.bw.close()).orDie
       }
     }

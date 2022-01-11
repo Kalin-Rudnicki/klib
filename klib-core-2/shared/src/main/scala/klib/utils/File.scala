@@ -108,6 +108,12 @@ final class File(val path: Path) {
       case false => ZIO.fail(new RuntimeException(s"File ($path) does not exist"))
     }
 
+  def createIfDNE: Task[Unit] =
+    exists.flatMap {
+      case true  => ZIO.unit
+      case false => createFile()
+    }
+
   // =====|  |=====
 
   override def toString: String = path.toString
