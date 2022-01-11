@@ -528,6 +528,7 @@ object Logger {
 
   sealed trait Event
   object Event {
+
     final case class Compound(events: List[Event]) extends Event
     final case class Break(`type`: Break.Type, print: Break.Print) extends Event
     object Break {
@@ -549,6 +550,16 @@ object Logger {
     final case class RequireLogLevel(logLevel: LogLevel, event: () => Event) extends Event {
       override def toString: String = s"RequireLogLevel($logLevel,${event()})"
     }
+
+    def apply(event: Event): Event =
+      event
+
+    def apply(event0: Event, event1: Event, eventN: Event*): Event =
+      Compound(event0 :: event1 :: eventN.toList)
+
+    val empty: Event =
+      Compound(Nil)
+
   }
 
   // =====| Helpers |=====
