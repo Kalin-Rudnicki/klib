@@ -2,11 +2,11 @@ package klib.utils
 
 import zio._
 
-final case class Err(
+final case class Message(
     devMessage: String,
     userMessage: Option[String],
     stackTrace: Array[StackTraceElement], // TODO (KR) : Switch to ZIO stack-trace (?)
-    cause: Option[Err],
+    cause: Option[Message],
 ) {
 
   def toLoggerEvent(errorLevel: Logger.LogLevel): URIO[RunMode, Logger.Event] =
@@ -33,28 +33,28 @@ final case class Err(
     } yield Logger.Event(
       Logger.println.info.event(message),
       Logger.Event(
-        Err.stackTraceEvent(stackTrace),
+        Message.stackTraceEvent(stackTrace),
         causeEvent,
       ),
     )
 
 }
-object Err {
+object Message {
 
   def apply(
       devMessage: String,
       userMessage: Option[String] = None,
-      cause: Option[Err] = None,
-  ): Err =
-    Err(
+      cause: Option[Message] = None,
+  ): Message =
+    Message(
       devMessage = devMessage,
       userMessage = userMessage,
       stackTrace = Thread.currentThread().getStackTrace,
       cause = cause,
     )
 
-  def fromThrowable(throwable: Throwable, userMessage: Option[String] = None): Err =
-    Err(
+  def fromThrowable(throwable: Throwable, userMessage: Option[String] = None): Message =
+    Message(
       devMessage = Option(throwable.getMessage).getOrElse(throwable.toString),
       userMessage = userMessage,
       stackTrace = throwable.getStackTrace,
