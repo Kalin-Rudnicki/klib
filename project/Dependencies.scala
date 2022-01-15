@@ -33,6 +33,7 @@ object Dependencies {
 
     val zio = crossDep("zio", version)
     val `zio-test` = crossDep("zio-test", version, _ % Test)
+    val `zio-test-sbt` = crossDep("zio-test-sbt", version, _ % Test)
   }
 
   object `org.typelevel` extends Org("org.typelevel") {

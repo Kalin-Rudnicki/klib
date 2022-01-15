@@ -83,10 +83,13 @@ lazy val `klib-core-2` =
       // Dependencies
       Dependencies.`dev.zio`.zio,
       Dependencies.`dev.zio`.`zio-test`,
+      Dependencies.`dev.zio`.`zio-test-sbt`,
       Dependencies.`io.circe`.`circe-core`,
       Dependencies.`io.circe`.`circe-generic`,
       Dependencies.`io.circe`.`circe-parser`,
       Dependencies.`org.typelevel`.`cats-effect`,
+      // Testing
+      testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")),
     )
     .jsSettings()
     .jvmSettings(
