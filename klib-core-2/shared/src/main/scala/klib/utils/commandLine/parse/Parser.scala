@@ -1,0 +1,228 @@
+package klib.utils.commandLine.parse
+
+import scala.annotation.tailrec
+import scala.reflect.ClassTag
+
+import cats.data.EitherNel
+import cats.data.NonEmptyList
+import cats.data.NonEmptySet
+import cats.syntax.either.*
+import cats.syntax.list.*
+import cats.syntax.option.*
+import cats.syntax.parallel.*
+import zio.Zippable
+
+import klib.fp.typeclass.*
+
+final case class BuiltParser[+T](
+    parse: List[Arg] => EitherNel[Error, T],
+)
+
+final case class Parser[+T](
+    parseF: List[Arg] => Result[T],
+    elements: List[Element],
+) {
+
+  // =====| Building |=====
+
+  def >&>[T2](other: Parser[T2])(implicit zip: Zippable[T, T2]): Parser[zip.Out] =
+    Parser(
+      parseF = { args =>
+        val res1 = this.parseF(args)
+        val res2 = other.parseF(res1.remainingArgs)
+        Result(
+          (res1.res, res2.res) match {
+            case (Right(r1), Right(r2))   => zip.zip(r1, r2).asRight
+            case (Left(err1), Right(_))   => err1.asLeft
+            case (Right(_), Left(err2))   => err2.asLeft
+            case (Left(err1), Left(err2)) => (err1 ::: err2).asLeft
+          },
+          res2.remainingArgs,
+        )
+      },
+      elements = this.elements ::: other.elements,
+    )
+
+  def map[T2](f: T => T2): Parser[T2] =
+    Parser(
+      parseF = parseF(_).mapResult(f),
+      elements = elements,
+    )
+
+  // =====| Build |=====
+
+  private def build[Extras](extrasF: List[Arg] => EitherNel[Error, Extras])(implicit
+      zip: Zippable[T, Extras],
+  ): BuiltParser[zip.Out] =
+    BuiltParser(
+      parse = { args =>
+        val result = parseF(args)
+        val extras = extrasF(result.remainingArgs)
+        (result.res, extras).parMapN(zip.zip)
+      },
+    )
+
+  def discardExtras: BuiltParser[T] =
+    build(_ => ().asRight)
+
+  def disallowExtras: BuiltParser[T] =
+    build {
+      _.toNel match {
+        case Some(nel) => nel.map { arg => Error(None, Error.Reason.UnexpectedArg(arg)) }.asLeft
+        case None      => ().asRight
+      }
+    }
+
+  def extrasAsArgs(implicit zip: Zippable[T, List[Arg]]): BuiltParser[zip.Out] =
+    build(_.asRight)
+
+}
+object Parser {
+
+  object singleValue {
+
+    final case class Builder[T](
+        private val _baseName: String,
+        private val _typeName: String,
+        private val _decodeFromString: DecodeFromString[T],
+        private val _primaryLongParam: Param.SimpleLong,
+        private val _longParamAliases: List[Param.SimpleLong],
+        private val _primaryShortParam: Option[Param.SimpleShort],
+        private val _shortParamAliases: List[Param.SimpleShort],
+        private val _description: List[String],
+    ) {
+
+      // =====| Modify |=====
+
+      def withPrimaryLongParam(name: String): Builder[T] =
+        this.copy(_primaryLongParam = Param.SimpleLong(name))
+
+      def withLongParamAliases(names: String*): Builder[T] =
+        this.copy(_longParamAliases = names.toList.map(Param.SimpleLong.apply))
+
+      def addLongParamAliases(names: String*): Builder[T] =
+        this.copy(_longParamAliases = _longParamAliases ::: names.toList.map(Param.SimpleLong.apply))
+
+      def withPrimaryShortParam(name: Char): Builder[T] =
+        this.copy(_primaryShortParam = Param.SimpleShort(name).some)
+
+      def withoutPrimaryShortParam: Builder[T] =
+        this.copy(_primaryShortParam = None)
+
+      def withShortParamAliases(names: Char*): Builder[T] =
+        this.copy(_shortParamAliases = names.toList.map(Param.SimpleShort.apply))
+
+      def addShortParamAliases(names: Char*): Builder[T] =
+        this.copy(_shortParamAliases = _shortParamAliases ::: names.toList.map(Param.SimpleShort.apply))
+
+      def withDescription(description: String*): Builder[T] =
+        this.copy(_description = description.toList)
+
+      def addDescription(description: String*): Builder[T] =
+        this.copy(_description = _description ::: description.toList)
+
+      // =====| Build |=====
+
+      private def build[T2](
+          requirementLevel: RequirementLevel,
+      )(
+          mapRes: (Option[T], Element) => EitherNel[Error, T2],
+      ): Parser[T2] = {
+        import Arg.find.*
+
+        val element: Element =
+          Element(
+            baseName = _baseName,
+            typeName = _typeName,
+            params = NonEmptyList(_primaryLongParam, _primaryShortParam.toList ::: _longParamAliases ::: _shortParamAliases),
+            requirementLevel = requirementLevel,
+            description = _description,
+          )
+
+        val allLongParams: List[Param.SimpleLong] = _primaryLongParam :: _longParamAliases
+        val allShortParams: List[Param.SimpleShort] = _primaryShortParam.toList ::: _shortParamAliases
+
+        val optionalParseFunction: List[Arg] => Result[Option[T]] = { args =>
+          @tailrec
+          def findLoop[T](
+              queue: List[T],
+              find: T => Option[Found[String]],
+          ): Option[Found[String]] =
+            queue match {
+              case head :: tail =>
+                find(head) match {
+                  case some @ Some(_) => some
+                  case None           => findLoop(tail, find)
+                }
+              case Nil =>
+                None
+            }
+
+          def foundFromLongParams: Option[Found[String]] =
+            findLoop(allLongParams, p => combined.longParamWithValue(p.name)(args))
+          def foundFromShortParams: Option[Found[String]] =
+            findLoop(allShortParams, p => combined.shortParamWithValue(p.name)(args))
+          def foundFromAny: Option[Found[String]] = foundFromLongParams orElse foundFromShortParams
+
+          foundFromAny match {
+            case Some(found) =>
+              Result(
+                res = _decodeFromString.decode(found.arg) match {
+                  case Left(error)  => NonEmptyList.one(Error(element.some, Error.Reason.MalformattedValue(found.arg))).asLeft
+                  case Right(value) => value.some.asRight
+                },
+                remainingArgs = found.remaining,
+              )
+            case None =>
+              Result(
+                res = None.asRight,
+                remainingArgs = args,
+              )
+          }
+        }
+
+        val parseFunction: List[Arg] => Result[T2] =
+          optionalParseFunction(_).flatMapResult(mapRes(_, element))
+
+        Parser(
+          parseF = parseFunction,
+          elements = element :: Nil,
+        )
+      }
+
+      def required: Parser[T] =
+        build[T](RequirementLevel.Required) { (res, element) =>
+          res match {
+            case Some(value) => value.asRight
+            case None        => NonEmptyList.one(Error(element.some, Error.Reason.MissingRequired)).asLeft
+          }
+        }
+      def default(default: T): Parser[T] =
+        build[T](RequirementLevel.Default) { (res, _) => res.getOrElse(default).asRight }
+      def optional: Parser[Option[T]] =
+        build[Option[T]](RequirementLevel.Optional) { (res, _) => res.asRight }
+
+    }
+
+    def apply[T](
+        baseName: String,
+        primaryLongParamName: Defaultable[String] = Defaultable.Auto,
+        primaryShortParamName: DefaultableOption[Char] = Defaultable.Auto,
+    )(implicit
+        dfs: DecodeFromString[T],
+        ct: ClassTag[T],
+    ): Builder[T] =
+      Builder(
+        _baseName = baseName,
+        _typeName = ct.runtimeClass.getSimpleName,
+        _decodeFromString = dfs,
+        _primaryLongParam = Param.SimpleLong(primaryLongParamName.toValue(baseName)),
+        _longParamAliases = Nil,
+        _primaryShortParam = primaryShortParamName.toOptionO(baseName.headOption).map(Param.SimpleShort.apply),
+        _shortParamAliases = Nil,
+        _description = Nil,
+      )
+
+  }
+
+}
