@@ -87,7 +87,7 @@ object ParserTests extends DefaultKSpec {
 
   // =====| ... |=====
 
-  private val personSpec: TestSpec = {
+  private val personSpec1: TestSpec = {
     final case class Person(
         firstName: String,
         lastName: String,
@@ -95,7 +95,7 @@ object ParserTests extends DefaultKSpec {
     )
 
     TestCaseSuite
-      .build("person")(
+      .build("person1")(
         (
           Parser.singleValue[String]("first-name").required >&>
             Parser.singleValue[String]("last-name").required >&>
@@ -164,9 +164,83 @@ object ParserTests extends DefaultKSpec {
       .toSuite
   }
 
+  private val personSpec2: TestSpec = {
+    final case class Person(
+        firstName: String,
+        lastName: String,
+        age: Option[Int],
+    )
+
+    TestCaseSuite
+      .build("person2")(
+        (
+          Parser.singleValue[String]("first-name").required >&>
+            Parser.singleValue[String]("last-name").required >&>
+            Parser.singleValue[Int]("age").optional
+        ).map(Person.apply),
+      )(
+        TestCase.failing("empty")()(
+          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
+          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
+        ),
+        TestCase.failing("missing 2")(
+          "--first-name",
+          "First",
+        )(
+          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
+        ),
+        TestCase.passing("success 1")(
+          "--first-name",
+          "First",
+          "--last-name",
+          "Last",
+        )()(Person("First", "Last", None)),
+        TestCase.passing("success 2")(
+          "--first-name",
+          "First",
+          "--last-name",
+          "Last",
+          "--age",
+          "100",
+        )()(Person("First", "Last", 100.some)),
+        TestCase.passing("success + extra")(
+          "--first-name",
+          "First",
+          "--last-name",
+          "Last",
+          "--age",
+          "100",
+          "unrelated-value",
+        )(
+          Arg.Value("unrelated-value"),
+        )(Person("First", "Last", 100.some)),
+        TestCase.failing("malformatted")(
+          "--first-name",
+          "First",
+          "--last-name",
+          "Last",
+          "--age",
+          "not-an-int",
+        )(
+          reasonAssertion(equalTo(Error.Reason.MalformattedValue("not-an-int"))),
+        ),
+        TestCase.failing("malformatted + missing 1")(
+          "--first-name",
+          "First",
+          "--age",
+          "not-an-int",
+        )(
+          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
+          reasonAssertion(equalTo(Error.Reason.MalformattedValue("not-an-int"))),
+        ),
+      )
+      .toSuite
+  }
+
   override def spec: TestSpec =
-    suite("PersonTests")(
-      personSpec,
+    suite("ParserTests")(
+      personSpec1,
+      personSpec2,
     )
 
 }
