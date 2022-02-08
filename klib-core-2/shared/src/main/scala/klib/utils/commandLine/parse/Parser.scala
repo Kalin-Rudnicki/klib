@@ -16,6 +16,7 @@ import klib.fp.typeclass.*
 
 final case class BuiltParser[+T](
     parse: List[Arg] => EitherNel[Error, T],
+    helpString: HelpConfig => String,
 )
 
 final case class Parser[+T](
@@ -60,6 +61,20 @@ final case class Parser[+T](
         val extras = extrasF(result.remainingArgs)
         (result.res, extras).parMapN(zip.zip)
       },
+      helpString = { helpConfig =>
+        val linePairs = elements.flatMap(_.toHelpString(helpConfig))
+        val maxParamsUsed: Int = linePairs.map(_._1.length).maxOption.getOrElse(0).min(helpConfig.maxParamsWidth)
+
+        val paramLines: List[String] =
+          linePairs.map { (leftStr, rightStr) =>
+            s"${" " * helpConfig.leftPadding}$leftStr${" " * (maxParamsUsed - leftStr.length + helpConfig.centerPadding)}$rightStr"
+          }
+
+        val allLines: List[String] =
+          "Usage : ARGS" :: paramLines
+
+        allLines.mkString("\n")
+      },
     )
 
   def discardExtras: BuiltParser[T] =
@@ -85,35 +100,35 @@ object Parser {
         private val _baseName: String,
         private val _typeName: String,
         private val _decodeFromString: DecodeFromString[T],
-        private val _primaryLongParam: Param.SimpleLong,
-        private val _longParamAliases: List[Param.SimpleLong],
-        private val _primaryShortParam: Option[Param.SimpleShort],
-        private val _shortParamAliases: List[Param.SimpleShort],
+        private val _primaryLongParam: Param.LongWithValue,
+        private val _longParamAliases: List[Param.LongWithValue],
+        private val _primaryShortParam: Option[Param.ShortWithValue],
+        private val _shortParamAliases: List[Param.ShortWithValue],
         private val _description: List[String],
     ) {
 
       // =====| Modify |=====
 
       def withPrimaryLongParam(name: String): Builder[T] =
-        this.copy(_primaryLongParam = Param.SimpleLong(name))
+        this.copy(_primaryLongParam = Param.LongWithValue(name))
 
       def withLongParamAliases(names: String*): Builder[T] =
-        this.copy(_longParamAliases = names.toList.map(Param.SimpleLong.apply))
+        this.copy(_longParamAliases = names.toList.map(Param.LongWithValue.apply))
 
       def addLongParamAliases(names: String*): Builder[T] =
-        this.copy(_longParamAliases = _longParamAliases ::: names.toList.map(Param.SimpleLong.apply))
+        this.copy(_longParamAliases = _longParamAliases ::: names.toList.map(Param.LongWithValue.apply))
 
       def withPrimaryShortParam(name: Char): Builder[T] =
-        this.copy(_primaryShortParam = Param.SimpleShort(name).some)
+        this.copy(_primaryShortParam = Param.ShortWithValue(name).some)
 
       def withoutPrimaryShortParam: Builder[T] =
         this.copy(_primaryShortParam = None)
 
       def withShortParamAliases(names: Char*): Builder[T] =
-        this.copy(_shortParamAliases = names.toList.map(Param.SimpleShort.apply))
+        this.copy(_shortParamAliases = names.toList.map(Param.ShortWithValue.apply))
 
       def addShortParamAliases(names: Char*): Builder[T] =
-        this.copy(_shortParamAliases = _shortParamAliases ::: names.toList.map(Param.SimpleShort.apply))
+        this.copy(_shortParamAliases = _shortParamAliases ::: names.toList.map(Param.ShortWithValue.apply))
 
       def withDescription(description: String*): Builder[T] =
         this.copy(_description = description.toList)
@@ -139,8 +154,8 @@ object Parser {
             description = _description,
           )
 
-        val allLongParams: List[Param.SimpleLong] = _primaryLongParam :: _longParamAliases
-        val allShortParams: List[Param.SimpleShort] = _primaryShortParam.toList ::: _shortParamAliases
+        val allLongParams: List[Param.LongWithValue] = _primaryLongParam :: _longParamAliases
+        val allShortParams: List[Param.ShortWithValue] = _primaryShortParam.toList ::: _shortParamAliases
 
         val optionalParseFunction: List[Arg] => Result[Option[T]] = { args =>
           @tailrec
@@ -216,9 +231,9 @@ object Parser {
         _baseName = baseName,
         _typeName = ct.runtimeClass.getSimpleName,
         _decodeFromString = dfs,
-        _primaryLongParam = Param.SimpleLong(primaryLongParamName.toValue(baseName)),
+        _primaryLongParam = Param.LongWithValue(primaryLongParamName.toValue(baseName)),
         _longParamAliases = Nil,
-        _primaryShortParam = primaryShortParamName.toOptionO(baseName.headOption).map(Param.SimpleShort.apply),
+        _primaryShortParam = primaryShortParamName.toOptionO(baseName.headOption).map(Param.ShortWithValue.apply),
         _shortParamAliases = Nil,
         _description = Nil,
       )

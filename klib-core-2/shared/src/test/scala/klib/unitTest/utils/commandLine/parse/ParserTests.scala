@@ -64,6 +64,11 @@ object ParserTests extends DefaultKSpec {
     def toSuite: TestSpec = {
       val (passes, fails) = testCases.partition(_.shouldPass)
 
+      println(builtParser.helpString(HelpConfig.default(false)))
+      println
+      println(builtParser.helpString(HelpConfig.default(true)))
+      println
+
       suite(name)(
         suite("Passes")(passes.map(_.toTest(builtParser))*),
         suite("Fails")(fails.map(_.toTest(builtParser))*),
@@ -126,6 +131,11 @@ object ParserTests extends DefaultKSpec {
           "--age",
           "100",
         )()(Person("First", "Last", 100)),
+        TestCase.passing("success - --arg=VALUE")(
+          "--first-name=First",
+          "--last-name=Last",
+          "--age=100",
+        )()(Person("First", "Last", 100)),
         TestCase.passing("success + extra")(
           "--first-name",
           "First",
@@ -170,9 +180,9 @@ object ParserTests extends DefaultKSpec {
     TestCaseSuite
       .build("person2")(
         (
-          Parser.singleValue[String]("first-name").required >&>
-            Parser.singleValue[String]("last-name").required >&>
-            Parser.singleValue[Int]("age").optional
+          Parser.singleValue[String]("first-name").withDescription("Persons first name").required >&>
+            Parser.singleValue[String]("last-name").withDescription("Persons last name").required >&>
+            Parser.singleValue[Int]("age").withLongParamAliases("a", "b", "c", "d").withDescription("Persons age").optional
         ).map(Person.apply),
       )(
         TestCase.failing("empty")()(
