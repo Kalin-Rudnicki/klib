@@ -1,9 +1,9 @@
 package klib.test
 
-import cats.syntax.option._
-import zio._
+import cats.syntax.option.*
+import zio.*
 
-import klib.utils._
+import klib.utils.*
 
 object SharedMain extends ZIOApp {
 

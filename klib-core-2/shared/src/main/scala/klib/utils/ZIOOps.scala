@@ -3,16 +3,16 @@ package klib.utils
 import scala.annotation.tailrec
 
 import cats.data.*
-import cats.syntax.either._
-import cats.syntax.list._
-import cats.syntax.option._
+import cats.syntax.either.*
+import cats.syntax.list.*
+import cats.syntax.option.*
 import zio.*
 
 extension (zio: ZIO.type) {
 
   def traverse[R, E, A, B](nel: NonEmptyList[A])(f: A => ZIO[R, E, B]): ZIO[R, NonEmptyList[E], NonEmptyList[B]] =
     ZIO
-      .foreach(NonEmptyChunk(nel.head, nel.tail: _*))(f(_).either)
+      .foreach(NonEmptyChunk(nel.head, nel.tail*))(f(_).either)
       .flatMap { nec =>
         @tailrec
         def loopErrors(
@@ -65,5 +65,11 @@ extension [R, A](zio: ZIO[R, Throwable, A]) {
 
   def messageError: ZIO[R, Message, A] =
     zio.mapError(Message.fromThrowable(_))
+
+}
+extension [R, E, A](zio: ZIO[R, E, A]) {
+
+  def nelError: ZIO[R, NonEmptyList[E], A] =
+    zio.mapError(NonEmptyList.one)
 
 }

@@ -3,7 +3,7 @@ package klib.utils
 import com.google.common.jimfs.Configuration
 import com.google.common.jimfs.Jimfs
 
-import zio._
+import zio.*
 
 extension (fs: FileSystem.type) {
 

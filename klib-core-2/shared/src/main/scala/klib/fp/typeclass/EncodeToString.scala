@@ -2,8 +2,8 @@ package klib.fp.typeclass
 
 import java.util.UUID
 
-import io.circe._
-import io.circe.syntax._
+import io.circe.*
+import io.circe.syntax.*
 
 // =====| Core |=====
 

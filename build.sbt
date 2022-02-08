@@ -80,6 +80,7 @@ lazy val `klib-core-2` =
       scalaVersion := Scala_3,
       // TODO (KR) : Cross Version?
       sonatypeCredentialHost := "s01.oss.sonatype.org",
+      scalacOptions += "-source:future",
       // Dependencies
       Dependencies.`dev.zio`.zio,
       Dependencies.`dev.zio`.`zio-test`,

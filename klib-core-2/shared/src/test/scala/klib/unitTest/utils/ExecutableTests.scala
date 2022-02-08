@@ -6,7 +6,7 @@ import zio.test.Assertion.*
 import klib.unitTest.SpecUtils.*
 import klib.utils.*
 
-object LoggerTests extends DefaultKSpec {
+object ExecutableTests extends DefaultKSpec {
 
   private val splitArgsSpec: TestSpec = {
     def createTest(name: String, args: List[String], exp: => Executable.SplitArgs): TestSpec =
@@ -99,7 +99,7 @@ object LoggerTests extends DefaultKSpec {
   }
 
   override def spec: TestSpec =
-    suite("LoggerTests")(
+    suite("ExecutableTests")(
       splitArgsSpec,
     )
 

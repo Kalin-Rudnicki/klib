@@ -1,6 +1,6 @@
 package klib.utils
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 import zio.*
 

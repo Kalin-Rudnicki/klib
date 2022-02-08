@@ -3,21 +3,14 @@ package klib.utils
 import scala.annotation.tailrec
 
 import cats.data.NonEmptyList
-import cats.syntax.option._
+import cats.syntax.option.*
 import zio.*
 
-opaque type Executable[-R] = List[String] => ZIO[Executable.Environment[R], NonEmptyList[Message], Unit]
-extension [R](executable: Executable[R]) {
-
-  def run: ZIO[R with ZEnv with ZIOAppArgs, Nothing, Unit] = ???
-
-}
-
+// TODO (KR) :
 object Executable {
 
   // =====| Type Aliases |=====
 
-  type Environment[R] = R & ZEnv & Env
   type Env = FileSystem with Logger with RunMode
 
   // =====| Builders |=====
@@ -28,7 +21,7 @@ object Executable {
 
   final case class SplitArgs(
       subCommands: List[String],
-      loggerArgs: List[String],
+      configArgs: List[String],
       programArgs: List[String],
   )
   object SplitArgs {
@@ -62,17 +55,17 @@ object Executable {
 
       splitOnDoubleDash(args, Nil) match {
         case Some((beforeDoubleDash, programArgs)) =>
-          val (subCommands, loggerArgs) = splitOnFirstDash(beforeDoubleDash, Nil)
+          val (subCommands, configArgs) = splitOnFirstDash(beforeDoubleDash, Nil)
           SplitArgs(
             subCommands = subCommands,
-            loggerArgs = loggerArgs,
+            configArgs = configArgs,
             programArgs = programArgs,
           )
         case None =>
           val (subCommands, programArgs) = splitOnFirstDash(args, Nil)
           SplitArgs(
             subCommands = subCommands,
-            loggerArgs = Nil,
+            configArgs = Nil,
             programArgs = programArgs,
           )
       }

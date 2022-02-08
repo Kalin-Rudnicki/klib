@@ -4,20 +4,22 @@ import java.util.UUID
 
 import scala.util.Try
 
-import io.circe._
-import io.circe.parser._
-import zio._
+import cats.syntax.either.*
+import io.circe.*
+import io.circe.parser.*
+
+import klib.utils.Message
 
 // =====| Core |=====
 
 trait DecodeFromString[+T] {
 
-  def decode(string: String): Task[T]
+  def decode(string: String): Either[Message, T]
 
   final def map[T2](f: T => T2): DecodeFromString[T2] =
     decode(_).map(f)
 
-  final def fMap[T2](f: T => Task[T2]): DecodeFromString[T2] =
+  final def fMap[T2](f: T => Either[Message, T2]): DecodeFromString[T2] =
     decode(_).flatMap(f)
 
 }
@@ -27,13 +29,13 @@ object DecodeFromString {
     implicitly[DecodeFromString[T]]
 
   def fromCirceDecoder[T: Decoder]: DecodeFromString[T] =
-    str => ZIO.fromEither(decode(str))
+    decode[T](_).leftMap(Message.fromThrowable(_))
 
   implicit val stringDecodeString: DecodeFromString[String] =
-    ZIO.succeed(_)
+    _.asRight
 
   def fromOptionF[R](name: String, f: String => Option[R]): DecodeFromString[R] =
-    str => ZIO.fromOption(f(str)).mapError(_ => new RuntimeException(s"Malformatted $name '$str'"))
+    str => f(str).toRight(Message(s"Malformatted $name '$str'"))
 
   implicit val booleanDecodeString: DecodeFromString[Boolean] =
     fromOptionF("boolean", _.toBooleanOption)
@@ -51,7 +53,7 @@ object DecodeFromString {
     fromOptionF("double", _.toDoubleOption)
 
   implicit val uuidDecodeString: DecodeFromString[UUID] =
-    str => ZIO.attempt(UUID.fromString(str))
+    str => Try(UUID.fromString(str)).toEither.leftMap(Message.fromThrowable(_))
 
 }
 

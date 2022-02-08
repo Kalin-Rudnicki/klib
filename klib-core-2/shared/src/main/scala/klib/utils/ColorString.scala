@@ -2,8 +2,8 @@ package klib.utils
 
 import scala.annotation.tailrec
 
-import cats.data._
-import cats.syntax.option._
+import cats.data.*
+import cats.syntax.option.*
 
 sealed trait ColorString {
 
@@ -112,14 +112,13 @@ sealed trait ColorString {
         str.split(splitStr).map(ColorString.Simple(color, _)).toList
       case ColorString.Complex(color, pairs, tail) =>
         List(
-          pairs.flatMap {
-            case (oStr, cStr) =>
-              List(
-                oStr.toList.flatMap {
-                  _.split(splitStr).map(ColorString.Simple(color, _))
-                },
-                cStr.split(splitStr),
-              ).flatten
+          pairs.flatMap { case (oStr, cStr) =>
+            List(
+              oStr.toList.flatMap {
+                _.split(splitStr).map(ColorString.Simple(color, _))
+              },
+              cStr.split(splitStr),
+            ).flatten
           },
           tail.toList.flatMap {
             _.split(splitStr).map(ColorString.Simple(color, _))
@@ -132,9 +131,8 @@ sealed trait ColorString {
       case ColorString.Simple(_, str) =>
         str.length
       case ColorString.Complex(_, pairs, tail) =>
-        pairs.map {
-          case (oStr, cStr) =>
-            oStr.fold(0)(_.length) + cStr.length
+        pairs.map { case (oStr, cStr) =>
+          oStr.fold(0)(_.length) + cStr.length
         }.sum + tail.fold(0)(_.length)
     }
 
@@ -148,10 +146,9 @@ sealed trait ColorString {
         case ColorString.Simple(_, str) =>
           stringBuilder.append(str)
         case ColorString.Complex(_, pairs, tail) =>
-          pairs.foreach {
-            case (str, cStr) =>
-              str.foreach(stringBuilder.append)
-              rec(cStr)
+          pairs.foreach { case (str, cStr) =>
+            str.foreach(stringBuilder.append)
+            rec(cStr)
           }
           tail.foreach(stringBuilder.append)
       }
@@ -190,17 +187,16 @@ sealed trait ColorString {
           )
         case ColorString.Complex(color, pairs, tail) =>
           val afterPairs =
-            pairs.foldLeft(colorState) {
-              case (ccs, (oStr, cStr)) =>
-                val afterOStr =
-                  oStr.map(append(ccs, color, _)).getOrElse(ccs)
-                val afterCStr =
-                  rec(
-                    cStr,
-                    afterOStr,
-                  )
+            pairs.foldLeft(colorState) { case (ccs, (oStr, cStr)) =>
+              val afterOStr =
+                oStr.map(append(ccs, color, _)).getOrElse(ccs)
+              val afterCStr =
+                rec(
+                  cStr,
+                  afterOStr,
+                )
 
-                afterCStr
+              afterCStr
             }
           val afterTail =
             tail.map(append(afterPairs, color, _)).getOrElse(afterPairs)
@@ -212,9 +208,8 @@ sealed trait ColorString {
       this,
       ColorString.ColorState.Default,
     )
-    ColorString.Color.Default.diffWithState(finalColorState).foreach {
-      case (ansi, _) =>
-        stringBuilder.append(ansi)
+    ColorString.Color.Default.diffWithState(finalColorState).foreach { case (ansi, _) =>
+      stringBuilder.append(ansi)
     }
     stringBuilder.toString
   }
@@ -222,7 +217,7 @@ sealed trait ColorString {
 }
 
 object ColorString {
-  import klib.utils.{Color => RawColor}
+  import klib.utils.Color as RawColor
 
   private def ansiEscape(codes: NonEmptyList[String]): String =
     s"\u001b[${codes.toList.mkString(";")}m"

@@ -1,9 +1,13 @@
 package klib.unitTest
 
-import zio._
-import zio.test._
+import cats.data.NonEmptyList
+import cats.syntax.option.*
+import zio.*
+import zio.test.*
+import zio.test.Assertion.*
+import zio.test.AssertionM.Render.*
 
-import klib.utils._
+import klib.utils.*
 
 object SpecUtils {
 
@@ -35,5 +39,20 @@ object SpecUtils {
     override protected final def layers: ZLayer[TestEnvironment, Nothing, TestEnv] = testLayers.orDie
 
   }
+
+  // =====| Assertions |=====
+
+  def assertFrom[Original, Modified](
+      name: String,
+      assertion: Assertion[Modified],
+      toNested: Original => Modified,
+  ): Assertion[Original] =
+    assertionRec(name)(param(assertion))(assertion)(toNested(_).some)
+
+  def assertNel[T](assertion: Assertion[List[T]]): Assertion[NonEmptyList[T]] =
+    assertFrom("NonEmptyList", assertion, _.toList)
+
+  def assertSeq[T](assertions: Assertion[T]*): Assertion[Seq[T]] =
+    assertions.toList.zipWithIndex.foldLeft[Assertion[Seq[T]]](hasSize(equalTo(assertions.size))) { case (j, (a, i)) => j && hasAt(i)(a) }
 
 }

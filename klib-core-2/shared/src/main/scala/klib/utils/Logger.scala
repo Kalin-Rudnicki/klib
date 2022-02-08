@@ -616,7 +616,7 @@ object Logger {
                 track :: Nil,
                 split._1.toList.map(InfiniteSet.Exclusive(_)),
                 split._2.toList.map(InfiniteSet.Inclusive(_)),
-              ).flatten: _*,
+              ).flatten *,
             ),
           )
         }

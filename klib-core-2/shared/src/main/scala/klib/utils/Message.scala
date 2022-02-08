@@ -1,6 +1,7 @@
 package klib.utils
 
-import zio._
+import cats.syntax.option.*
+import zio.*
 
 final case class Message(
     devMessage: String,
@@ -53,12 +54,26 @@ object Message {
       cause = cause,
     )
 
+  def same(message: String, cause: Option[Message] = None): Message =
+    Message(
+      devMessage = message,
+      userMessage = message.some,
+      cause = cause,
+    )
+
   def fromThrowable(throwable: Throwable, userMessage: Option[String] = None): Message =
     Message(
       devMessage = Option(throwable.getMessage).getOrElse(throwable.toString),
       userMessage = userMessage,
       stackTrace = throwable.getStackTrace,
       cause = Option(throwable.getCause).map(fromThrowable(_, None)),
+    )
+
+  def shouldNeverHappen: Message =
+    Message(
+      devMessage = "This should never happen...",
+      userMessage = None,
+      cause = None,
     )
 
   // TODO (KR) : Improve?

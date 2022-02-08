@@ -20,14 +20,14 @@ import zio.*
 final class File(val path: Path) {
 
   def createFile(fileAttributes: FileAttribute[_]*): Task[Unit] =
-    ZIO.attempt(Files.createFile(this.path, fileAttributes: _*))
+    ZIO.attempt(Files.createFile(this.path, fileAttributes*))
   def createDirectory(fileAttributes: FileAttribute[_]*): Task[Unit] =
-    ZIO.attempt(Files.createDirectory(this.path, fileAttributes: _*))
+    ZIO.attempt(Files.createDirectory(this.path, fileAttributes*))
   def createDirectories(fileAttributes: FileAttribute[_]*): Task[Unit] =
-    ZIO.attempt(Files.createDirectories(this.path, fileAttributes: _*))
+    ZIO.attempt(Files.createDirectories(this.path, fileAttributes*))
 
   def createSymbolicLink(target: File, fileAttributes: FileAttribute[_]*): Task[Unit] =
-    ZIO.attempt(Files.createSymbolicLink(this.path, target.path, fileAttributes: _*))
+    ZIO.attempt(Files.createSymbolicLink(this.path, target.path, fileAttributes*))
   def createLink(existing: File): Task[Unit] =
     ZIO.attempt(Files.createLink(this.path, existing.path))
 
@@ -35,9 +35,9 @@ final class File(val path: Path) {
     ZIO.attempt(Files.deleteIfExists(this.path))
 
   def copyTo(target: File, copyOptions: CopyOption*): Task[Unit] =
-    ZIO.attempt(Files.copy(this.path, target.path, copyOptions: _*))
+    ZIO.attempt(Files.copy(this.path, target.path, copyOptions*))
   def moveTo(target: File, copyOptions: CopyOption*): Task[Unit] =
-    ZIO.attempt(Files.move(this.path, target.path, copyOptions: _*))
+    ZIO.attempt(Files.move(this.path, target.path, copyOptions*))
 
   def exists: Task[Boolean] =
     ZIO.attempt(Files.exists(this.path))
@@ -49,11 +49,11 @@ final class File(val path: Path) {
     ZIO.attempt(Files.isSymbolicLink(this.path))
 
   def outputStream(openOptions: OpenOption*): Task[OutputStream] =
-    ZIO.attempt(Files.newOutputStream(this.path, openOptions: _*))
+    ZIO.attempt(Files.newOutputStream(this.path, openOptions*))
   def inputStream(openOptions: OpenOption*): Task[InputStream] =
-    ZIO.attempt(Files.newInputStream(this.path, openOptions: _*))
+    ZIO.attempt(Files.newInputStream(this.path, openOptions*))
   def bufferedWriter(openOptions: OpenOption*): Task[BufferedWriter] =
-    ZIO.attempt(Files.newBufferedWriter(this.path, openOptions: _*))
+    ZIO.attempt(Files.newBufferedWriter(this.path, openOptions*))
   def bufferedReader: Task[BufferedReader] =
     ZIO.attempt(Files.newBufferedReader(this.path))
 
