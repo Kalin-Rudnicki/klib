@@ -149,7 +149,9 @@ object Parser {
           Element(
             baseName = _baseName,
             typeName = _typeName,
-            params = NonEmptyList(_primaryLongParam, _primaryShortParam.toList ::: _longParamAliases ::: _shortParamAliases),
+            primaryParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList),
+            aliasParams = _longParamAliases ::: _shortParamAliases,
+            allParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList ::: _longParamAliases ::: _shortParamAliases),
             requirementLevel = requirementLevel,
             description = _description,
           )

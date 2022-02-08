@@ -3,23 +3,18 @@ package klib.utils.commandLine.parse
 import scala.annotation.tailrec
 
 import cats.data.NonEmptyList
+import cats.syntax.option.*
+import cats.syntax.list.*
 
 final case class Element(
     baseName: String,
     typeName: String,
-    params: NonEmptyList[Param],
+    primaryParams: NonEmptyList[Param],
+    aliasParams: List[Param],
+    allParams: NonEmptyList[Param],
     requirementLevel: RequirementLevel,
     description: List[String],
 ) {
-
-  private def extraDescription: List[String] =
-    List(
-      requirementLevel.toString,
-    )
-
-  private def fullDescription(helpExtra: Boolean): List[String] =
-    if (helpExtra) description ::: extraDescription
-    else description
 
   // TODO (KR) : Improve
   def toHelpString(helpConfig: HelpConfig): List[(String, String)] = {
@@ -65,11 +60,27 @@ final case class Element(
           }
       }
 
-    loop(
-      params.toList.map(_.formattedName).mkString(", ") :: Nil,
-      fullDescription(helpConfig.helpExtra),
-      Nil,
-    )
+    def extraDescriptions: List[String] =
+      List(
+        requirementLevel.toString,
+      )
+    def paramString(params: NonEmptyList[Param]): String = params.toList.map(_.formattedName).mkString(", ")
+
+    if (helpConfig.helpExtra)
+      loop(
+        List(
+          paramString(primaryParams).some,
+          aliasParams.toNel.map(params => s"${" " * helpConfig.leftPadding}${paramString(params)}"),
+        ).flatten,
+        description ::: extraDescriptions,
+        Nil,
+      )
+    else
+      loop(
+        paramString(primaryParams) :: Nil,
+        description,
+        Nil,
+      )
   }
 
 }
