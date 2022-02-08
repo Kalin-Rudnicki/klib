@@ -22,7 +22,7 @@ object ParserTests extends DefaultKSpec {
   ) {
 
     def toTest(parser: BuiltParser[(P, List[Arg])]): TestSpec =
-      test(name)(assert(parser.parse(Arg.parse(args)))(assertion))
+      test(name)(assert(parser.parseF(Arg.parse(args)))(assertion))
 
   }
   private object TestCase {
@@ -64,9 +64,15 @@ object ParserTests extends DefaultKSpec {
     def toSuite: TestSpec = {
       val (passes, fails) = testCases.partition(_.shouldPass)
 
-      println(builtParser.helpString(HelpConfig.default(false)))
+      println(builtParser.parse("--help-extra"))
       println
-      println(builtParser.helpString(HelpConfig.default(true)))
+      println(builtParser.parse("-H"))
+      println
+      println(builtParser.parse("--help"))
+      println
+      println(builtParser.parse("-h"))
+      println
+      println
       println
 
       suite(name)(

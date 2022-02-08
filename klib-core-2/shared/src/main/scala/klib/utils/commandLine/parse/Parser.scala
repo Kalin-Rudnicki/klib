@@ -5,7 +5,6 @@ import scala.reflect.ClassTag
 
 import cats.data.EitherNel
 import cats.data.NonEmptyList
-import cats.data.NonEmptySet
 import cats.syntax.either.*
 import cats.syntax.list.*
 import cats.syntax.option.*
@@ -15,12 +14,58 @@ import zio.Zippable
 import klib.fp.typeclass.*
 
 final case class BuiltParser[+T](
-    parse: List[Arg] => EitherNel[Error, T],
+    parseF: List[Arg] => EitherNel[Error, T],
     helpString: HelpConfig => String,
-)
+) {
+
+  def parse(argStrings: String*): BuiltParser.Result[T] =
+    parse(argStrings.toList)
+
+  def parse(argStrings: List[String]): BuiltParser.Result[T] = {
+    val args: List[Arg] = Arg.parse(argStrings)
+
+    val helpExtra: Option[Boolean] = {
+      import Arg.find.basic.*
+
+      def lp(name: String, value: Boolean): Option[Boolean] =
+        longParam(name)(args).map(_ => value)
+
+      def sp(name: Char, value: Boolean): Option[Boolean] =
+        shortParamSingle(name)(args).map(_ => value) orElse
+          shortParamMulti(name)(args).map(_ => value)
+
+      lp("help-extra", true) orElse
+        sp('H', true) orElse
+        lp("help", false) orElse
+        sp('h', false)
+    }
+
+    helpExtra match {
+      case Some(helpExtra) => BuiltParser.Result.Help(helpString(HelpConfig.default(helpExtra)))
+      case None =>
+        parseF(args) match {
+          case Left(errors) => BuiltParser.Result.Failure(errors)
+          case Right(value) => BuiltParser.Result.Success(value)
+        }
+    }
+  }
+
+}
+object BuiltParser {
+
+  sealed trait Result[+T]
+  object Result {
+    final case class Success[+T](result: T) extends Result[T]
+    final case class Failure(errors: NonEmptyList[Error]) extends Result[Nothing]
+    final case class Help(helpString: String) extends Result[Nothing] {
+      override def toString: String = helpString
+    }
+  }
+
+}
 
 final case class Parser[+T](
-    parseF: List[Arg] => Result[T],
+    parseF: List[Arg] => Parser.Result[T],
     elements: List[Element],
 ) {
 
@@ -31,7 +76,7 @@ final case class Parser[+T](
       parseF = { args =>
         val res1 = this.parseF(args)
         val res2 = other.parseF(res1.remainingArgs)
-        Result(
+        Parser.Result(
           (res1.res, res2.res) match {
             case (Right(r1), Right(r2))   => zip.zip(r1, r2).asRight
             case (Left(err1), Right(_))   => err1.asLeft
@@ -56,13 +101,41 @@ final case class Parser[+T](
       zip: Zippable[T, Extras],
   ): BuiltParser[zip.Out] =
     BuiltParser(
-      parse = { args =>
+      parseF = { args =>
         val result = parseF(args)
         val extras = extrasF(result.remainingArgs)
         (result.res, extras).parMapN(zip.zip)
       },
       helpString = { helpConfig =>
-        val linePairs = elements.flatMap(_.toHelpString(helpConfig))
+        def makeHelpElement(
+            longName: String,
+            shortName: Char,
+            description: String,
+        ): Element = {
+          val primaryParams: NonEmptyList[Param] =
+            NonEmptyList.of(
+              Param.Long(longName),
+              Param.Short(shortName),
+            )
+
+          Element(
+            baseName = longName,
+            typeName = "flag",
+            primaryParams = primaryParams,
+            aliasParams = Nil,
+            allParams = primaryParams,
+            requirementLevel = None,
+            description = description :: Nil,
+          )
+        }
+
+        val linePairs = (
+          List(
+            makeHelpElement("help", 'h', "Display help message"),
+            makeHelpElement("help-extra", 'H', "Display help message, with extra details"),
+          ) :::
+            elements
+        ).flatMap(_.toHelpString(helpConfig))
         val maxParamsUsed: Int = linePairs.map(_._1.length).maxOption.getOrElse(0).min(helpConfig.maxParamsWidth)
 
         val paramLines: List[String] =
@@ -93,6 +166,19 @@ final case class Parser[+T](
 
 }
 object Parser {
+
+  final case class Result[+T](
+      res: EitherNel[Error, T],
+      remainingArgs: List[Arg],
+  ) {
+
+    def mapResult[T2](f: T => T2): Result[T2] =
+      Result(res.map(f), remainingArgs)
+
+    def flatMapResult[T2](f: T => EitherNel[Error, T2]): Result[T2] =
+      Result(res.flatMap(f), remainingArgs)
+
+  }
 
   object singleValue {
 
@@ -152,7 +238,7 @@ object Parser {
             primaryParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList),
             aliasParams = _longParamAliases ::: _shortParamAliases,
             allParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList ::: _longParamAliases ::: _shortParamAliases),
-            requirementLevel = requirementLevel,
+            requirementLevel = requirementLevel.some,
             description = _description,
           )
 

@@ -12,7 +12,7 @@ final case class Element(
     primaryParams: NonEmptyList[Param],
     aliasParams: List[Param],
     allParams: NonEmptyList[Param],
-    requirementLevel: RequirementLevel,
+    requirementLevel: Option[RequirementLevel],
     description: List[String],
 ) {
 
@@ -62,8 +62,8 @@ final case class Element(
 
     def extraDescriptions: List[String] =
       List(
-        requirementLevel.toString,
-      )
+        requirementLevel.map(_.toString),
+      ).flatten
     def paramString(params: NonEmptyList[Param]): String = params.toList.map(_.formattedName).mkString(", ")
 
     if (helpConfig.helpExtra)
