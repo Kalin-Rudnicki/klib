@@ -27,18 +27,14 @@ object ParserTests extends DefaultKSpec {
   }
   private object TestCase {
 
-    private def passingAssertion[P](exp: P): Assertion[EitherNel[Error, (P, List[Arg])]] = {
-      val tmp: Assertion[(P, List[Arg])] = assertFrom("res", equalTo(exp), _._1)
-      isRight(tmp)
-    }
+    private def passingAssertion[P](exp: P): Assertion[EitherNel[Error, (P, List[Arg])]] =
+      isRight(equalTo(exp).imap[(P, List[Arg])]("res", _._1))
 
     private def failingAssertion[P](errorAssertion: Assertion[NonEmptyList[Error]]): Assertion[EitherNel[Error, (P, List[Arg])]] =
       isLeft(errorAssertion)
 
-    private def remainingAssertion[P](outArgs: List[Arg]): Assertion[EitherNel[Error, (P, List[Arg])]] = {
-      val tmp: Assertion[(P, List[Arg])] = assertFrom("remainingArgs", equalTo(outArgs), _._2)
-      isRight(tmp)
-    }
+    private def remainingAssertion[P](outArgs: List[Arg]): Assertion[EitherNel[Error, (P, List[Arg])]] =
+      isRight(equalTo(outArgs).imap[(P, List[Arg])]("remainingArgs", _._2))
 
     def passing[P](name: String)(inArgs: String*)(outArgs: Arg*)(exp: P): TestCase[P] =
       TestCase(
@@ -83,7 +79,7 @@ object ParserTests extends DefaultKSpec {
   }
 
   private def reasonAssertion(assertion: Assertion[Error.Reason]): Assertion[Error] =
-    assertFrom("reason", assertion, _.reason)
+    assertion.imap("reason", _.reason)
 
   // =====| ... |=====
 

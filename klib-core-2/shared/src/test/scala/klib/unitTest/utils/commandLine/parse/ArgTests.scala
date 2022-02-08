@@ -68,18 +68,12 @@ object ArgTests extends DefaultKSpec {
     import Arg.find.basic.*
 
     val foundSpec: TestSpec = {
-      def assertFoundArg[A](arg: A): Assertion[Found[A]] = {
-        val assertion = equalTo(arg)
-        assertionRec("foundArg")(param(assertion))(assertion)(_.arg.some)
-      }
-      def assertFoundBefore(before: Arg*): Assertion[Found[Any]] = {
-        val assertion = equalTo(before.toList)
-        assertionRec("foundBefore")(param(assertion))(assertion)(_.before.some)
-      }
-      def assertFoundAfter(after: Arg*): Assertion[Found[Any]] = {
-        val assertion = equalTo(after.toList)
-        assertionRec("foundAfter")(param(assertion))(assertion)(_.after.some)
-      }
+      def assertFoundArg[A](arg: A): Assertion[Found[A]] =
+        equalTo(arg).imap("foundArg", _.arg)
+      def assertFoundBefore(before: Arg*): Assertion[Found[Any]] =
+        equalTo(before.toList).imap("foundBefore", _.before)
+      def assertFoundAfter(after: Arg*): Assertion[Found[Any]] =
+        equalTo(after.toList).imap("foundAfter", _.after)
 
       def makeTest[A](name: String)(args: Arg*)(findF: List[Arg] => Option[Found[A]])(assertion: Assertion[Found[A]]): TestSpec =
         test(name)(assert(findF(args.toList))(isSome(assertion)))

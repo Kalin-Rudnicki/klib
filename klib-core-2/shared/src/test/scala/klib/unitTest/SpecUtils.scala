@@ -42,17 +42,17 @@ object SpecUtils {
 
   // =====| Assertions |=====
 
-  def assertFrom[Original, Modified](
-      name: String,
-      assertion: Assertion[Modified],
-      toNested: Original => Modified,
-  ): Assertion[Original] =
-    assertionRec(name)(param(assertion))(assertion)(toNested(_).some)
-
   def assertNel[T](assertion: Assertion[List[T]]): Assertion[NonEmptyList[T]] =
-    assertFrom("NonEmptyList", assertion, _.toList)
+    assertion.imap("NonEmptyList", _.toList)
 
   def assertSeq[T](assertions: Assertion[T]*): Assertion[Seq[T]] =
     assertions.toList.zipWithIndex.foldLeft[Assertion[Seq[T]]](hasSize(equalTo(assertions.size))) { case (j, (a, i)) => j && hasAt(i)(a) }
+
+  extension [A](assertion: Assertion[A]) {
+
+    def imap[B](name: String, f: B => A): Assertion[B] =
+      assertionRec(name)(param(assertion))(assertion)(f(_).some)
+
+  }
 
 }
