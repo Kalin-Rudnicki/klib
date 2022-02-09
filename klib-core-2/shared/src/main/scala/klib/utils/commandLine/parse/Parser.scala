@@ -107,6 +107,7 @@ final case class Parser[+T](
         (result.res, extras).parMapN(zip.zip)
       },
       helpString = { helpConfig =>
+
         def makeHelpElement(
             longName: String,
             shortName: Char,
@@ -118,7 +119,7 @@ final case class Parser[+T](
               Param.Short(shortName),
             )
 
-          Element(
+          Element.ParamElement(
             baseName = longName,
             typeName = "flag",
             primaryParams = primaryParams,
@@ -139,32 +140,15 @@ final case class Parser[+T](
         val paramNamesCount: Map[String, Int] = allParamsNames.groupBy(identity).map { (k, v) => (k, v.size) }
         val duplicateNames: List[String] = paramNamesCount.filter(_._2 > 1).toList.map(_._1)
 
-        val basicLinePairs: List[(String, String)] = allElements.flatMap(_.toHelpString(helpConfig))
-        val duplicateNamePairs: Option[NonEmptyList[(String, String)]] =
-          duplicateNames.toNel.map { duplicateNames =>
-            (s"${" " * helpConfig.leftPadding}Duplicate param-names:", "") ::
-              duplicateNames.map(n => (s"${" " * (2 * helpConfig.leftPadding)}$n", ""))
-          }
-        val warningPairs: List[Option[NonEmptyList[(String, String)]]] = duplicateNamePairs :: Nil
-        val linePairs: List[(String, String)] =
-          warningPairs.flatMap(_.fold(List.empty[(String, String)])(_.toList)).toNel match {
-            case Some(warningPairs) =>
-              basicLinePairs ::: ("", "") :: ("[WARNING]", "") :: warningPairs.toList
-            case None =>
-              basicLinePairs
-          }
+        val linePairs: List[Pair[String]] =
+          Pair.zipPairs(helpConfig)(
+            allElements.map(_.helpStringLinesPair(helpConfig, 0)),
+          )
 
-        val maxParamsUsed: Int = linePairs.map(_._1.length).maxOption.getOrElse(0).min(helpConfig.maxParamsWidth)
+        val lines: List[String] =
+          Pair.makeLines(helpConfig, linePairs)
 
-        val paramLines: List[String] =
-          linePairs.map { (leftStr, rightStr) =>
-            s"${" " * helpConfig.leftPadding}$leftStr${" " * (maxParamsUsed - leftStr.length + helpConfig.centerPadding)}$rightStr"
-          }
-
-        val allLines: List[String] =
-          "Usage : ARGS" :: paramLines
-
-        allLines.mkString("\n")
+        ("Usage : [ARGS]" :: lines).mkString("\n")
       },
     )
 
@@ -285,7 +269,7 @@ object Parser {
       // =====| Build |=====
 
       override protected def makeElement(requirementLevel: RequirementLevel): Element =
-        Element(
+        Element.ParamElement(
           baseName = _baseName,
           typeName = _typeName,
           primaryParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList),
@@ -398,7 +382,7 @@ object Parser {
       // =====| Build |=====
 
       override protected def makeElement(requirementLevel: RequirementLevel): Element =
-        Element(
+        Element.ParamElement(
           baseName = _baseName,
           typeName = "Boolean",
           primaryParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList),
