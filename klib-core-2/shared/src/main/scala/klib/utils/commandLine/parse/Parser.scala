@@ -180,6 +180,39 @@ object Parser {
 
   }
 
+  sealed trait GenBuilder[T] {
+
+    protected def makeElement(requirementLevel: RequirementLevel): Element
+    protected def optionalParseFunction(args: List[Arg], element: Element): Result[Option[T]]
+
+    private final def build[T2](
+        requirementLevel: RequirementLevel,
+    )(
+        mapRes: (Option[T], Element) => EitherNel[Error, T2],
+    ): Parser[T2] = {
+      val element: Element = makeElement(requirementLevel)
+      val parseFunction: List[Arg] => Result[T2] = optionalParseFunction(_, element).flatMapResult(mapRes(_, element))
+
+      Parser(
+        parseF = parseFunction,
+        elements = element :: Nil,
+      )
+    }
+
+    final def required: Parser[T] =
+      build[T](RequirementLevel.Required) { (res, element) =>
+        res match {
+          case Some(value) => value.asRight
+          case None        => NonEmptyList.one(Error(element.some, Error.Reason.MissingRequired)).asLeft
+        }
+      }
+    final def default(default: T): Parser[T] =
+      build[T](RequirementLevel.Default) { (res, _) => res.getOrElse(default).asRight }
+    final def optional: Parser[Option[T]] =
+      build[Option[T]](RequirementLevel.Optional) { (res, _) => res.asRight }
+
+  }
+
   object singleValue {
 
     final case class Builder[T](
@@ -191,7 +224,7 @@ object Parser {
         private val _primaryShortParam: Option[Param.ShortWithValue],
         private val _shortParamAliases: List[Param.ShortWithValue],
         private val _description: List[String],
-    ) {
+    ) extends GenBuilder[T] {
 
       // =====| Modify |=====
 
@@ -224,87 +257,54 @@ object Parser {
 
       // =====| Build |=====
 
-      private def build[T2](
-          requirementLevel: RequirementLevel,
-      )(
-          mapRes: (Option[T], Element) => EitherNel[Error, T2],
-      ): Parser[T2] = {
+      override protected def makeElement(requirementLevel: RequirementLevel): Element =
+        Element(
+          baseName = _baseName,
+          typeName = _typeName,
+          primaryParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList),
+          aliasParams = _longParamAliases ::: _shortParamAliases,
+          allParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList ::: _longParamAliases ::: _shortParamAliases),
+          requirementLevel = requirementLevel.some,
+          description = _description,
+        )
+
+      override protected def optionalParseFunction(args: List[Arg], element: Element): Result[Option[T]] = {
         import Arg.find.*
 
-        val element: Element =
-          Element(
-            baseName = _baseName,
-            typeName = _typeName,
-            primaryParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList),
-            aliasParams = _longParamAliases ::: _shortParamAliases,
-            allParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList ::: _longParamAliases ::: _shortParamAliases),
-            requirementLevel = requirementLevel.some,
-            description = _description,
-          )
-
-        val allLongParams: List[Param.LongWithValue] = _primaryLongParam :: _longParamAliases
-        val allShortParams: List[Param.ShortWithValue] = _primaryShortParam.toList ::: _shortParamAliases
-
-        val optionalParseFunction: List[Arg] => Result[Option[T]] = { args =>
-          @tailrec
-          def findLoop[T](
-              queue: List[T],
-              find: T => Option[Found[String]],
-          ): Option[Found[String]] =
-            queue match {
-              case head :: tail =>
-                find(head) match {
-                  case some @ Some(_) => some
-                  case None           => findLoop(tail, find)
-                }
-              case Nil =>
-                None
-            }
-
-          def foundFromLongParams: Option[Found[String]] =
-            findLoop(allLongParams, p => combined.longParamWithValue(p.name)(args))
-          def foundFromShortParams: Option[Found[String]] =
-            findLoop(allShortParams, p => combined.shortParamWithValue(p.name)(args))
-          def foundFromAny: Option[Found[String]] = foundFromLongParams orElse foundFromShortParams
-
-          foundFromAny match {
-            case Some(found) =>
-              Result(
-                res = _decodeFromString.decode(found.arg) match {
-                  case Left(error)  => NonEmptyList.one(Error(element.some, Error.Reason.MalformattedValue(found.arg))).asLeft
-                  case Right(value) => value.some.asRight
-                },
-                remainingArgs = found.remaining,
-              )
-            case None =>
-              Result(
-                res = None.asRight,
-                remainingArgs = args,
-              )
+        @tailrec
+        def findLoop[T](queue: List[T])(find: T => Option[Found[String]]): Option[Found[String]] =
+          queue match {
+            case head :: tail =>
+              find(head) match {
+                case some @ Some(_) => some
+                case None           => findLoop(tail)(find)
+              }
+            case Nil =>
+              None
           }
+
+        def foundFromLongParams: Option[Found[String]] =
+          findLoop(_primaryLongParam :: _longParamAliases)(p => combined.longParamWithValue(p.name)(args))
+        def foundFromShortParams: Option[Found[String]] =
+          findLoop(_primaryShortParam.toList ::: _shortParamAliases)(p => combined.shortParamWithValue(p.name)(args))
+        def foundFromAny: Option[Found[String]] = foundFromLongParams orElse foundFromShortParams
+
+        foundFromAny match {
+          case Some(found) =>
+            Result(
+              res = _decodeFromString.decode(found.arg) match {
+                case Left(error)  => NonEmptyList.one(Error(element.some, Error.Reason.MalformattedValue(found.arg))).asLeft
+                case Right(value) => value.some.asRight
+              },
+              remainingArgs = found.remaining,
+            )
+          case None =>
+            Result(
+              res = None.asRight,
+              remainingArgs = args,
+            )
         }
-
-        val parseFunction: List[Arg] => Result[T2] =
-          optionalParseFunction(_).flatMapResult(mapRes(_, element))
-
-        Parser(
-          parseF = parseFunction,
-          elements = element :: Nil,
-        )
       }
-
-      def required: Parser[T] =
-        build[T](RequirementLevel.Required) { (res, element) =>
-          res match {
-            case Some(value) => value.asRight
-            case None        => NonEmptyList.one(Error(element.some, Error.Reason.MissingRequired)).asLeft
-          }
-        }
-      def default(default: T): Parser[T] =
-        build[T](RequirementLevel.Default) { (res, _) => res.getOrElse(default).asRight }
-      def optional: Parser[Option[T]] =
-        build[Option[T]](RequirementLevel.Optional) { (res, _) => res.asRight }
-
     }
 
     def apply[T](
@@ -322,6 +322,136 @@ object Parser {
         _primaryLongParam = Param.LongWithValue(primaryLongParamName.toValue(baseName)),
         _longParamAliases = Nil,
         _primaryShortParam = primaryShortParamName.toOptionO(baseName.headOption).map(Param.ShortWithValue.apply),
+        _shortParamAliases = Nil,
+        _description = Nil,
+      )
+
+  }
+
+  object toggle {
+
+    final case class Builder(
+        private val _baseName: String,
+        private val _primaryLongParam: Param.LongToggle,
+        private val _longParamAliases: List[Param.LongToggle],
+        private val _primaryShortParam: Option[Param.ShortToggle],
+        private val _shortParamAliases: List[Param.ShortToggle],
+        private val _description: List[String],
+    ) extends GenBuilder[Boolean] {
+
+      // =====| Modify |=====
+
+      def withPrimaryLongParam(truePrefix: Option[String], falsePrefix: Option[String]): Builder =
+        this.copy(_primaryLongParam = Param.LongToggle(_baseName, truePrefix, falsePrefix))
+
+      def withLongParamAliases(params: Param.LongToggle*): Builder =
+        this.copy(_longParamAliases = params.toList)
+
+      def addLongParamAliases(params: Param.LongToggle*): Builder =
+        this.copy(_longParamAliases = _longParamAliases ::: params.toList)
+
+      def withPrimaryShortParam(trueName: Char, falseName: Char): Builder =
+        this.copy(_primaryShortParam = Param.ShortToggle(trueName, falseName).some)
+
+      def withoutPrimaryShortParam: Builder =
+        this.copy(_primaryShortParam = None)
+
+      def withShortParamAliases(params: Param.ShortToggle*): Builder =
+        this.copy(_shortParamAliases = params.toList)
+
+      def addShortParamAliases(params: Param.ShortToggle*): Builder =
+        this.copy(_shortParamAliases = _shortParamAliases ::: params.toList)
+
+      def withDescription(description: String*): Builder =
+        this.copy(_description = description.toList)
+
+      def addDescription(description: String*): Builder =
+        this.copy(_description = _description ::: description.toList)
+
+      // =====| Build |=====
+
+      override protected def makeElement(requirementLevel: RequirementLevel): Element =
+        Element(
+          baseName = _baseName,
+          typeName = "Boolean",
+          primaryParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList),
+          aliasParams = _longParamAliases ::: _shortParamAliases,
+          allParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList ::: _longParamAliases ::: _shortParamAliases),
+          requirementLevel = requirementLevel.some,
+          description = _description,
+        )
+
+      override protected def optionalParseFunction(args: List[Arg], element: Element): Result[Option[Boolean]] = {
+        import Arg.find.*
+
+        val allLongParams: List[Param.LongToggle] = _primaryLongParam :: _longParamAliases
+        val allShortParams: List[Param.ShortToggle] = _primaryShortParam.toList ::: _shortParamAliases
+
+        @tailrec
+        def findLoop[T](queue: List[T])(find: T => Option[Found[Boolean]]): Option[Found[Boolean]] =
+          queue match {
+            case head :: tail =>
+              find(head) match {
+                case some @ Some(_) => some
+                case None           => findLoop(tail)(find)
+              }
+            case Nil =>
+              None
+          }
+
+        def foundFromLongParams: Option[Found[Boolean]] =
+          findLoop(_primaryLongParam :: _longParamAliases) { p =>
+            basic.longParam(p.trueName)(args).map(_.map(_ => true)) orElse
+              basic.longParam(p.falseName)(args).map(_.map(_ => false))
+          }
+        def foundFromShortParams: Option[Found[Boolean]] =
+          findLoop(_primaryShortParam.toList ::: _shortParamAliases) { p =>
+            basic.shortParamSingle(p.trueName)(args).map(_.map(_ => true)) orElse
+              basic.shortParamMulti(p.trueName)(args).map(_.map(_ => true)) orElse
+              basic.shortParamSingle(p.falseName)(args).map(_.map(_ => false)) orElse
+              basic.shortParamMulti(p.falseName)(args).map(_.map(_ => false))
+          }
+        def foundFromAny: Option[Found[Boolean]] = foundFromLongParams orElse foundFromShortParams
+
+        foundFromAny match {
+          case Some(found) =>
+            Result(
+              res = found.arg.some.asRight,
+              remainingArgs = found.remaining,
+            )
+          case None =>
+            Result(
+              res = None.asRight,
+              remainingArgs = args,
+            )
+        }
+      }
+
+    }
+
+    def apply[T](
+        baseName: String,
+        primaryLongParamTruePrefix: DefaultableOption[String] = Defaultable.Auto,
+        primaryLongParamFalsePrefix: DefaultableOption[String] = Defaultable.Auto,
+        primaryShortParamName: DefaultableOption[Char] = Defaultable.Auto,
+    ): Builder =
+      Builder(
+        _baseName = baseName,
+        _primaryLongParam = (primaryLongParamTruePrefix, primaryLongParamFalsePrefix) match {
+          case (Defaultable.Auto, Defaultable.Auto) => Param.LongToggle(baseName, None, "no".some)
+
+          case (Defaultable.Auto, Defaultable.Some(falsePrefix)) => Param.LongToggle(baseName, None, falsePrefix.some)
+          case (Defaultable.Auto, Defaultable.None)              => Param.LongToggle(baseName, "yes".some, None)
+
+          case (Defaultable.Some(truePrefix), Defaultable.Auto) => Param.LongToggle(baseName, truePrefix.some, None)
+          case (Defaultable.None, Defaultable.Auto)             => Param.LongToggle(baseName, None, "no".some)
+
+          case (truePrefix, falsePrefix) => Param.LongToggle(baseName, truePrefix.toOptionO(None), falsePrefix.toOptionV("no"))
+        },
+        _longParamAliases = Nil,
+        _primaryShortParam = primaryShortParamName
+          .toOptionO(baseName.headOption)
+          .map { c => Param.ShortToggle(c.toUpper, c.toLower) },
         _shortParamAliases = Nil,
         _description = Nil,
       )

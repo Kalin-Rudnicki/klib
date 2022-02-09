@@ -62,18 +62,11 @@ object ParserTests extends DefaultKSpec {
     private val builtParser: BuiltParser[(P, List[Arg])] = parser.extrasAsArgs
 
     def toSuite: TestSpec = {
-      val (passes, fails) = testCases.partition(_.shouldPass)
+      // REMOVE : ...
+      println(builtParser.helpString(HelpConfig.default(true)))
+      println
 
-      println(builtParser.parse("--help-extra"))
-      println
-      println(builtParser.parse("-H"))
-      println
-      println(builtParser.parse("--help"))
-      println
-      println(builtParser.parse("-h"))
-      println
-      println
-      println
+      val (passes, fails) = testCases.partition(_.shouldPass)
 
       suite(name)(
         suite("Passes")(passes.map(_.toTest(builtParser))*),
@@ -181,6 +174,7 @@ object ParserTests extends DefaultKSpec {
         firstName: String,
         lastName: String,
         age: Option[Int],
+        isCool: Boolean,
     )
 
     TestCaseSuite
@@ -188,7 +182,8 @@ object ParserTests extends DefaultKSpec {
         (
           Parser.singleValue[String]("first-name").withDescription("Persons first name").required >&>
             Parser.singleValue[String]("last-name").withDescription("Persons last name").required >&>
-            Parser.singleValue[Int]("age").withLongParamAliases("a", "b", "c", "d").withDescription("Persons age").optional
+            Parser.singleValue[Int]("age").withLongParamAliases("a", "b", "c", "d").withDescription("Persons age").optional >&>
+            Parser.toggle("cool", Defaultable.Some("is"), Defaultable.Some("isnt")).default(true)
         ).map(Person.apply),
       )(
         TestCase.failing("empty")()(
@@ -206,7 +201,7 @@ object ParserTests extends DefaultKSpec {
           "First",
           "--last-name",
           "Last",
-        )()(Person("First", "Last", None)),
+        )()(Person("First", "Last", None, true)),
         TestCase.passing("success 2")(
           "--first-name",
           "First",
@@ -214,7 +209,21 @@ object ParserTests extends DefaultKSpec {
           "Last",
           "--age",
           "100",
-        )()(Person("First", "Last", 100.some)),
+        )()(Person("First", "Last", 100.some, true)),
+        TestCase.passing("success 3")(
+          "--first-name",
+          "First",
+          "--last-name",
+          "Last",
+          "--is-cool",
+        )()(Person("First", "Last", None, true)),
+        TestCase.passing("success 4")(
+          "--first-name",
+          "First",
+          "--last-name",
+          "Last",
+          "--isnt-cool",
+        )()(Person("First", "Last", None, false)),
         TestCase.passing("success + extra")(
           "--first-name",
           "First",
@@ -225,7 +234,7 @@ object ParserTests extends DefaultKSpec {
           "unrelated-value",
         )(
           Arg.Value("unrelated-value"),
-        )(Person("First", "Last", 100.some)),
+        )(Person("First", "Last", 100.some, true)),
         TestCase.failing("malformatted")(
           "--first-name",
           "First",
