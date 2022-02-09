@@ -95,7 +95,6 @@ lazy val `klib-core-2` =
     .jsSettings()
     .jvmSettings(
       // Dependencies
-      Dependencies.`org.rogach`.scallop,
       Dependencies.`com.google.jimfs`.jimfs,
     )
 

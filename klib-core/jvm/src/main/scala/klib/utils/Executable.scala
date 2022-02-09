@@ -143,9 +143,7 @@ object Executable {
 
       private val logLevelMap =
         Logger.LogLevel.AllTolerance
-          .flatMap(ll =>
-            (ll.priority.toString -> ll) :: (ll.name.toUpperCase -> ll) :: (ll.displayName.toUpperCase -> ll) :: Nil,
-          )
+          .flatMap(ll => (ll.priority.toString -> ll) :: (ll.name.toUpperCase -> ll) :: (ll.displayName.toUpperCase -> ll) :: Nil)
           .toMap
 
       override def parse(

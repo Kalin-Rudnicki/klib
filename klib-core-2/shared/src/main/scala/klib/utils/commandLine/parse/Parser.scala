@@ -129,13 +129,31 @@ final case class Parser[+T](
           )
         }
 
-        val linePairs = (
+        val allElements =
           List(
             makeHelpElement("help", 'h', "Display help message"),
             makeHelpElement("help-extra", 'H', "Display help message, with extra details"),
-          ) :::
-            elements
-        ).flatMap(_.toHelpString(helpConfig))
+          ) ::: elements
+
+        val allParamsNames: List[String] = allElements.flatMap(_.allParams.toList.flatMap(_.allParamStrings))
+        val paramNamesCount: Map[String, Int] = allParamsNames.groupBy(identity).map { (k, v) => (k, v.size) }
+        val duplicateNames: List[String] = paramNamesCount.filter(_._2 > 1).toList.map(_._1)
+
+        val basicLinePairs: List[(String, String)] = allElements.flatMap(_.toHelpString(helpConfig))
+        val duplicateNamePairs: Option[NonEmptyList[(String, String)]] =
+          duplicateNames.toNel.map { duplicateNames =>
+            (s"${" " * helpConfig.leftPadding}Duplicate param-names:", "") ::
+              duplicateNames.map(n => (s"${" " * (2 * helpConfig.leftPadding)}$n", ""))
+          }
+        val warningPairs: List[Option[NonEmptyList[(String, String)]]] = duplicateNamePairs :: Nil
+        val linePairs: List[(String, String)] =
+          warningPairs.flatMap(_.fold(List.empty[(String, String)])(_.toList)).toNel match {
+            case Some(warningPairs) =>
+              basicLinePairs ::: ("", "") :: ("[WARNING]", "") :: warningPairs.toList
+            case None =>
+              basicLinePairs
+          }
+
         val maxParamsUsed: Int = linePairs.map(_._1.length).maxOption.getOrElse(0).min(helpConfig.maxParamsWidth)
 
         val paramLines: List[String] =
@@ -213,6 +231,12 @@ object Parser {
 
   }
 
+  def unit: Parser[Unit] =
+    Parser(
+      args => Result(().asRight, args),
+      Nil,
+    )
+
   object singleValue {
 
     final case class Builder[T](
@@ -254,6 +278,9 @@ object Parser {
 
       def addDescription(description: String*): Builder[T] =
         this.copy(_description = _description ::: description.toList)
+
+      def many: Builder[List[T]] =
+        this.copy(_decodeFromString = _decodeFromString.commaSeparatedList)
 
       // =====| Build |=====
 

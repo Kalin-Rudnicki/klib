@@ -6,6 +6,8 @@ import cats.data.NonEmptyList
 import cats.syntax.option.*
 import zio.*
 
+import klib.utils.commandLine.parse.*
+
 // TODO (KR) :
 object Executable {
 
@@ -73,6 +75,27 @@ object Executable {
 
   }
 
+  final case class KLibConf(
+      logTolerance: Logger.LogLevel,
+      flags: Set[String],
+      idtStr: String,
+      clearScreen: Boolean,
+  )
+  object KLibConf {
+
+    val parser: Parser[KLibConf] = {
+      Parser.singleValue[Logger.LogLevel]("log-tolerance").addDescription("Minimum log level").default(Logger.LogLevel.Info) >&>
+        Parser.singleValue[String]("flags").many.addDescription("Add flags to logger").default(Nil).map(_.toSet) >&>
+        Parser.singleValue[String]("h-idt-str").addDescription("Indent string for logger").default("    ") >&>
+        Parser.toggle("clear").addDescription("Clear the screen before execution").default(false)
+    }.map(KLibConf.apply)
+
+  }
+
   // TODO (KR) :
+
+  def main(args: Array[String]): Unit = {
+    println(KLibConf.parser.disallowExtras.helpString(HelpConfig.default(false)))
+  }
 
 }

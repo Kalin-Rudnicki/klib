@@ -7,9 +7,12 @@ import java.nio.file.StandardOpenOption
 import scala.annotation.tailrec
 
 import cats.data.*
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.list.*
 import zio.*
+
+import klib.fp.typeclass.DecodeFromString
 
 final class Logger private (
     defaultIndent: String,
@@ -88,7 +91,7 @@ final class Logger private (
             if (requiredFlags.forall(flags.contains)) handle(logLevel, ops, event())
             else UIO.unit
           case Logger.Event.RequireLogLevel(logLevel, event) =>
-            if (logLevel.priority >= source.logTolerance.priority) handle(logLevel.some, ops, event())
+            if (logLevel.logPriority >= source.logTolerance.tolerancePriority) handle(logLevel.some, ops, event())
             else UIO.unit
         }
 
@@ -139,7 +142,7 @@ object Logger {
     ).toLayer
 
   def live(
-      logTolerance: Logger.LogLevel with Logger.LogLevel.Tolerance,
+      logTolerance: Logger.LogLevel,
       defaultIndent: String = "    ",
       flags: Set[String] = Set.empty,
       flagMap: Map[String, InfiniteSet[String]] = Map.empty,
@@ -298,7 +301,7 @@ object Logger {
 
   abstract class Source(
       val name: String,
-      val logTolerance: LogLevel with LogLevel.Tolerance,
+      val logTolerance: LogLevel,
       val queuedBreak: Ref[Option[Event.Break]],
   ) {
 
@@ -322,7 +325,7 @@ object Logger {
     // ---  ---
 
     def stdOut(
-        logTolerance: LogLevel with LogLevel.Tolerance,
+        logTolerance: LogLevel,
         initialQueuedBreak: Option[Event.Break] = None,
     ): UIO[Source] =
       for {
@@ -340,7 +343,7 @@ object Logger {
 
     def file(
         file: File,
-        logTolerance: LogLevel with LogLevel.Tolerance,
+        logTolerance: LogLevel,
         initialQueuedBreak: Option[Event.Break] = None,
     ): UIO[Source] = {
       final class BufferedWriterOps(val bw: BufferedWriter) extends Ops {
@@ -376,26 +379,42 @@ object Logger {
   // =====| LogLevel |=====
 
   sealed abstract class LogLevel(
-      val priority: Int,
+      val tolerancePriority: Int,
+      val logPriority: Int,
       val name: String,
       val displayName: String,
       val extendedColor: Color,
       val simpleColor: Color,
   ) {
 
+    def this(
+        priority: Int,
+        name: String,
+        displayName: String,
+        extendedColor: Color,
+        simpleColor: Color,
+    ) = this(
+      tolerancePriority = priority,
+      logPriority = priority,
+      name = name,
+      displayName = displayName,
+      extendedColor = extendedColor,
+      simpleColor = simpleColor,
+    )
+
     def toString(colorMode: ColorMode): String =
-      s"$name${LogLevel.tag(this.some, colorMode)}($priority)"
+      s"$name${LogLevel.tag(this.some, colorMode)}(${List(tolerancePriority, logPriority).distinct.mkString("/")})"
 
     override def toString: String =
       toString(ColorMode.Extended)
 
   }
   object LogLevel {
-    sealed trait Tolerance
 
     case object Never
         extends LogLevel(
-          priority = 0,
+          tolerancePriority = 9,
+          logPriority = 0,
           name = "Never",
           displayName = "NEVER",
           extendedColor = Color.Default, // TODO (KR) :
@@ -410,7 +429,6 @@ object Logger {
           extendedColor = Color.RGB.fromHex(0x0277bd),
           simpleColor = Color.Named.Cyan,
         )
-        with Tolerance
 
     case object Detailed
         extends LogLevel(
@@ -420,7 +438,6 @@ object Logger {
           extendedColor = Color.RGB.fromHex(0x66bb6a),
           simpleColor = Color.Named.Blue,
         )
-        with Tolerance
 
     case object Info
         extends LogLevel(
@@ -430,7 +447,6 @@ object Logger {
           extendedColor = Color.RGB.fromHex(0x1b5e20),
           simpleColor = Color.Named.Green,
         )
-        with Tolerance
 
     case object Important
         extends LogLevel(
@@ -440,7 +456,6 @@ object Logger {
           extendedColor = Color.RGB.fromHex(0x880e4f),
           simpleColor = Color.Named.Yellow,
         )
-        with Tolerance
 
     case object Warning
         extends LogLevel(
@@ -450,7 +465,6 @@ object Logger {
           extendedColor = Color.RGB.fromHex(0xffff00),
           simpleColor = Color.Named.Yellow,
         )
-        with Tolerance
 
     case object Error
         extends LogLevel(
@@ -460,7 +474,6 @@ object Logger {
           extendedColor = Color.RGB.fromHex(0xff3d00),
           simpleColor = Color.Named.Red,
         )
-        with Tolerance
 
     case object Fatal
         extends LogLevel(
@@ -470,7 +483,6 @@ object Logger {
           extendedColor = Color.RGB.fromHex(0xd50000),
           simpleColor = Color.Named.Red,
         )
-        with Tolerance
 
     case object Always
         extends LogLevel(
@@ -480,7 +492,6 @@ object Logger {
           extendedColor = Color.Default, // TODO (KR) :
           simpleColor = Color.Default,
         )
-        with Tolerance
 
     // ---  ---
 
@@ -497,17 +508,18 @@ object Logger {
         Always,
       )
 
-    val AllTolerance: List[LogLevel with Tolerance] =
-      List(
-        Debug,
-        Detailed,
-        Info,
-        Important,
-        Warning,
-        Error,
-        Fatal,
-        Always,
-      )
+    val AllMap: Map[String, LogLevel] =
+      All.flatMap { ll =>
+        List(ll.tolerancePriority.toString, ll.name, ll.displayName)
+          .map(s => (s.toUpperCase, ll))
+      }.toMap
+
+    implicit val dfs: DecodeFromString[LogLevel] = { str =>
+      AllMap.get(str.toUpperCase) match {
+        case Some(ll) => ll.asRight
+        case None     => Message(s"No such log-level: ${str.toUpperCase}").asLeft
+      }
+    }
 
     // ---  ---
 

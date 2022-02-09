@@ -40,8 +40,4 @@ object Dependencies {
     val `cats-effect` = crossDep("cats-effect", "3.3.3")
   }
 
-  object `org.rogach` extends Org("org.rogach") {
-    val scallop = dep("scallop", "4.0.4")
-  }
-
 }

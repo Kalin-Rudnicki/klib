@@ -5,6 +5,7 @@ import java.util.UUID
 import scala.util.Try
 
 import cats.syntax.either.*
+import cats.syntax.traverse.*
 import io.circe.*
 import io.circe.parser.*
 
@@ -21,6 +22,9 @@ trait DecodeFromString[+T] {
 
   final def fMap[T2](f: T => Either[Message, T2]): DecodeFromString[T2] =
     decode(_).flatMap(f)
+
+  final def commaSeparatedList: DecodeFromString[List[T]] =
+    _.split("\n").toList.traverse(decode)
 
 }
 object DecodeFromString {
