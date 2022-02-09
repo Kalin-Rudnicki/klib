@@ -18,7 +18,7 @@ final class Logger private (
     defaultIndent: String,
     sources: List[Logger.Source],
     flags: InfiniteSet[String],
-    colorMode: Logger.ColorMode, // TODO (KR) : Move to Source
+    colorMode: ColorMode, // TODO (KR) : Move to Source
     indents: Ref[List[String]], // TODO (KR) : Maybe this should be on the Source (?)
 ) { logger =>
 
@@ -110,7 +110,7 @@ object Logger {
       flags: Set[String],
       flagMap: Map[String, InfiniteSet[String]],
       sources: List[UIO[Logger.Source]],
-      colorMode: Logger.ColorMode,
+      colorMode: ColorMode,
       initialIndents: List[String],
   ): UIO[Logger] =
     for {
@@ -129,7 +129,7 @@ object Logger {
       flags: Set[String],
       flagMap: Map[String, InfiniteSet[String]],
       sources: List[UIO[Logger.Source]],
-      colorMode: Logger.ColorMode,
+      colorMode: ColorMode,
       initialIndents: List[String],
   ): ZLayer[Any, Nothing, Logger] =
     Logger(
@@ -146,7 +146,7 @@ object Logger {
       defaultIndent: String = "    ",
       flags: Set[String] = Set.empty,
       flagMap: Map[String, InfiniteSet[String]] = Map.empty,
-      colorMode: Logger.ColorMode = Logger.ColorMode.Extended,
+      colorMode: ColorMode = ColorMode.Extended,
       initialIndents: List[String] = Nil,
       extraSources: List[UIO[Logger.Source]] = Nil,
   ): ZLayer[Any, Nothing, Logger] =
@@ -367,15 +367,6 @@ object Logger {
 
   }
 
-  // =====| ColorMode |=====
-
-  sealed trait ColorMode
-  object ColorMode {
-    case object Extended extends ColorMode
-    case object Simple extends ColorMode
-    case object Colorless extends ColorMode
-  }
-
   // =====| LogLevel |=====
 
   sealed abstract class LogLevel(
@@ -426,7 +417,7 @@ object Logger {
           priority = 1,
           name = "Debug",
           displayName = "DEBUG",
-          extendedColor = Color.RGB.fromHex(0x0277bd),
+          extendedColor = Color(0x0277bd),
           simpleColor = Color.Named.Cyan,
         )
 
@@ -435,7 +426,7 @@ object Logger {
           priority = 2,
           name = "Detailed",
           displayName = "DETLD",
-          extendedColor = Color.RGB.fromHex(0x66bb6a),
+          extendedColor = Color(0x66bb6a),
           simpleColor = Color.Named.Blue,
         )
 
@@ -444,7 +435,7 @@ object Logger {
           priority = 3,
           name = "Info",
           displayName = "INFO",
-          extendedColor = Color.RGB.fromHex(0x1b5e20),
+          extendedColor = Color(0x1b5e20),
           simpleColor = Color.Named.Green,
         )
 
@@ -453,7 +444,7 @@ object Logger {
           priority = 4,
           name = "Important",
           displayName = "IMPRT",
-          extendedColor = Color.RGB.fromHex(0x880e4f),
+          extendedColor = Color(0x880e4f),
           simpleColor = Color.Named.Yellow,
         )
 
@@ -462,7 +453,7 @@ object Logger {
           priority = 5,
           name = "Warning",
           displayName = "WARN",
-          extendedColor = Color.RGB.fromHex(0xffff00),
+          extendedColor = Color(0xffff00),
           simpleColor = Color.Named.Yellow,
         )
 
@@ -471,7 +462,7 @@ object Logger {
           priority = 6,
           name = "Error",
           displayName = "ERROR",
-          extendedColor = Color.RGB.fromHex(0xff3d00),
+          extendedColor = Color(0xff3d00),
           simpleColor = Color.Named.Red,
         )
 
@@ -480,7 +471,7 @@ object Logger {
           priority = 7,
           name = "Fatal",
           displayName = "FATAL",
-          extendedColor = Color.RGB.fromHex(0xd50000),
+          extendedColor = Color(0xd50000),
           simpleColor = Color.Named.Red,
         )
 
@@ -534,15 +525,8 @@ object Logger {
         case Some(logLevel) =>
           def ansi(color: Color): String = s"$AnsiEscapeString${color.fgMod}m"
 
-          def color(colorMode: ColorMode): Color =
-            colorMode match {
-              case ColorMode.Extended  => logLevel.extendedColor
-              case ColorMode.Simple    => logLevel.simpleColor
-              case ColorMode.Colorless => Color.Default
-            }
-
           val paddedName = logLevel.displayName.padTo(LogLevel.MaxDisplayNameLength, ' ')
-          color(colorMode) match {
+          colorMode.selectColor(logLevel.extendedColor, logLevel.simpleColor) match {
             case Color.Default =>
               s"[$paddedName]"
             case cmColor =>

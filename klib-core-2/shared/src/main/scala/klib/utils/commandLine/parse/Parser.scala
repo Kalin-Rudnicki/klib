@@ -140,7 +140,7 @@ final case class Parser[+T](
         val paramNamesCount: Map[String, Int] = allParamsNames.groupBy(identity).map { (k, v) => (k, v.size) }
         val duplicateNames: List[String] = paramNamesCount.filter(_._2 > 1).toList.map(_._1)
 
-        val linePairs: List[Pair[String]] =
+        val linePairs: List[Pair.Same[String]] =
           Pair.zipPairs(helpConfig)(
             allElements.map(_.helpStringLinesPair(helpConfig, 0)),
           )

@@ -96,6 +96,15 @@ object Executable {
 
   def main(args: Array[String]): Unit = {
     println(KLibConf.parser.disallowExtras.helpString(HelpConfig.default(false)))
+
+    import klib.utils.IndentedString.*
+
+    println
+    println(
+      indented(
+        "A\nB\nC",
+      ).toString("  "),
+    )
   }
 
 }

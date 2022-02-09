@@ -89,9 +89,8 @@ final class Logger private (
     copy(
       flagMap = (this.flagMap.toList ++ flagMap.toList)
         .groupMap(_._1)(_._2)
-        .map {
-          case (key, value) =>
-            key -> InfiniteSet.union(value: _*)
+        .map { case (key, value) =>
+          key -> InfiniteSet.union(value: _*)
         },
     )
 
@@ -655,8 +654,7 @@ object Logger {
           track: InfiniteSet[String],
       ): InfiniteSet[String] = {
         val unseen = current &~ seen
-        if (unseen.isEmpty)
-          track
+        if (unseen.isEmpty) track
         else {
           val split =
             unseen.partitionMap { f =>
@@ -696,8 +694,7 @@ object Logger {
           exclusive: Set[String],
       ): Set[String] = {
         val unseen = current &~ seen
-        if (unseen.isEmpty)
-          exclusive
+        if (unseen.isEmpty) exclusive
         else {
           val filtered =
             current.flatMap { f =>

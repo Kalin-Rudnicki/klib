@@ -26,7 +26,7 @@ object JvmMain extends ZIOApp {
           Logger.Source.stdOut(Logger.LogLevel.Info),
           Logger.Source.file(logFile, Logger.LogLevel.Debug),
         ),
-        colorMode = Logger.ColorMode.Extended,
+        colorMode = ColorMode.Extended,
         initialIndents = Nil,
       )
     } yield logger

@@ -4,6 +4,7 @@ import scala.annotation.tailrec
 
 import cats.data.*
 import cats.syntax.option.*
+import cats.syntax.list.*
 
 sealed trait ColorString {
 
@@ -340,29 +341,16 @@ object ColorString {
 
   trait Implicits {
 
-    implicit class ColorStringIdOps(obj: Any) {
+    extension (obj: Any) {
 
       def toColorString: ColorString =
         Simple(Color.Empty, obj.toString)
 
     }
 
-    implicit class ColorStringStringOps(str: String) {
-
-      def stripColor: String =
-        str.replaceAll("\u001b\\[\\d+(;\\d+)*m", "")
-
-      def replaceColor(regex: String, color: RawColor): String =
-        str.replaceAll(regex, s"\u001b[${color.fgMod}m$$0\u001b[0m")
-
-    }
-
     implicit class ColorStringInterpolator(sc: StringContext) {
 
       def color(args: ColorString*): ColorString = {
-        def nonEmptyString(str: String): Option[String] =
-          Option.when(str.nonEmpty)(str)
-
         @tailrec
         def loop(
             sQueue: List[String],
@@ -374,10 +362,10 @@ object ColorString {
               loop(
                 sT,
                 csT,
-                (nonEmptyString(sH), csH) :: stack,
+                (sH.toNES, csH) :: stack,
               )
             case (_, Nil) =>
-              (stack.reverse, nonEmptyString(sQueue.mkString))
+              (stack.reverse, sQueue.mkString.toNES)
             case (Nil, csH :: csT) => // This should not be possible...
               loop(
                 Nil,
@@ -393,39 +381,24 @@ object ColorString {
 
     }
 
-    implicit class ColorStringListOps(csl: List[ColorString]) {
+    extension (csl: List[ColorString]) {
 
       def csMkString: ColorString =
-        csMkString("")
+        csMkString("", "", "")
 
-      def csMkString(joinStr: String, color: Color = Color.Empty): ColorString = {
-        val js = Option.when(joinStr.nonEmpty)(joinStr)
+      def csMkString(sep: String): ColorString =
+        csMkString("", sep, "")
 
-        val pairs: List[(Option[String], ColorString)] = {
-          @tailrec
-          def loop(
-              queue: List[ColorString],
-              stack: List[(Option[String], ColorString)],
-          ): List[(Option[String], ColorString)] =
-            queue match {
-              case Nil =>
-                stack.reverse
-              case head :: tail =>
-                loop(
-                  tail,
-                  (js, head) :: stack,
-                )
-            }
+      def csMkString(start: String, sep: String, end: String): ColorString = {
+        val sepO = sep.toNES
 
-          csl match {
-            case Nil =>
-              Nil
-            case head :: tail =>
-              loop(tail, (None, head) :: Nil)
+        val pairs: List[(Option[String], ColorString)] =
+          csl.toNel match {
+            case Some(csl) => csl.tail.foldLeft((start.toNES, csl.head) :: Nil) { (l, cs) => (sepO, cs) :: l }
+            case None      => Nil
           }
-        }
 
-        ColorString.Complex(color, pairs, None)
+        ColorString.Complex(Color.Empty, pairs, end.toNES)
       }
 
     }

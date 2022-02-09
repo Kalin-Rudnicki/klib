@@ -2,22 +2,30 @@ package klib.utils.commandLine.parse
 
 import scala.annotation.tailrec
 
-opaque type Pair[+T] = (T, T)
-extension [T](pair: Pair[T]) {
-  def left: T = pair._1
-  def right: T = pair._2
+opaque type Pair[+L, +R] = (L, R)
+extension [L, R](pair: Pair[L, R]) {
+  def left: L = pair._1
+  def right: R = pair._2
 }
 object Pair {
 
-  def apply[T](left: T, right: T): Pair[T] = (left, right)
+  def apply[L, R](left: L, right: R): Pair[L, R] = (left, right)
 
-  def zipPair(helpConfig: HelpConfig, pair: Pair[List[String]]): List[Pair[String]] = {
+  opaque type Same[+T] = Pair[T, T]
+  object Same {
+
+    def apply[T](left: T, right: T): Pair.Same[T] =
+      Pair(left, right)
+
+  }
+
+  def zipPair(helpConfig: HelpConfig, pair: Pair.Same[List[String]]): List[Pair.Same[String]] = {
     @tailrec
     def loop(
         leftLines: List[String],
         rightLines: List[String],
         stack: List[(String, String)],
-    ): List[Pair[String]] =
+    ): List[Pair.Same[String]] =
       leftLines match {
         case leftHead :: leftTail =>
           if (leftHead.length > helpConfig.maxParamsWidth)
@@ -61,10 +69,10 @@ object Pair {
     )
   }
 
-  def zipPairs(helpConfig: HelpConfig)(pairs: List[Pair[List[String]]]*): List[Pair[String]] =
+  def zipPairs(helpConfig: HelpConfig)(pairs: List[Pair.Same[List[String]]]*): List[Pair.Same[String]] =
     pairs.toList.flatMap(_.flatMap(zipPair(helpConfig, _)))
 
-  def makeLines(helpConfig: HelpConfig, pairs: List[Pair[String]]): List[String] = {
+  def makeLines(helpConfig: HelpConfig, pairs: List[Pair.Same[String]]): List[String] = {
     val maxParamsUsed: Int = pairs.map(_.left.length).maxOption.getOrElse(0).min(helpConfig.maxParamsWidth)
 
     pairs.map { pair =>

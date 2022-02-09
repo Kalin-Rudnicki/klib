@@ -10,6 +10,9 @@ object Color {
   def apply(r: Int, g: Int, b: Int): Color =
     RGB(r, g, b)
 
+  def apply(hex: Int): Color =
+    RGB((hex >> 4) & 0xff, (hex >> 2) & 0xff, hex & 0xff)
+
   sealed abstract class Named(n: Char) extends Color {
     override def fgMod: String = s"3$n"
     override def bgMod: String = s"4$n"
@@ -29,12 +32,6 @@ object Color {
   final case class RGB(r: Int, g: Int, b: Int) extends Color {
     override def fgMod: String = s"38;2;$r;$g;$b"
     override def bgMod: String = s"48;2;$r;$g;$b"
-  }
-  object RGB {
-
-    def fromHex(hex: Int): RGB =
-      RGB((hex >> 4) & 0xff, (hex >> 2) & 0xff, hex & 0xff)
-
   }
 
   case object Default extends Color {

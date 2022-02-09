@@ -7,7 +7,7 @@ import cats.syntax.option.*
 import cats.syntax.list.*
 
 sealed trait Element {
-  def helpStringLinesPair(helpConfig: HelpConfig, indentCount: Int): Pair[List[String]]
+  def helpStringLinesPair(helpConfig: HelpConfig, indentCount: Int): Pair.Same[List[String]]
   def allParams: NonEmptyList[Param]
 }
 object Element {
@@ -28,24 +28,31 @@ object Element {
       description: List[String],
   ) extends Element {
 
-    override def helpStringLinesPair(helpConfig: HelpConfig, indentCount: Int): Pair[List[String]] = {
+    override def helpStringLinesPair(helpConfig: HelpConfig, indentCount: Int): Pair.Same[List[String]] = {
       def extraDescriptions: List[String] =
         List(
           requirementLevel.map(_.toString),
         ).flatten
-      def paramString(params: NonEmptyList[Param]): String = params.toList.map(_.formattedName).mkString(", ")
+      def paramString(params: NonEmptyList[Param], extraIndent: Boolean): String =
+        params.toList
+          .map(_.formattedName)
+          .mkString(
+            baseIndentString(helpConfig, indentCount + (if (extraIndent) 1 else 0)),
+            ", ",
+            "",
+          )
 
       if (helpConfig.helpExtra)
-        Pair(
+        Pair.Same(
           List(
-            paramString(primaryParams).some,
-            aliasParams.toNel.map(params => s"${" " * helpConfig.leftPadding}${paramString(params)}"),
+            paramString(primaryParams, false).some,
+            aliasParams.toNel.map(paramString(_, true)),
           ).flatten,
           description ::: extraDescriptions,
         )
       else
-        Pair(
-          paramString(primaryParams) :: Nil,
+        Pair.Same(
+          paramString(primaryParams, false) :: Nil,
           description,
         )
     }

@@ -16,7 +16,7 @@ object SharedMain extends ZIOApp {
           flags = Set.empty,
           flagMap = Map.empty,
           defaultIndent = "|   ",
-          colorMode = Logger.ColorMode.Extended,
+          colorMode = ColorMode.Extended,
           sources = List(Logger.Source.stdOut(Logger.LogLevel.Info)),
           initialIndents = Nil,
         ),
