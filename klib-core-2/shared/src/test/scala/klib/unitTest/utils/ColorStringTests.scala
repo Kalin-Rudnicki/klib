@@ -19,7 +19,7 @@ object ColorStringTests extends DefaultKSpec {
 
   import TestData.*
 
-  private def makeTest(
+  private def makeToStringTest(
       name: String,
       colorString: => ColorString,
       exp: String,
@@ -31,12 +31,12 @@ object ColorStringTests extends DefaultKSpec {
 
   private val miscSpec: TestSpec =
     suite("misc")(
-      makeTest(
+      makeToStringTest(
         "ColorString.Simple",
         Red,
         "[[Red]]Red[[Default]]",
       ),
-      makeTest(
+      makeToStringTest(
         "ColorString.Simple + ColorString.Simple",
         Red + Blue,
         "[[Red]]Red[[Blue]]Blue[[Default]]",
@@ -45,50 +45,59 @@ object ColorStringTests extends DefaultKSpec {
 
   private val interpolationSpec: TestSpec =
     suite("interpolation")(
-      makeTest(
+      makeToStringTest(
         "touching",
         color"$Red$Blue",
         "[[Red]]Red[[Blue]]Blue[[Default]]",
       ),
-      makeTest(
+      makeToStringTest(
         "not touching",
         color"$Red-$Blue-$Green",
         "[[Red]]Red[[Default]]-[[Blue]]Blue[[Default]]-[[Green]]Green[[Default]]",
       ),
-      makeTest(
+      makeToStringTest(
         "spaces on outside",
         color"--$Red-$Blue--",
         "--[[Red]]Red[[Default]]-[[Blue]]Blue[[Default]]--",
       ),
-      makeTest(
+      makeToStringTest(
         "modified after interpolation",
         color"$Red-$Blue-$Green".yellow,
         "[[Red]]Red[[Yellow]]-[[Blue]]Blue[[Yellow]]-[[Green]]Green[[Default]]",
       ),
-      makeTest(
+      makeToStringTest(
         "nested with same color",
         color"--$Red--".red,
         s"[[Red]]--Red--[[Default]]",
       ),
-      makeTest(
+      makeToStringTest(
         "nested 1",
         color"--${color"--$Red-$Blue--"}--",
         "----[[Red]]Red[[Default]]-[[Blue]]Blue[[Default]]----",
       ),
-      makeTest(
+      makeToStringTest(
         "nested 2",
         color"--${color"--$Red-$Blue--".green}--",
         "--[[Green]]--[[Red]]Red[[Green]]-[[Blue]]Blue[[Green]]--[[Default]]--",
       ),
-      makeTest(
+      makeToStringTest(
         "nested 3",
         color"--${color"--$Red-$Blue--"}--".yellow,
         "[[Yellow]]----[[Red]]Red[[Yellow]]-[[Blue]]Blue[[Yellow]]----[[Default]]",
       ),
-      makeTest(
+      makeToStringTest(
         "nested 4",
         color"--${color"--$Red-$Blue--".green}--".yellow,
         "[[Yellow]]--[[Green]]--[[Red]]Red[[Green]]-[[Blue]]Blue[[Green]]--[[Yellow]]--[[Default]]",
+      ),
+    )
+
+  private val splitSpec: TestSpec =
+    suite("split")(
+      makeToStringTest(
+        "simple",
+        "1,2,3".toColorString.red.split(",").csMkString("(", ",", ")"),
+        "([[Red]]1[[Default]],[[Red]]2[[Default]],[[Red]]3[[Default]])",
       ),
     )
 
@@ -96,6 +105,7 @@ object ColorStringTests extends DefaultKSpec {
     suite("ColorStringTests")(
       miscSpec,
       interpolationSpec,
-    ) @@ TestAspect.sequential // REMOVE
+      splitSpec,
+    )
 
 }

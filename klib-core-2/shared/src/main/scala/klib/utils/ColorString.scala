@@ -107,30 +107,34 @@ sealed trait ColorString {
         ColorString.Complex(color, pairs, tail.fold(otherStr)(_ + otherStr).some)
     }
 
-  def split(splitStr: String): List[ColorString] =
-    this match {
-      case ColorString.Simple(color, str) =>
-        str.split(splitStr).map(ColorString.Simple(color, _)).toList
-      case ColorString.Complex(color, pairs, tail) =>
-        List(
-          pairs.flatMap { case (oStr, cStr) =>
-            List(
-              oStr.toList.flatMap {
-                _.split(splitStr).map(ColorString.Simple(color, _))
-              },
-              cStr.split(splitStr),
-            ).flatten
-          },
-          tail.toList.flatMap {
-            _.split(splitStr).map(ColorString.Simple(color, _))
-          },
-        ).flatten
-    }
+  def split(splitStr: String): List[ColorString] = {
+    val res =
+      this match {
+        case ColorString.Simple(color, str) =>
+          str.split(splitStr).map(ColorString.Simple(color, _)).toList
+        case ColorString.Complex(color, pairs, tail) =>
+          List(
+            pairs.flatMap { case (oStr, cStr) =>
+              List(
+                oStr.toList.flatMap {
+                  _.split(splitStr).map(ColorString.Simple(color, _))
+                },
+                cStr.split(splitStr),
+              ).flatten
+            },
+            tail.toList.flatMap {
+              _.split(splitStr).map(ColorString.Simple(color, _))
+            },
+          ).flatten
+      }
+
+    res
+  }
 
   def show: String =
     this match {
       case ColorString.Simple(color, str) =>
-        s"Simple($color, ${str.unesc})"
+        s"Simple($color: ${str.unesc})"
       case ColorString.Complex(color, pairs, tail) =>
         def pairToStrings(pair: (Option[String], ColorString)): List[String] =
           List(pair._1.fold("_")(_.unesc), pair._2.show)
@@ -138,7 +142,7 @@ sealed trait ColorString {
         val allElems: List[String] =
           pairs.flatMap(pairToStrings) ::: tail.fold("_")(_.unesc) :: Nil
 
-        s"Complex($color${allElems.mkString(", ", ", ", "")})"
+        s"Complex($color: ${allElems.mkString(", ")})"
     }
 
   def length: Int =
@@ -425,7 +429,7 @@ object ColorString {
 
         val pairs: List[(Option[String], ColorString)] =
           csl.toNel match {
-            case Some(csl) => csl.tail.foldLeft((start.toNES, csl.head) :: Nil) { (l, cs) => (sepO, cs) :: l }
+            case Some(csl) => csl.tail.foldLeft((start.toNES, csl.head) :: Nil) { (l, cs) => (sepO, cs) :: l }.reverse
             case None      => Nil
           }
 
