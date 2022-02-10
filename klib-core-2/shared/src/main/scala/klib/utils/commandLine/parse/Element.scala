@@ -37,7 +37,7 @@ object Element {
         Pair(
           List(
             LeftLine(paramString(primaryParams, false)).some,
-            aliasParams.toNel.map(p => LeftLine(paramString(p, true), 1)),
+            aliasParams.toNel.map(p => LeftLine(paramString(p, true)).indentBy(1)),
           ).flatten,
           description ::: extraDescriptions,
         )

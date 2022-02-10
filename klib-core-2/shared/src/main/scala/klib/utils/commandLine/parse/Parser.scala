@@ -132,34 +132,31 @@ final case class Parser[+T](
 
         val allElements =
           List(
-            List(
-              Element.Break,
-              makeHelpElement("help", 'h', "Display help message"),
-              makeHelpElement("help-extra", 'H', "Display help message, with extra details"),
-              Element.Break,
-            ),
-            elements,
-            List(
-              Element.Break,
-            ),
-          ).flatten
+            Element.Break,
+            makeHelpElement("help", 'h', "Display help message"),
+            makeHelpElement("help-extra", 'H', "Display help message, with extra details"),
+            Element.Break,
+          ) ::: elements
 
         val allParamsNames: List[String] = allElements.flatMap(_.allParams.flatMap(_.allParamStrings))
         val paramNamesCount: Map[String, Int] = allParamsNames.groupBy(identity).map { (k, v) => (k, v.size) }
         val duplicateNames: List[String] = paramNamesCount.filter(_._2 > 1).toList.map(_._1)
-        val duplicateNamesLines: List[Pair[LeftLine, String]] =
-          Option
-            .when(duplicateNames.nonEmpty) {
+        val duplicateNamesLines: Pair[List[LeftLine], List[String]] =
+          if (helpConfig.helpExtra && duplicateNames.nonEmpty)
+            Pair(
               List(
-                Pair(LeftLine(""), ""),
-                Pair(LeftLine(""), ""),
-              )
-            }
-            .getOrElse(Nil)
+                LeftLine(""),
+                LeftLine("[Duplicate Param Names]".yellow),
+              ) ::: duplicateNames.map(n => LeftLine(n).indentBy(1)),
+              Nil,
+            )
+          else
+            Pair(Nil, Nil)
 
         val linePairs: List[Pair[ColorString, String]] =
           Pair.zipPairs(helpConfig)(
             allElements.map(_.helpStringLinesPair(helpConfig)),
+            duplicateNamesLines :: Nil,
           )
 
         val lines: List[String] =
