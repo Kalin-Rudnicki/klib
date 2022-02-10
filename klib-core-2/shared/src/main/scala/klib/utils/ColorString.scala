@@ -345,7 +345,7 @@ object ColorString {
 
   // =====| ... |=====
 
-  final case class Simple private[ColorString] (
+  final case class Simple(
       color: Color,
       str: String,
   ) extends ColorString {
@@ -359,7 +359,7 @@ object ColorString {
   }
 
   // color"someString${cString}${cString}someString${cString}someString"
-  final case class Complex private[ColorString] (
+  final case class Complex private[utils] (
       color: Color,
       pairs: List[(Option[String], ColorString)],
       tail: Option[String],
@@ -374,71 +374,61 @@ object ColorString {
 
   }
 
-  trait Implicits {
+}
 
-    extension (obj: Any) {
+given convertStringToColorString: Conversion[String, ColorString] = ColorString.Simple(ColorString.Color.Default, _)
 
-      def toColorString: ColorString =
-        Simple(Color.Empty, obj.toString)
+implicit class ColorStringInterpolator(sc: StringContext) {
 
-    }
-
-    implicit class ColorStringInterpolator(sc: StringContext) {
-
-      def color(args: ColorString*): ColorString = {
-        @tailrec
-        def loop(
-            sQueue: List[String],
-            csQueue: List[ColorString],
-            stack: List[(Option[String], ColorString)],
-        ): (List[(Option[String], ColorString)], Option[String]) =
-          (sQueue, csQueue) match {
-            case (sH :: sT, csH :: csT) =>
-              loop(
-                sT,
-                csT,
-                (sH.toNES, csH) :: stack,
-              )
-            case (_, Nil) =>
-              (stack.reverse, sQueue.mkString.toNES)
-            case (Nil, csH :: csT) => // This should not be possible...
-              loop(
-                Nil,
-                csT,
-                (None, csH) :: stack,
-              )
-          }
-
-        val (pairs, tail) = loop(sc.parts.toList, args.toList, Nil)
-
-        ColorString.Complex(Color.Empty, pairs, tail)
+  def color(args: ColorString*): ColorString = {
+    @tailrec
+    def loop(
+        sQueue: List[String],
+        csQueue: List[ColorString],
+        stack: List[(Option[String], ColorString)],
+    ): (List[(Option[String], ColorString)], Option[String]) =
+      (sQueue, csQueue) match {
+        case (sH :: sT, csH :: csT) =>
+          loop(
+            sT,
+            csT,
+            (sH.toNES, csH) :: stack,
+          )
+        case (_, Nil) =>
+          (stack.reverse, sQueue.mkString.toNES)
+        case (Nil, csH :: csT) => // This should not be possible...
+          loop(
+            Nil,
+            csT,
+            (None, csH) :: stack,
+          )
       }
 
-    }
+    val (pairs, tail) = loop(sc.parts.toList, args.toList, Nil)
 
-    extension (csl: List[ColorString]) {
-
-      def csMkString: ColorString =
-        csMkString("", "", "")
-
-      def csMkString(sep: String): ColorString =
-        csMkString("", sep, "")
-
-      def csMkString(start: String, sep: String, end: String): ColorString = {
-        val sepO = sep.toNES
-
-        val pairs: List[(Option[String], ColorString)] =
-          csl.toNel match {
-            case Some(csl) => csl.tail.foldLeft((start.toNES, csl.head) :: Nil) { (l, cs) => (sepO, cs) :: l }.reverse
-            case None      => Nil
-          }
-
-        ColorString.Complex(Color.Empty, pairs, end.toNES)
-      }
-
-    }
-
+    ColorString.Complex(ColorString.Color.Empty, pairs, tail)
   }
-  object Implicits extends Implicits
+
+}
+
+extension (csl: List[ColorString]) {
+
+  def csMkString: ColorString =
+    csMkString("", "", "")
+
+  def csMkString(sep: String): ColorString =
+    csMkString("", sep, "")
+
+  def csMkString(start: String, sep: String, end: String): ColorString = {
+    val sepO = sep.toNES
+
+    val pairs: List[(Option[String], ColorString)] =
+      csl.toNel match {
+        case Some(csl) => csl.tail.foldLeft((start.toNES, csl.head) :: Nil) { (l, cs) => (sepO, cs) :: l }.reverse
+        case None      => Nil
+      }
+
+    ColorString.Complex(ColorString.Color.Empty, pairs, end.toNES)
+  }
 
 }

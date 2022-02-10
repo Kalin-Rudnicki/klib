@@ -5,16 +5,15 @@ import zio.test.Assertion.*
 import zio.test.*
 
 import klib.unitTest.SpecUtils.*
-import klib.utils.*
-import klib.utils.ColorString.Implicits.*
+import klib.utils.{*, given}
 import klib.utils.commandLine.parse.*
 
 object ColorStringTests extends DefaultKSpec {
 
   private object TestData {
-    val Red: ColorString = "Red".toColorString.red
-    val Blue: ColorString = "Blue".toColorString.blue
-    val Green: ColorString = "Green".toColorString.green
+    val Red: ColorString = "Red".red
+    val Blue: ColorString = "Blue".blue
+    val Green: ColorString = "Green".green
   }
 
   import TestData.*
