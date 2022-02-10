@@ -127,6 +127,20 @@ sealed trait ColorString {
         ).flatten
     }
 
+  def show: String =
+    this match {
+      case ColorString.Simple(color, str) =>
+        s"Simple($color, ${str.unesc})"
+      case ColorString.Complex(color, pairs, tail) =>
+        def pairToStrings(pair: (Option[String], ColorString)): List[String] =
+          List(pair._1.fold("_")(_.unesc), pair._2.show)
+
+        val allElems: List[String] =
+          pairs.flatMap(pairToStrings) ::: tail.fold("_")(_.unesc) :: Nil
+
+        s"Complex($color${allElems.mkString(", ", ", ", "")})"
+    }
+
   def length: Int =
     this match {
       case ColorString.Simple(_, str) =>
@@ -158,39 +172,47 @@ sealed trait ColorString {
     stringBuilder.toString
   }
 
-  override def toString: String = {
+  override def toString: String = toString(ColorMode.Extended)
+  def toString(colorMode: ColorMode): String = {
     val stringBuilder: StringBuilder = new StringBuilder
 
     def append(
-        cs: ColorString.ColorState,
-        c: ColorString.Color,
+        prevColorState: ColorString.ColorState,
+        newColorState: ColorString.ColorState,
         str: String,
-    ): ColorString.ColorState =
-      c.diffWithState(cs) match {
-        case Some((ansi, ncs)) =>
-          stringBuilder.append(ansi).append(str)
-          ncs
-        case None =>
-          stringBuilder.append(str)
-          cs
-      }
+    ): ColorString.ColorState = {
+      val before = stringBuilder.toString
+      val res =
+        newColorState.diffWithState(prevColorState, colorMode) match {
+          case Some((ansi, ncs)) =>
+            stringBuilder.append(ansi).append(str)
+            ncs
+          case None =>
+            stringBuilder.append(str)
+            prevColorState
+        }
+      val after = stringBuilder.toString
+
+      res
+    }
 
     def rec(
         colorString: ColorString,
-        colorState: ColorString.ColorState,
+        prevColorState: ColorString.ColorState,
     ): ColorString.ColorState =
       colorString match {
         case ColorString.Simple(color, str) =>
           append(
-            colorState,
-            color,
+            prevColorState,
+            color.toColorState(prevColorState),
             str,
           )
         case ColorString.Complex(color, pairs, tail) =>
+          val newColorState = color.toColorState(prevColorState)
           val afterPairs =
-            pairs.foldLeft(colorState) { case (ccs, (oStr, cStr)) =>
+            pairs.foldLeft(prevColorState) { case (ccs, (oStr, cStr)) =>
               val afterOStr =
-                oStr.map(append(ccs, color, _)).getOrElse(ccs)
+                oStr.fold(ccs)(append(ccs, newColorState, _))
               val afterCStr =
                 rec(
                   cStr,
@@ -200,7 +222,7 @@ sealed trait ColorString {
               afterCStr
             }
           val afterTail =
-            tail.map(append(afterPairs, color, _)).getOrElse(afterPairs)
+            tail.map(append(afterPairs, newColorState, _)).getOrElse(afterPairs)
 
           afterTail
       }
@@ -209,9 +231,7 @@ sealed trait ColorString {
       this,
       ColorString.ColorState.Default,
     )
-    ColorString.Color.Default.diffWithState(finalColorState).foreach { case (ansi, _) =>
-      stringBuilder.append(ansi)
-    }
+    append(finalColorState, ColorString.ColorState.Default, "")
     stringBuilder.toString
   }
 
@@ -219,9 +239,6 @@ sealed trait ColorString {
 
 object ColorString {
   import klib.utils.Color as RawColor
-
-  private def ansiEscape(codes: NonEmptyList[String]): String =
-    s"\u001b[${codes.toList.mkString(";")}m"
 
   final case class Color(
       fg: Option[RawColor],
@@ -240,33 +257,25 @@ object ColorString {
         bg = bg.orElse(other.bg),
       )
 
-    // Does a diff, to make sure any coloring is needed
-    def diffWithState(colorState: ColorState): Option[(String, ColorState)] =
-      (fg.filterNot(_ == colorState.fg), bg.filterNot(_ == colorState.bg)) match {
-        case (Some(fg), Some(bg)) =>
-          (
-            ansiEscape(NonEmptyList.of(fg.fgMod, bg.bgMod)),
-            colorState.copy(fg = fg, bg = bg),
-          ).some
-        case (Some(fg), None) =>
-          (
-            ansiEscape(NonEmptyList.of(fg.fgMod)),
-            colorState.copy(fg = fg),
-          ).some
-        case (None, Some(bg)) =>
-          (
-            ansiEscape(NonEmptyList.of(bg.bgMod)),
-            colorState.copy(bg = bg),
-          ).some
-        case (None, None) =>
-          None
-      }
-
-    def toColorState: ColorState =
+    def toColorState(parentColorState: ColorState): ColorState =
       ColorState(
-        fg.getOrElse(RawColor.Default),
-        bg.getOrElse(RawColor.Default),
+        fg.getOrElse(parentColorState.fg),
+        bg.getOrElse(parentColorState.bg),
       )
+
+    override def toString: String =
+      bg match {
+        case Some(bg) =>
+          fg match {
+            case Some(fg) => s"$fg.fg + $bg.bg"
+            case None     => s"$bg.bg"
+          }
+        case None =>
+          fg match {
+            case Some(fg) => s"$fg.fg"
+            case None     => "NoColor"
+          }
+      }
 
   }
   object Color {
@@ -281,27 +290,49 @@ object ColorString {
 
     def toColor: Color = Color(fg = fg.some, bg = bg.some)
 
-    def colorizeAndDeColorize(surroundings: ColorState): Option[(String, String)] = {
+    def colorizeAndDeColorize(surroundings: ColorState, cm: ColorMode): Option[(String, String)] = {
       (this.fg != surroundings.fg, this.bg != surroundings.bg) match {
         case (true, true) =>
           (
-            ansiEscape(NonEmptyList.of(this.fg.fgMod, this.bg.bgMod)),
-            ansiEscape(NonEmptyList.of(surroundings.fg.fgMod, surroundings.bg.bgMod)),
+            cm.ansiEscape(NonEmptyList.of(cm.fgMod(this.fg), cm.bgMod(this.bg))),
+            cm.ansiEscape(NonEmptyList.of(cm.fgMod(surroundings.fg), cm.bgMod(surroundings.bg))),
           ).some
         case (true, false) =>
           (
-            ansiEscape(NonEmptyList.of(this.fg.fgMod)),
-            ansiEscape(NonEmptyList.of(surroundings.fg.fgMod)),
+            cm.ansiEscape(NonEmptyList.of(cm.fgMod(this.fg))),
+            cm.ansiEscape(NonEmptyList.of(cm.fgMod(surroundings.fg))),
           ).some
         case (false, true) =>
           (
-            ansiEscape(NonEmptyList.of(this.bg.bgMod)),
-            ansiEscape(NonEmptyList.of(surroundings.bg.bgMod)),
+            cm.ansiEscape(NonEmptyList.of(cm.bgMod(this.bg))),
+            cm.ansiEscape(NonEmptyList.of(cm.bgMod(surroundings.bg))),
           ).some
         case (false, false) =>
           None
       }
     }
+
+    // Does a diff, to make sure any coloring is needed
+    def diffWithState(colorState: ColorState, colorMode: ColorMode): Option[(String, ColorState)] =
+      (Option.when(fg != colorState.fg)(fg), Option.when(bg != colorState.bg)(bg)) match {
+        case (Some(fg), Some(bg)) =>
+          (
+            colorMode.ansiEscape(NonEmptyList.of(colorMode.fgMod(fg), colorMode.bgMod(bg))),
+            colorState.copy(fg = fg, bg = bg),
+          ).some
+        case (Some(fg), None) =>
+          (
+            colorMode.ansiEscape(NonEmptyList.of(colorMode.fgMod(fg))),
+            colorState.copy(fg = fg),
+          ).some
+        case (None, Some(bg)) =>
+          (
+            colorMode.ansiEscape(NonEmptyList.of(colorMode.bgMod(bg))),
+            colorState.copy(bg = bg),
+          ).some
+        case (None, None) =>
+          None
+      }
 
   }
   object ColorState {

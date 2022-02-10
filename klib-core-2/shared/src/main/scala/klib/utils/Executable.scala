@@ -97,6 +97,8 @@ object Executable {
   def main(args: Array[String]): Unit = {
     println(KLibConf.parser.disallowExtras.helpString(HelpConfig.default(false)))
 
+    import klib.utils.ColorMode
+    import klib.utils.ColorString.Implicits.*
     import klib.utils.IndentedString.*
 
     println
@@ -105,6 +107,7 @@ object Executable {
         "A\nB\nC",
       ).toString("  "),
     )
+    println("A,B,C".toColorString.red.split(",").csMkString(", ").toString(ColorMode.Show))
   }
 
 }

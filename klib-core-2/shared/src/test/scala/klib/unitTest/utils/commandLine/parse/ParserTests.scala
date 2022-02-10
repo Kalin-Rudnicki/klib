@@ -5,7 +5,6 @@ import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.option.*
 import zio.test.Assertion.*
-import zio.test.AssertionM.Render.*
 import zio.test.{Result as _, *}
 
 import klib.unitTest.SpecUtils.*
