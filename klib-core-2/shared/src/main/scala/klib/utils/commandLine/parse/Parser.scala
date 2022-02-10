@@ -96,6 +96,12 @@ final case class Parser[+T](
       elements = elements,
     )
 
+  def section(label: ColorString, indentBy: Int = 1): Parser[T] =
+    Parser(
+      parseF = parseF,
+      elements = Element.Section(label, elements, indentBy) :: Nil,
+    )
+
   // =====| Build |=====
 
   private def build[Extras](extrasF: List[Arg] => EitherNel[Error, Extras])(implicit
@@ -155,7 +161,7 @@ final case class Parser[+T](
 
         val linePairs: List[Pair[ColorString, String]] =
           Pair.zipPairs(helpConfig)(
-            allElements.map(_.helpStringLinesPair(helpConfig)),
+            allElements.flatMap(_.helpStringLinesPair(helpConfig)),
             duplicateNamesLines :: Nil,
           )
 
