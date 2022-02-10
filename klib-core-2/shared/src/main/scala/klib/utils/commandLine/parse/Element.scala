@@ -28,10 +28,10 @@ object Element {
         List(
           requirementLevel.map(_.toString),
         ).flatten
-      def paramString(params: NonEmptyList[Param], extraIndent: Boolean): String =
+      def paramString(params: NonEmptyList[Param], extraIndent: Boolean): ColorString =
         params.toList
           .map(_.formattedName)
-          .mkString(", ")
+          .csMkString(", ")
 
       if (helpConfig.helpExtra)
         Pair(

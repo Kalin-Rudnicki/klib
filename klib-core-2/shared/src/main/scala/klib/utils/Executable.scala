@@ -88,7 +88,7 @@ object Executable {
     val parser: Parser[KLibConf] = {
       Parser.singleValue[Logger.LogLevel]("log-tolerance").addDescription("Minimum log level").default(Logger.LogLevel.Info) >&>
         Parser.singleValue[String]("flags").many.addDescription("Add flags to logger").default(Nil).map(_.toSet) >&>
-        Parser.singleValue[String]("h-idt-str").withLongParamAliases("fun").addDescription("Indent string for logger").default("    ") >&>
+        Parser.singleValue[String]("idt-str").addDescription("Indent string for logger").default("    ") >&>
         Parser.toggle("clear").addDescription("Clear the screen before execution").default(false)
     }.map(KLibConf.apply)
 
@@ -97,6 +97,7 @@ object Executable {
   // TODO (KR) :
 
   def main(args: Array[String]): Unit = {
+    println(KLibConf.parser.disallowExtras.helpString(HelpConfig.default(false)))
     println(KLibConf.parser.disallowExtras.helpString(HelpConfig.default(true)))
   }
 
