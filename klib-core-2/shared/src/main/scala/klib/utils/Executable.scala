@@ -83,10 +83,12 @@ object Executable {
   )
   object KLibConf {
 
+    // TODO (KR) : Fix this
+
     val parser: Parser[KLibConf] = {
       Parser.singleValue[Logger.LogLevel]("log-tolerance").addDescription("Minimum log level").default(Logger.LogLevel.Info) >&>
         Parser.singleValue[String]("flags").many.addDescription("Add flags to logger").default(Nil).map(_.toSet) >&>
-        Parser.singleValue[String]("h-idt-str").addDescription("Indent string for logger").default("    ") >&>
+        Parser.singleValue[String]("h-idt-str").withLongParamAliases("fun").addDescription("Indent string for logger").default("    ") >&>
         Parser.toggle("clear").addDescription("Clear the screen before execution").default(false)
     }.map(KLibConf.apply)
 
@@ -95,19 +97,7 @@ object Executable {
   // TODO (KR) :
 
   def main(args: Array[String]): Unit = {
-    println(KLibConf.parser.disallowExtras.helpString(HelpConfig.default(false)))
-
-    import klib.utils.ColorMode
-    import klib.utils.ColorString.Implicits.*
-    import klib.utils.IndentedString.*
-
-    println
-    println(
-      indented(
-        "A\nB\nC",
-      ).toString("  "),
-    )
-    println("A,B,C".toColorString.red.split(",").csMkString(", ").toString(ColorMode.Show))
+    println(KLibConf.parser.disallowExtras.helpString(HelpConfig.default(true)))
   }
 
 }

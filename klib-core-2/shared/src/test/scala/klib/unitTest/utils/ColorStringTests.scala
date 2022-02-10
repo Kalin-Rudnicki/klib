@@ -31,6 +31,11 @@ object ColorStringTests extends DefaultKSpec {
   private val miscSpec: TestSpec =
     suite("misc")(
       makeToStringTest(
+        "no color",
+        "NoColor".dflt,
+        "NoColor",
+      ),
+      makeToStringTest(
         "ColorString.Simple",
         Red,
         "[[Red]]Red[[Default]]",

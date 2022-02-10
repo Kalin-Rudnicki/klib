@@ -12,6 +12,7 @@ import cats.syntax.parallel.*
 import zio.Zippable
 
 import klib.fp.typeclass.*
+import klib.utils.{*, given}
 
 final case class BuiltParser[+T](
     parseF: List[Arg] => EitherNel[Error, T],
@@ -124,7 +125,6 @@ final case class Parser[+T](
             typeName = "flag",
             primaryParams = primaryParams,
             aliasParams = Nil,
-            allParams = primaryParams,
             requirementLevel = None,
             description = description :: Nil,
           )
@@ -132,17 +132,34 @@ final case class Parser[+T](
 
         val allElements =
           List(
-            makeHelpElement("help", 'h', "Display help message"),
-            makeHelpElement("help-extra", 'H', "Display help message, with extra details"),
-          ) ::: elements
+            List(
+              Element.Break,
+              makeHelpElement("help", 'h', "Display help message"),
+              makeHelpElement("help-extra", 'H', "Display help message, with extra details"),
+              Element.Break,
+            ),
+            elements,
+            List(
+              Element.Break,
+            ),
+          ).flatten
 
-        val allParamsNames: List[String] = allElements.flatMap(_.allParams.toList.flatMap(_.allParamStrings))
+        val allParamsNames: List[String] = allElements.flatMap(_.allParams.flatMap(_.allParamStrings))
         val paramNamesCount: Map[String, Int] = allParamsNames.groupBy(identity).map { (k, v) => (k, v.size) }
         val duplicateNames: List[String] = paramNamesCount.filter(_._2 > 1).toList.map(_._1)
+        val duplicateNamesLines: List[Pair[LeftLine, String]] =
+          Option
+            .when(duplicateNames.nonEmpty) {
+              List(
+                Pair(LeftLine(""), ""),
+                Pair(LeftLine(""), ""),
+              )
+            }
+            .getOrElse(Nil)
 
-        val linePairs: List[Pair.Same[String]] =
+        val linePairs: List[Pair[ColorString, String]] =
           Pair.zipPairs(helpConfig)(
-            allElements.map(_.helpStringLinesPair(helpConfig, 0)),
+            allElements.map(_.helpStringLinesPair(helpConfig)),
           )
 
         val lines: List[String] =
@@ -274,7 +291,6 @@ object Parser {
           typeName = _typeName,
           primaryParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList),
           aliasParams = _longParamAliases ::: _shortParamAliases,
-          allParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList ::: _longParamAliases ::: _shortParamAliases),
           requirementLevel = requirementLevel.some,
           description = _description,
         )
@@ -387,7 +403,6 @@ object Parser {
           typeName = "Boolean",
           primaryParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList),
           aliasParams = _longParamAliases ::: _shortParamAliases,
-          allParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList ::: _longParamAliases ::: _shortParamAliases),
           requirementLevel = requirementLevel.some,
           description = _description,
         )

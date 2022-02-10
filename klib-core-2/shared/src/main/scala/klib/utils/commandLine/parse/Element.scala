@@ -6,29 +6,24 @@ import cats.data.NonEmptyList
 import cats.syntax.option.*
 import cats.syntax.list.*
 
+import klib.utils.{*, given}
+
 sealed trait Element {
-  def helpStringLinesPair(helpConfig: HelpConfig, indentCount: Int): Pair.Same[List[String]]
-  def allParams: NonEmptyList[Param]
+  def helpStringLinesPair(helpConfig: HelpConfig): Pair[List[LeftLine], List[String]]
+  def allParams: List[Param]
 }
 object Element {
-
-  private def baseIndentString(helpConfig: HelpConfig, indentCount: Int): String =
-    " " * (helpConfig.leftPadding * indentCount)
-
-  private def indentString(helpConfig: HelpConfig): String =
-    " " * helpConfig.leftPadding
 
   final case class ParamElement(
       baseName: String,
       typeName: String,
       primaryParams: NonEmptyList[Param],
       aliasParams: List[Param],
-      allParams: NonEmptyList[Param],
       requirementLevel: Option[RequirementLevel],
       description: List[String],
   ) extends Element {
 
-    override def helpStringLinesPair(helpConfig: HelpConfig, indentCount: Int): Pair.Same[List[String]] = {
+    override def helpStringLinesPair(helpConfig: HelpConfig): Pair[List[LeftLine], List[String]] = {
       def extraDescriptions: List[String] =
         List(
           requirementLevel.map(_.toString),
@@ -36,27 +31,30 @@ object Element {
       def paramString(params: NonEmptyList[Param], extraIndent: Boolean): String =
         params.toList
           .map(_.formattedName)
-          .mkString(
-            baseIndentString(helpConfig, indentCount + (if (extraIndent) 1 else 0)),
-            ", ",
-            "",
-          )
+          .mkString(", ")
 
       if (helpConfig.helpExtra)
-        Pair.Same(
+        Pair(
           List(
-            paramString(primaryParams, false).some,
-            aliasParams.toNel.map(paramString(_, true)),
+            LeftLine(paramString(primaryParams, false)).some,
+            aliasParams.toNel.map(p => LeftLine(paramString(p, true), 1)),
           ).flatten,
           description ::: extraDescriptions,
         )
       else
-        Pair.Same(
-          paramString(primaryParams, false) :: Nil,
+        Pair(
+          LeftLine(paramString(primaryParams, false)) :: Nil,
           description,
         )
     }
 
+    override def allParams: List[Param] = primaryParams.toList ::: aliasParams
+  }
+
+  case object Break extends Element {
+    override def helpStringLinesPair(helpConfig: HelpConfig): Pair[List[LeftLine], List[String]] =
+      Pair(LeftLine("") :: Nil, Nil)
+    override def allParams: List[Param] = Nil
   }
 
 }

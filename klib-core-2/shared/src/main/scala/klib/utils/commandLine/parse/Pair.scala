@@ -2,6 +2,8 @@ package klib.utils.commandLine.parse
 
 import scala.annotation.tailrec
 
+import klib.utils.{*, given}
+
 opaque type Pair[+L, +R] = (L, R)
 extension [L, R](pair: Pair[L, R]) {
   def left: L = pair._1
@@ -11,28 +13,21 @@ object Pair {
 
   def apply[L, R](left: L, right: R): Pair[L, R] = (left, right)
 
-  opaque type Same[+T] = Pair[T, T]
-  object Same {
-
-    def apply[T](left: T, right: T): Pair.Same[T] =
-      Pair(left, right)
-
-  }
-
-  def zipPair(helpConfig: HelpConfig, pair: Pair.Same[List[String]]): List[Pair.Same[String]] = {
+  def zipPair(helpConfig: HelpConfig, pair: Pair[List[LeftLine], List[String]]): List[Pair[ColorString, String]] = {
     @tailrec
     def loop(
-        leftLines: List[String],
+        leftLines: List[LeftLine],
         rightLines: List[String],
-        stack: List[(String, String)],
-    ): List[Pair.Same[String]] =
+        stack: List[Pair[ColorString, String]],
+    ): List[Pair[ColorString, String]] =
       leftLines match {
         case leftHead :: leftTail =>
-          if (leftHead.length > helpConfig.maxParamsWidth)
+          val leftCS = leftHead.toColorString(helpConfig.leftPadding)
+          if (leftCS.length > helpConfig.maxParamsWidth)
             loop(
               leftTail,
               rightLines,
-              (leftHead, "") :: stack,
+              (leftCS, "") :: stack,
             )
           else
             rightLines match {
@@ -40,13 +35,13 @@ object Pair {
                 loop(
                   leftTail,
                   rightTail,
-                  (leftHead, rightHead) :: stack,
+                  (leftCS, rightHead) :: stack,
                 )
               case Nil =>
                 loop(
                   leftTail,
                   rightLines,
-                  (leftHead, "") :: stack,
+                  (leftCS, "") :: stack,
                 )
             }
         case Nil =>
@@ -69,10 +64,10 @@ object Pair {
     )
   }
 
-  def zipPairs(helpConfig: HelpConfig)(pairs: List[Pair.Same[List[String]]]*): List[Pair.Same[String]] =
+  def zipPairs(helpConfig: HelpConfig)(pairs: List[Pair[List[LeftLine], List[String]]]*): List[Pair[ColorString, String]] =
     pairs.toList.flatMap(_.flatMap(zipPair(helpConfig, _)))
 
-  def makeLines(helpConfig: HelpConfig, pairs: List[Pair.Same[String]]): List[String] = {
+  def makeLines(helpConfig: HelpConfig, pairs: List[Pair[ColorString, String]]): List[String] = {
     val maxParamsUsed: Int = pairs.map(_.left.length).maxOption.getOrElse(0).min(helpConfig.maxParamsWidth)
 
     pairs.map { pair =>
