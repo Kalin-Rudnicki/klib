@@ -77,15 +77,12 @@ final case class Parser[+T](
       parseF = { args =>
         val res1 = this.parseF(args)
         val res2 = other.parseF(res1.remainingArgs)
-        Parser.Result(
-          (res1.res, res2.res) match {
-            case (Right(r1), Right(r2))   => zip.zip(r1, r2).asRight
-            case (Left(err1), Right(_))   => err1.asLeft
-            case (Right(_), Left(err2))   => err2.asLeft
-            case (Left(err1), Left(err2)) => (err1 ::: err2).asLeft
-          },
-          res2.remainingArgs,
-        )
+        (res1.res, res2.res) match {
+          case (Right(r1), Right(r2))   => Parser.Result.success(zip.zip(r1, r2), res2.remainingArgs)
+          case (Left(err1), Right(_))   => Parser.Result.failure(err1, res2.remainingArgs)
+          case (Right(_), Left(err2))   => Parser.Result.failure(err2, res2.remainingArgs)
+          case (Left(err1), Left(err2)) => Parser.Result.failure(err1 ::: err2, res2.remainingArgs)
+        }
       },
       elements = this.elements ::: other.elements,
     )
@@ -189,7 +186,7 @@ final case class Parser[+T](
 }
 object Parser {
 
-  final case class Result[+T](
+  final case class Result[+T] private (
       res: EitherNel[Error, T],
       remainingArgs: List[Arg],
   ) {
@@ -199,6 +196,22 @@ object Parser {
 
     def flatMapResult[T2](f: T => EitherNel[Error, T2]): Result[T2] =
       Result(res.flatMap(f), remainingArgs)
+
+  }
+  object Result {
+
+    // =====| Basic Builders |=====
+
+    inline def success[T](t: T, remainingArgs: List[Arg]): Result[T] =
+      Result(t.asRight, remainingArgs)
+
+    inline def failure(errors: NonEmptyList[Error], remainingArgs: List[Arg]): Result[Nothing] =
+      Result(errors.asLeft, remainingArgs)
+    inline def failure(error0: Error, errorN: Error*)(remainingArgs: List[Arg]): Result[Nothing] =
+      failure(NonEmptyList(error0, errorN.toList), remainingArgs)
+
+    inline def fromEither[T](res: EitherNel[Error, T], remainingArgs: List[Arg]): Result[T] =
+      Result(res, remainingArgs)
 
   }
 
@@ -235,10 +248,51 @@ object Parser {
 
   }
 
+  // =====| Builders |=====
+
   def unit: Parser[Unit] =
     Parser(
-      args => Result(().asRight, args),
+      args => Result.success((), args),
       Nil,
+    )
+
+  private def ofParser[T](parsers: NonEmptyList[(String, Parser[T])])(
+      withRes: NonEmptyList[Parser.Result[T]] => Parser.Result[T],
+  ): Parser[T] =
+    Parser(
+      parseF = args => withRes(parsers.map(_._2.parseF(args))),
+      elements = parsers.toList.flatMap { (n, p) => p.section(s"$n:").elements },
+    )
+
+  def firstOf[T](p0: (String, Parser[T]), p1: (String, Parser[T]), pN: (String, Parser[T])*): Parser[T] =
+    ofParser(NonEmptyList(p0, p1 :: pN.toList)) { results =>
+      results.tail.foldLeft(results.head) { (acc, r) =>
+        acc.res match {
+          case Right(_) => acc
+          case Left(accErrors) =>
+            r.res match {
+              case Right(_)      => r
+              case Left(rErrors) =>
+                // TODO (KR) :
+                ???
+            }
+        }
+      }
+    }
+
+  def exclusiveOf[T](p0: (String, Parser[T]), p1: (String, Parser[T]), pN: (String, Parser[T])*): Parser[T] =
+    ofParser(NonEmptyList(p0, p1 :: pN.toList))(???)
+
+  def firstEither[L, R](leftParser: (String, Parser[L]), rightParser: (String, Parser[R])): Parser[Either[L, R]] =
+    firstOf(
+      leftParser._1 -> leftParser._2.map(_.asLeft),
+      rightParser._1 -> rightParser._2.map(_.asRight),
+    )
+
+  def exclusiveEither[L, R](leftParser: (String, Parser[L]), rightParser: (String, Parser[R])): Parser[Either[L, R]] =
+    exclusiveOf(
+      leftParser._1 -> leftParser._2.map(_.asLeft),
+      rightParser._1 -> rightParser._2.map(_.asRight),
     )
 
   object singleValue {
@@ -321,7 +375,7 @@ object Parser {
 
         foundFromAny match {
           case Some(found) =>
-            Result(
+            Result.fromEither(
               res = _decodeFromString.decode(found.arg) match {
                 case Left(error)  => NonEmptyList.one(Error(element.some, Error.Reason.MalformattedValue(found.arg))).asLeft
                 case Right(value) => value.some.asRight
@@ -329,10 +383,7 @@ object Parser {
               remainingArgs = found.remaining,
             )
           case None =>
-            Result(
-              res = None.asRight,
-              remainingArgs = args,
-            )
+            Result.success(None, args)
         }
       }
     }
@@ -443,16 +494,8 @@ object Parser {
         def foundFromAny: Option[Found[Boolean]] = foundFromLongParams orElse foundFromShortParams
 
         foundFromAny match {
-          case Some(found) =>
-            Result(
-              res = found.arg.some.asRight,
-              remainingArgs = found.remaining,
-            )
-          case None =>
-            Result(
-              res = None.asRight,
-              remainingArgs = args,
-            )
+          case Some(found) => Result.success(found.arg.some, found.remaining)
+          case None        => Result.success(None, args)
         }
       }
 

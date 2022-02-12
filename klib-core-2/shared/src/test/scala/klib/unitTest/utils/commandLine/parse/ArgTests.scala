@@ -134,10 +134,24 @@ object ArgTests extends DefaultKSpec {
     )
   }
 
+  private val remainingArgsSpec: TestSpec = {
+    def makeTest(name: String)(r1: Arg*)(r2: Arg*)(exp: Arg*): TestSpec =
+      test(name)(assert(Arg.remainingInBoth(r1.toList, r2.toList))(equalTo(exp.toList)))
+
+    suite("remaining-args")(
+      makeTest("empty")()()(),
+      makeTest("single-1")(Arg.Value("A"))()(Arg.Value("A")),
+      makeTest("single-2")()(Arg.Value("B"))(Arg.Value("B")),
+      makeTest("both-same")(Arg.Value("A"))(Arg.Value("A"))(Arg.Value("A")),
+      makeTest("both-different")(Arg.Value("A"))(Arg.Value("B"))(Arg.Value("A"), Arg.Value("B")),
+    )
+  }
+
   override def spec: TestSpec =
     suite("ArgTests")(
       parseSpec,
       findSpec,
+      remainingArgsSpec,
     )
 
 }

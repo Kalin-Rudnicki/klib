@@ -14,6 +14,7 @@ object Arg {
   //           : { firstName: First, lastName: Last } ()d
 
   // =====| ADT |=====
+
   final case class ShortParamMulti(name: Char) extends Arg
   final case class ShortParamSingle(name: Char) extends Arg
   final case class ShortParamSingleWithValue(name: Char, value: String) extends Arg
@@ -21,7 +22,12 @@ object Arg {
   final case class LongParamWithValue(name: String, value: String) extends Arg
   final case class Value(value: String) extends Arg
 
-  // =====| ... |=====
+  // =====| Remaining Args |=====
+
+  def remainingInBoth(remainingArgs1: List[Arg], remainingArgs2: List[Arg]): List[Arg] =
+    remainingArgs1.diff(remainingArgs2)
+
+  // =====| Parse / Find |=====
 
   private val EscapedRegex: Regex = "^\\[-](.*)$".r
   private val ShortParamMultiRegex: Regex = "^-([A-Za-z]{2,})$".r
