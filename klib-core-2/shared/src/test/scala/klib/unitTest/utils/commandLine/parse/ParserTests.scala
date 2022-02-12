@@ -72,17 +72,37 @@ object ParserTests extends DefaultKSpec {
       makeSuite("required") {
         Parser.singleValue[String]("string").required.disallowExtras
       }(
+        makePassingTest("present")("--string", "VALUE")("VALUE"),
+        makeFailingTest("missing")()(
+          isSubtype[Error.Reason.MissingRequired.type](anything),
+        ),
+        makeFailingTest("missing value")("--string")(
+          isSubtype[Error.Reason.MissingRequired.type](anything),
+          isSubtype[Error.Reason.UnexpectedArg](anything),
+        ),
       )
 
     val defaultSpec: TestSpec =
-      makeSuite("required") {
+      makeSuite("default") {
         Parser.singleValue[String]("string").default("DEFAULT").disallowExtras
-      }()
+      }(
+        makePassingTest("present")("--string", "VALUE")("VALUE"),
+        makePassingTest("missing")()("DEFAULT"),
+        makeFailingTest("missing value")("--string")(
+          isSubtype[Error.Reason.UnexpectedArg](anything),
+        ),
+      )
 
     val optionalSpec: TestSpec =
-      makeSuite("required") {
+      makeSuite("optional") {
         Parser.singleValue[String]("string").optional.disallowExtras
-      }()
+      }(
+        makePassingTest("present")("--string", "VALUE")("VALUE".some),
+        makePassingTest("missing")()(Option.empty[String]),
+        makeFailingTest("missing value")("--string")(
+          isSubtype[Error.Reason.UnexpectedArg](anything),
+        ),
+      )
 
     suite("requirement")(
       requiredSpec,
