@@ -15,7 +15,7 @@ import klib.fp.typeclass.*
 import klib.utils.{*, given}
 
 final case class BuiltParser[+T](
-    parseF: List[Arg] => EitherNel[Error, T],
+    parseF: IndexedArgs => EitherNel[Error, T],
     helpString: HelpConfig => String,
 ) {
 
@@ -23,7 +23,7 @@ final case class BuiltParser[+T](
     parse(argStrings.toList)
 
   def parse(argStrings: List[String]): BuiltParser.Result[T] = {
-    val args: List[Arg] = Arg.parse(argStrings)
+    val args: IndexedArgs = Arg.parse(argStrings)
 
     val helpExtra: Option[Boolean] = {
       import Arg.find.basic.*
@@ -66,7 +66,7 @@ object BuiltParser {
 }
 
 final case class Parser[+T](
-    parseF: List[Arg] => Parser.Result[T],
+    parseF: IndexedArgs => Parser.Result[T],
     elements: List[Element],
 ) {
 
@@ -101,7 +101,7 @@ final case class Parser[+T](
 
   // =====| Build |=====
 
-  private def build[Extras](extrasF: List[Arg] => EitherNel[Error, Extras])(implicit
+  private def build[Extras](extrasF: IndexedArgs => EitherNel[Error, Extras])(implicit
       zip: Zippable[T, Extras],
   ): BuiltParser[zip.Out] =
     BuiltParser(
@@ -181,6 +181,9 @@ final case class Parser[+T](
     }
 
   def extrasAsArgs(implicit zip: Zippable[T, List[Arg]]): BuiltParser[zip.Out] =
+    build(_.map(_.value).asRight)
+
+  def extrasAsIndexedArgs(implicit zip: Zippable[T, List[Indexed[Arg]]]): BuiltParser[zip.Out] =
     build(_.asRight)
 
 }
@@ -188,7 +191,7 @@ object Parser {
 
   final case class Result[+T] private (
       res: EitherNel[Error, T],
-      remainingArgs: List[Arg],
+      remainingArgs: IndexedArgs,
   ) {
 
     def mapResult[T2](f: T => T2): Result[T2] =
@@ -202,15 +205,15 @@ object Parser {
 
     // =====| Basic Builders |=====
 
-    inline def success[T](t: T, remainingArgs: List[Arg]): Result[T] =
+    inline def success[T](t: T, remainingArgs: IndexedArgs): Result[T] =
       Result(t.asRight, remainingArgs)
 
-    inline def failure(errors: NonEmptyList[Error], remainingArgs: List[Arg]): Result[Nothing] =
+    inline def failure(errors: NonEmptyList[Error], remainingArgs: IndexedArgs): Result[Nothing] =
       Result(errors.asLeft, remainingArgs)
-    inline def failure(error0: Error, errorN: Error*)(remainingArgs: List[Arg]): Result[Nothing] =
+    inline def failure(error0: Error, errorN: Error*)(remainingArgs: IndexedArgs): Result[Nothing] =
       failure(NonEmptyList(error0, errorN.toList), remainingArgs)
 
-    inline def fromEither[T](res: EitherNel[Error, T], remainingArgs: List[Arg]): Result[T] =
+    inline def fromEither[T](res: EitherNel[Error, T], remainingArgs: IndexedArgs): Result[T] =
       Result(res, remainingArgs)
 
   }
@@ -218,7 +221,7 @@ object Parser {
   sealed trait GenBuilder[T] {
 
     protected def makeElement(requirementLevel: RequirementLevel): Element
-    protected def optionalParseFunction(args: List[Arg], element: Element): Result[Option[T]]
+    protected def optionalParseFunction(args: IndexedArgs, element: Element): Result[Option[T]]
 
     private final def build[T2](
         requirementLevel: RequirementLevel,
@@ -226,7 +229,7 @@ object Parser {
         mapRes: (Option[T], Element) => EitherNel[Error, T2],
     ): Parser[T2] = {
       val element: Element = makeElement(requirementLevel)
-      val parseFunction: List[Arg] => Result[T2] = optionalParseFunction(_, element).flatMapResult(mapRes(_, element))
+      val parseFunction: IndexedArgs => Result[T2] = optionalParseFunction(_, element).flatMapResult(mapRes(_, element))
 
       Parser(
         parseF = parseFunction,
@@ -352,7 +355,7 @@ object Parser {
           description = _description,
         )
 
-      override protected def optionalParseFunction(args: List[Arg], element: Element): Result[Option[T]] = {
+      override protected def optionalParseFunction(args: IndexedArgs, element: Element): Result[Option[T]] = {
         import Arg.find.*
 
         @tailrec
@@ -461,7 +464,7 @@ object Parser {
           description = _description,
         )
 
-      override protected def optionalParseFunction(args: List[Arg], element: Element): Result[Option[Boolean]] = {
+      override protected def optionalParseFunction(args: IndexedArgs, element: Element): Result[Option[Boolean]] = {
         import Arg.find.*
 
         val allLongParams: List[Param.LongToggle] = _primaryLongParam :: _longParamAliases

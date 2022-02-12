@@ -11,7 +11,7 @@ import klib.utils.commandLine.parse.*
 object ArgTests extends DefaultKSpec {
 
   private val parseSpec: TestSpec = {
-    def makeTest(name: String)(strArgs: String*)(expArgs: Arg*): TestSpec =
+    def makeTest(name: String)(strArgs: String*)(expArgs: Indexed[Arg]*): TestSpec =
       test(name)(assert(Arg.parse(strArgs.toList))(equalTo(expArgs.toList)))
 
     suite("parse")(
@@ -20,38 +20,38 @@ object ArgTests extends DefaultKSpec {
         makeTest("short-param-multi")(
           "-ab",
         )(
-          Arg.ShortParamMulti('a'),
-          Arg.ShortParamMulti('b'),
+          Arg.ShortParamMulti('a', 0).atIndex(0),
+          Arg.ShortParamMulti('b', 1).atIndex(0),
         ),
         makeTest("short-param-single")(
           "-a",
         )(
-          Arg.ShortParamSingle('a'),
+          Arg.ShortParamSingle('a').atIndex(0),
         ),
         makeTest("short-param-single-with-value")(
           "-a=value",
         )(
-          Arg.ShortParamSingleWithValue('a', "value"),
+          Arg.ShortParamSingleWithValue('a', "value").atIndex(0),
         ),
         makeTest("long-param")(
           "--long-param",
         )(
-          Arg.LongParam("long-param"),
+          Arg.LongParam("long-param").atIndex(0),
         ),
         makeTest("long-param-with-value")(
           "--long-param=value",
         )(
-          Arg.LongParamWithValue("long-param", "value"),
+          Arg.LongParamWithValue("long-param", "value").atIndex(0),
         ),
         makeTest("value")(
           "value",
         )(
-          Arg.Value("value"),
+          Arg.Value("value").atIndex(0),
         ),
         makeTest("escaped-value")(
           "[-]--escaped-value",
         )(
-          Arg.Value("--escaped-value"),
+          Arg.Value("--escaped-value").atIndex(0),
         ),
       ),
       suite("complex")(
@@ -68,20 +68,20 @@ object ArgTests extends DefaultKSpec {
       def assertFoundArg[A](arg: A): Assertion[Found[A]] =
         equalTo(arg).imap("foundArg", _.arg)
       def assertFoundBefore(before: Arg*): Assertion[Found[Any]] =
-        equalTo(before.toList).imap("foundBefore", _.before)
+        equalTo(before.toList).imap("foundBefore", _.before.map(_.value))
       def assertFoundAfter(after: Arg*): Assertion[Found[Any]] =
-        equalTo(after.toList).imap("foundAfter", _.after)
+        equalTo(after.toList).imap("foundAfter", _.after.map(_.value))
 
-      def makeTest[A](name: String)(args: Arg*)(findF: List[Arg] => Option[Found[A]])(assertion: Assertion[Found[A]]): TestSpec =
-        test(name)(assert(findF(args.toList))(isSome(assertion)))
+      def makeTest[A](name: String)(args: Arg*)(findF: IndexedArgs => Option[Found[A]])(assertion: Assertion[Found[A]]): TestSpec =
+        test(name)(assert(findF(Indexed.list(args.toList)))(isSome(assertion)))
 
       suite("found")(
         makeTest("short-param-multi")(
           Arg.Value("a"),
-          Arg.ShortParamMulti('b'),
+          Arg.ShortParamMulti('b', 0),
           Arg.Value("c"),
         )(shortParamMulti('b'))(
-          assertFoundArg(Arg.ShortParamMulti('b')) &&
+          assertFoundArg(Arg.ShortParamMulti('b', 0)) &&
             assertFoundBefore(Arg.Value("a")) &&
             assertFoundAfter(Arg.Value("c")),
         ),
@@ -135,15 +135,24 @@ object ArgTests extends DefaultKSpec {
   }
 
   private val remainingArgsSpec: TestSpec = {
-    def makeTest(name: String)(r1: Arg*)(r2: Arg*)(exp: Arg*): TestSpec =
+    def makeTest(name: String)(r1: Indexed[Arg]*)(r2: Indexed[Arg]*)(exp: Indexed[Arg]*): TestSpec =
       test(name)(assert(Arg.remainingInBoth(r1.toList, r2.toList))(equalTo(exp.toList)))
 
     suite("remaining-args")(
       makeTest("empty")()()(),
-      makeTest("single-1")(Arg.Value("A"))()(Arg.Value("A")),
-      makeTest("single-2")()(Arg.Value("B"))(Arg.Value("B")),
-      makeTest("both-same")(Arg.Value("A"))(Arg.Value("A"))(Arg.Value("A")),
-      makeTest("both-different")(Arg.Value("A"))(Arg.Value("B"))(Arg.Value("A"), Arg.Value("B")),
+      makeTest("single-1")(Arg.Value("A").atIndex(0))()(
+        Arg.Value("A").atIndex(0),
+      ),
+      makeTest("single-2")()(Arg.Value("B").atIndex(0))(
+        Arg.Value("B").atIndex(0),
+      ),
+      makeTest("both-same")(Arg.Value("A").atIndex(0))(Arg.Value("A").atIndex(0))(
+        Arg.Value("A").atIndex(0),
+      ),
+      makeTest("both-different")(Arg.Value("A").atIndex(0))(Arg.Value("B").atIndex(1))(
+        Arg.Value("A").atIndex(0),
+        Arg.Value("B").atIndex(1),
+      ),
     )
   }
 

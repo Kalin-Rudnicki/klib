@@ -12,7 +12,7 @@ object Error {
   object Reason {
     case object MissingRequired extends Reason
     final case class MalformattedValue(value: String) extends Reason
-    final case class UnexpectedArg(arg: Arg) extends Reason
+    final case class UnexpectedArg(arg: Indexed[Arg]) extends Reason
   }
 
 }

@@ -5,6 +5,8 @@ import scala.util.matching.Regex
 
 import cats.syntax.option.*
 
+type IndexedArgs = List[Indexed[Arg]]
+
 sealed trait Arg
 object Arg {
 
@@ -15,7 +17,7 @@ object Arg {
 
   // =====| ADT |=====
 
-  final case class ShortParamMulti(name: Char) extends Arg
+  final case class ShortParamMulti(name: Char, subIdx: Int) extends Arg
   final case class ShortParamSingle(name: Char) extends Arg
   final case class ShortParamSingleWithValue(name: Char, value: String) extends Arg
   final case class LongParam(name: String) extends Arg
@@ -24,7 +26,7 @@ object Arg {
 
   // =====| Remaining Args |=====
 
-  def remainingInBoth(remainingArgs1: List[Arg], remainingArgs2: List[Arg]): List[Arg] =
+  def remainingInBoth(remainingArgs1: IndexedArgs, remainingArgs2: IndexedArgs): IndexedArgs =
     remainingArgs1.diff(remainingArgs2)
 
   // =====| Parse / Find |=====
@@ -36,11 +38,11 @@ object Arg {
   private val LongParamRegex: Regex = "^--([A-Za-z][A-Za-z\\d\\-]*)$".r
   private val LongParamWithValueRegex: Regex = "^--([A-Za-z][A-Za-z\\d\\-]*)=(.*)$".r
 
-  def parse(args: List[String]): List[Arg] = {
+  def parse(args: List[String]): IndexedArgs = {
     def parseArg(arg: String): List[Arg] =
       arg match {
         case EscapedRegex(value)                         => Value(value) :: Nil
-        case ShortParamMultiRegex(names)                 => names.toList.distinct.map(ShortParamMulti.apply)
+        case ShortParamMultiRegex(names)                 => names.toList.zipWithIndex.map(ShortParamMulti.apply)
         case ShortParamSingleRegex(name)                 => ShortParamSingle(name.head) :: Nil
         case ShortParamSingleWithValueRegex(name, value) => ShortParamSingleWithValue(name.head, value) :: Nil
         case LongParamRegex(name)                        => LongParam(name) :: Nil
@@ -48,32 +50,27 @@ object Arg {
         case value                                       => Value(value) :: Nil
       }
 
-    args.flatMap(parseArg)
+    Indexed.list(args).flatMap(_.mapToList(parseArg))
   }
 
   object find {
 
     final case class Found[+A](
-        before: List[Arg],
+        before: IndexedArgs,
         arg: A,
-        after: List[Arg],
+        after: IndexedArgs,
     ) {
-
-      def map[A2](f: A => A2): Found[A2] =
-        Found(before, f(arg), after)
-
-      def remaining: List[Arg] =
-        before ::: after
-
+      inline def map[A2](f: A => A2): Found[A2] = Found(before, f(arg), after)
+      inline def remaining: IndexedArgs = before ::: after
     }
 
-    private def findGeneric[A](f: PartialFunction[Arg, A])(args: List[Arg]): Option[Found[A]] = {
-      val liftedF: Arg => Option[A] = f.lift
+    private def findGeneric[A](f: PartialFunction[Arg, A])(args: IndexedArgs): Option[Found[A]] = {
+      val liftedF: Indexed[Arg] => Option[A] = iArg => f.lift(iArg.value)
 
       @tailrec
       def loop(
-          queue: List[Arg],
-          stack: List[Arg],
+          queue: IndexedArgs,
+          stack: IndexedArgs,
       ): Option[Found[A]] =
         queue match {
           case head :: tail =>
@@ -89,38 +86,40 @@ object Arg {
 
     object basic {
 
-      def shortParamMulti(name: Char)(args: List[Arg]): Option[Found[ShortParamMulti]] =
+      def shortParamMulti(name: Char)(args: IndexedArgs): Option[Found[ShortParamMulti]] =
         findGeneric { case p: ShortParamMulti if p.name == name => p }(args)
-      def shortParamSingle(name: Char)(args: List[Arg]): Option[Found[ShortParamSingle]] =
+      def shortParamSingle(name: Char)(args: IndexedArgs): Option[Found[ShortParamSingle]] =
         findGeneric { case p: ShortParamSingle if p.name == name => p }(args)
-      def shortParamSingleWithValue(name: Char)(args: List[Arg]): Option[Found[ShortParamSingleWithValue]] =
+      def shortParamSingleWithValue(name: Char)(args: IndexedArgs): Option[Found[ShortParamSingleWithValue]] =
         findGeneric { case p: ShortParamSingleWithValue if p.name == name => p }(args)
 
-      def longParam(name: String)(args: List[Arg]): Option[Found[LongParam]] =
+      def longParam(name: String)(args: IndexedArgs): Option[Found[LongParam]] =
         findGeneric { case p: LongParam if p.name == name => p }(args)
-      def longParamWithValue(name: String)(args: List[Arg]): Option[Found[LongParamWithValue]] =
+      def longParamWithValue(name: String)(args: IndexedArgs): Option[Found[LongParamWithValue]] =
         findGeneric { case p: LongParamWithValue if p.name == name => p }(args)
 
     }
 
     object combined {
 
-      private def firstArgIsValue(args: List[Arg]): Option[(Arg.Value, List[Arg])] =
+      private def firstArgIsValue(args: IndexedArgs): Option[(Arg.Value, List[Indexed[Arg]])] =
         args match {
-          case (value: Arg.Value) :: remaining => (value, remaining).some
-          case _                               => None
+          case Indexed(value: Arg.Value, _) :: remaining => (value, remaining).some
+          case _                                         => None
         }
-      private def withFirstArgIsValue[A](find: List[Arg] => Option[Found[A]])(args: List[Arg]): Option[Found[(A, Value)]] =
+      private def withFirstArgIsValue[A](
+          find: IndexedArgs => Option[Found[A]],
+      )(args: IndexedArgs): Option[Found[(A, Value)]] =
         for {
           found <- find(args)
           (value, after) <- firstArgIsValue(found.after)
         } yield Found(found.before, (found.arg, value), after)
 
-      def shortParamWithValue(name: Char)(args: List[Arg]): Option[Found[String]] =
+      def shortParamWithValue(name: Char)(args: IndexedArgs): Option[Found[String]] =
         withFirstArgIsValue(basic.shortParamSingle(name))(args).map(_.map(_._2.value)) orElse
           basic.shortParamSingleWithValue(name)(args).map(_.map(_.value))
 
-      def longParamWithValue(name: String)(args: List[Arg]): Option[Found[String]] =
+      def longParamWithValue(name: String)(args: IndexedArgs): Option[Found[String]] =
         withFirstArgIsValue(basic.longParam(name))(args).map(_.map(_._2.value)) orElse
           basic.longParamWithValue(name)(args).map(_.map(_.value))
 
