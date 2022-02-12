@@ -6,6 +6,15 @@ import scala.util.matching.Regex
 import cats.syntax.option.*
 
 type IndexedArgs = List[Indexed[Arg]]
+object IndexedArgs {
+
+  val ordering: Ordering[Indexed[Arg]] =
+    Ordering.by[Indexed[Arg], Int](_.index).orElseBy {
+      case Indexed(Arg.ShortParamMulti(_, i), _) => i
+      case _                                     => 0
+    }
+
+}
 
 sealed trait Arg
 object Arg {
@@ -27,7 +36,7 @@ object Arg {
   // =====| Remaining Args |=====
 
   def remainingInBoth(remainingArgs1: IndexedArgs, remainingArgs2: IndexedArgs): IndexedArgs =
-    remainingArgs1.diff(remainingArgs2)
+    (remainingArgs1 ::: remainingArgs2).distinct.sorted(IndexedArgs.ordering)
 
   // =====| Parse / Find |=====
 

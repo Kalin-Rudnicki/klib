@@ -125,7 +125,7 @@ object ArgTests extends DefaultKSpec {
     }
 
     val notFoundSpec: TestSpec =
-      suite("found")(
+      suite("not-found")(
       )
 
     suite("find")(
@@ -140,18 +140,54 @@ object ArgTests extends DefaultKSpec {
 
     suite("remaining-args")(
       makeTest("empty")()()(),
-      makeTest("single-1")(Arg.Value("A").atIndex(0))()(
+      makeTest("single-1")(
+        Arg.Value("A").atIndex(0),
+      )()(
         Arg.Value("A").atIndex(0),
       ),
-      makeTest("single-2")()(Arg.Value("B").atIndex(0))(
+      makeTest("single-2")()(
+        Arg.Value("B").atIndex(0),
+      )(
         Arg.Value("B").atIndex(0),
       ),
-      makeTest("both-same")(Arg.Value("A").atIndex(0))(Arg.Value("A").atIndex(0))(
+      makeTest("duplicate only shows up once")(
+        Arg.Value("A").atIndex(0),
+      )(
+        Arg.Value("A").atIndex(0),
+      )(
         Arg.Value("A").atIndex(0),
       ),
-      makeTest("both-different")(Arg.Value("A").atIndex(0))(Arg.Value("B").atIndex(1))(
+      makeTest("non-duplicates all show up")(
+        Arg.Value("A").atIndex(0),
+      )(
+        Arg.Value("B").atIndex(1),
+      )(
         Arg.Value("A").atIndex(0),
         Arg.Value("B").atIndex(1),
+      ),
+      makeTest("ordering is correct")(
+        Arg.Value("A1").atIndex(0),
+        Arg.Value("A2").atIndex(2),
+      )(
+        Arg.Value("B1").atIndex(1),
+        Arg.Value("B2").atIndex(3),
+      )(
+        Arg.Value("A1").atIndex(0),
+        Arg.Value("B1").atIndex(1),
+        Arg.Value("A2").atIndex(2),
+        Arg.Value("B2").atIndex(3),
+      ),
+      makeTest("short-arg-multi ordering is correct")(
+        Arg.ShortParamMulti('a', 0).atIndex(0),
+        Arg.ShortParamMulti('c', 2).atIndex(0),
+      )(
+        Arg.ShortParamMulti('b', 1).atIndex(0),
+        Arg.ShortParamMulti('d', 3).atIndex(0),
+      )(
+        Arg.ShortParamMulti('a', 0).atIndex(0),
+        Arg.ShortParamMulti('b', 1).atIndex(0),
+        Arg.ShortParamMulti('c', 2).atIndex(0),
+        Arg.ShortParamMulti('d', 3).atIndex(0),
       ),
     )
   }
