@@ -2,10 +2,18 @@ package klib.utils.commandLine.parse
 
 import cats.data.NonEmptyList
 
+import klib.utils.*
+
 final case class Error(
     element: Option[Element],
     reason: Error.Reason,
-)
+) {
+
+  // TODO (KR) :
+  def toMessage: Message =
+    Message(toString)
+
+}
 object Error {
 
   sealed trait Reason

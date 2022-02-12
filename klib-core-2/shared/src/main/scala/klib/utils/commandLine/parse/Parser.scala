@@ -406,6 +406,46 @@ object Parser {
         _description = Nil,
       )
 
+    def enumPairs[T](
+        baseName: String,
+        values: Seq[(String, T)],
+        primaryLongParamName: Defaultable[String] = Defaultable.Auto,
+        primaryShortParamName: DefaultableOption[Char] = Defaultable.Auto,
+    )(implicit
+        ct: ClassTag[T],
+    ): Builder[T] = {
+      implicit val dfs: DecodeFromString[T] = { str =>
+        val upcaseValues = values.map { (s, t) => (s.toUpperCase, t) }
+        upcaseValues.toMap.get(str.toUpperCase) match {
+          case Some(value) => value.asRight
+          case None        => Message(s"Invalid value ${str.unesc}, valid: ${upcaseValues.map(_._1).mkString(", ")}").asLeft
+        }
+      }
+
+      // TODO (KR) : Description
+      singleValue[T](
+        baseName = baseName,
+        primaryLongParamName = primaryLongParamName,
+        primaryShortParamName = primaryShortParamName,
+      )
+    }
+
+    def enumValues[T](
+        baseName: String,
+        values: Seq[T],
+        nameF: T => List[String] = (t: T) => t.toString :: Nil,
+        primaryLongParamName: Defaultable[String] = Defaultable.Auto,
+        primaryShortParamName: DefaultableOption[Char] = Defaultable.Auto,
+    )(implicit
+        ct: ClassTag[T],
+    ): Builder[T] =
+      enumPairs(
+        baseName = baseName,
+        values = values.flatMap(v => nameF(v).map((_, v))),
+        primaryLongParamName = primaryLongParamName,
+        primaryShortParamName = primaryShortParamName,
+      )
+
   }
 
   object toggle {

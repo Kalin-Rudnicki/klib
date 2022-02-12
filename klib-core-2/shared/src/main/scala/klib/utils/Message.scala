@@ -42,7 +42,7 @@ final case class Message(
 }
 object Message {
 
-  def apply(
+  inline def apply(
       devMessage: String,
       userMessage: Option[String] = None,
       cause: Option[Message] = None,
@@ -54,7 +54,7 @@ object Message {
       cause = cause,
     )
 
-  def same(message: String, cause: Option[Message] = None): Message =
+  inline def same(message: String, cause: Option[Message] = None): Message =
     Message(
       devMessage = message,
       userMessage = message.some,
@@ -69,7 +69,7 @@ object Message {
       cause = Option(throwable.getCause).map(fromThrowable(_, None)),
     )
 
-  def shouldNeverHappen: Message =
+  inline def shouldNeverHappen: Message =
     Message(
       devMessage = "This should never happen...",
       userMessage = None,

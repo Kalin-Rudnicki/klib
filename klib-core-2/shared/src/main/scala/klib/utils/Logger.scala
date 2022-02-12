@@ -505,13 +505,6 @@ object Logger {
           .map(s => (s.toUpperCase, ll))
       }.toMap
 
-    implicit val dfs: DecodeFromString[LogLevel] = { str =>
-      AllMap.get(str.toUpperCase) match {
-        case Some(ll) => ll.asRight
-        case None     => Message(s"No such log-level: ${str.toUpperCase}").asLeft
-      }
-    }
-
     // ---  ---
 
     private[Logger] val MaxDisplayNameLength: Int =
