@@ -13,254 +13,90 @@ import klib.utils.commandLine.parse.*
 
 object ParserTests extends DefaultKSpec {
 
-  private final case class TestCase[P](
+  private def makeSuite[P](name: String)(parser: BuiltParser[P])(children: (BuiltParser[P] ?=> TestSpec)*): TestSpec =
+    suite(name)(children.map(_(using parser))*)
+
+  private def makeTest[P](
       name: String,
       args: List[String],
-      assertion: Assertion[EitherNel[Error, (P, List[Arg])]],
-      shouldPass: Boolean,
-  ) {
+      assertion: => Assertion[BuiltParser.Result[P]],
+  )(implicit parser: BuiltParser[P]): TestSpec =
+    test(name)(assert(parser.parse(args))(assertion))
 
-    def toTest(parser: BuiltParser[(P, List[Arg])]): TestSpec =
-      test(name)(assert(parser.parseF(Arg.parse(args)))(assertion))
-
-  }
-  private object TestCase {
-
-    private def passingAssertion[P](exp: P): Assertion[EitherNel[Error, (P, List[Arg])]] =
-      isRight(equalTo(exp).imap[(P, List[Arg])]("res", _._1))
-
-    private def failingAssertion[P](errorAssertion: Assertion[NonEmptyList[Error]]): Assertion[EitherNel[Error, (P, List[Arg])]] =
-      isLeft(errorAssertion)
-
-    private def remainingAssertion[P](outArgs: List[Arg]): Assertion[EitherNel[Error, (P, List[Arg])]] =
-      isRight(equalTo(outArgs).imap[(P, List[Arg])]("remainingArgs", _._2))
-
-    def passing[P](name: String)(inArgs: String*)(outArgs: Arg*)(exp: P): TestCase[P] =
-      TestCase(
-        name = name,
-        args = inArgs.toList,
-        assertion = passingAssertion[P](exp) && remainingAssertion[P](outArgs.toList),
-        shouldPass = true,
-      )
-
-    def failing[P](name: String)(inArgs: String*)(errors: Assertion[Error]*): TestCase[P] =
-      TestCase(
-        name = name,
-        args = inArgs.toList,
-        assertion = failingAssertion[P](assertNel(assertSeq(errors*))),
-        shouldPass = false,
-      )
-
-  }
-
-  private final case class TestCaseSuite[P](
-      name: String,
-      parser: Parser[P],
-      testCases: List[TestCase[P]],
-  ) {
-    private val builtParser: BuiltParser[(P, List[Arg])] = parser.extrasAsArgs
-
-    def toSuite: TestSpec = {
-      // REMOVE : ...
-      println(builtParser.helpString(HelpConfig.default(true)))
-      println
-
-      val (passes, fails) = testCases.partition(_.shouldPass)
-
-      suite(name)(
-        suite("Passes")(passes.map(_.toTest(builtParser))*),
-        suite("Fails")(fails.map(_.toTest(builtParser))*),
-      )
-    }
-
-  }
-  private object TestCaseSuite {
-
-    def build[P](name: String)(parser: Parser[P])(testCases: TestCase[P]*): TestCaseSuite[P] =
-      TestCaseSuite(name, parser, testCases.toList)
-
-  }
-
-  private def reasonAssertion(assertion: Assertion[Error.Reason]): Assertion[Error] =
-    assertion.imap("reason", _.reason)
-
-  // =====| ... |=====
-
-  private val personSpec1: TestSpec = {
-    final case class Person(
-        firstName: String,
-        lastName: String,
-        age: Int,
+  private def makePassingTest[P: BuiltParser](name: String)(args: String*)(exp: => P): TestSpec =
+    makeTest(
+      name,
+      args.toList,
+      isSubtype[BuiltParser.Result.Success[P]](equalTo(exp).imap("result", _.result)),
     )
 
-    TestCaseSuite
-      .build("person1")(
-        (
-          Parser.singleValue[String]("first-name").required >&>
-            Parser.singleValue[String]("last-name").required >&>
-            Parser.singleValue[Int]("age").required
-        ).map(Person.apply),
-      )(
-        TestCase.failing("empty")()(
-          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
-          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
-          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
-        ),
-        TestCase.failing("missing 2")(
-          "--first-name",
-          "First",
-        )(
-          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
-          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
-        ),
-        TestCase.failing("missing 1")(
-          "--first-name",
-          "First",
-          "--last-name",
-          "Last",
-        )(
-          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
-        ),
-        TestCase.passing("success")(
-          "--first-name",
-          "First",
-          "--last-name",
-          "Last",
-          "--age",
-          "100",
-        )()(Person("First", "Last", 100)),
-        TestCase.passing("success - --arg=VALUE")(
-          "--first-name=First",
-          "--last-name=Last",
-          "--age=100",
-        )()(Person("First", "Last", 100)),
-        TestCase.passing("success + extra")(
-          "--first-name",
-          "First",
-          "--last-name",
-          "Last",
-          "--age",
-          "100",
-          "unrelated-value",
-        )(
-          Arg.Value("unrelated-value"),
-        )(Person("First", "Last", 100)),
-        TestCase.failing("malformatted")(
-          "--first-name",
-          "First",
-          "--last-name",
-          "Last",
-          "--age",
-          "not-an-int",
-        )(
-          reasonAssertion(equalTo(Error.Reason.MalformattedValue("not-an-int"))),
-        ),
-        TestCase.failing("malformatted + missing 1")(
-          "--first-name",
-          "First",
-          "--age",
-          "not-an-int",
-        )(
-          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
-          reasonAssertion(equalTo(Error.Reason.MalformattedValue("not-an-int"))),
-        ),
-      )
-      .toSuite
-  }
-
-  private val personSpec2: TestSpec = {
-    final case class Person(
-        firstName: String,
-        lastName: String,
-        age: Option[Int],
-        isCool: Boolean,
+  private def makeFailingTest[P: BuiltParser](name: String)(args: String*)(assertions: Assertion[Error.Reason]*): TestSpec =
+    makeTest(
+      name,
+      args.toList,
+      isSubtype[BuiltParser.Result.Failure](
+        assertNel(assertSeq(assertions.map(_.imap[Error]("reason", _.reason))*))
+          .imap("errors", _.errors),
+      ),
     )
 
-    TestCaseSuite
-      .build("person2")(
-        (
-          Parser.singleValue[String]("first-name").withDescription("Persons first name").required >&>
-            Parser.singleValue[String]("last-name").withDescription("Persons last name").required >&>
-            Parser.singleValue[Int]("age").withLongParamAliases("a", "b", "c", "d").withDescription("Persons age").optional >&>
-            Parser.toggle("cool", Defaultable.Some("is"), Defaultable.Some("isnt")).default(true)
-        ).map(Person.apply),
-      )(
-        TestCase.failing("empty")()(
-          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
-          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
-        ),
-        TestCase.failing("missing 2")(
-          "--first-name",
-          "First",
-        )(
-          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
-        ),
-        TestCase.passing("success 1")(
-          "--first-name",
-          "First",
-          "--last-name",
-          "Last",
-        )()(Person("First", "Last", None, true)),
-        TestCase.passing("success 2")(
-          "--first-name",
-          "First",
-          "--last-name",
-          "Last",
-          "--age",
-          "100",
-        )()(Person("First", "Last", 100.some, true)),
-        TestCase.passing("success 3")(
-          "--first-name",
-          "First",
-          "--last-name",
-          "Last",
-          "--is-cool",
-        )()(Person("First", "Last", None, true)),
-        TestCase.passing("success 4")(
-          "--first-name",
-          "First",
-          "--last-name",
-          "Last",
-          "--isnt-cool",
-        )()(Person("First", "Last", None, false)),
-        TestCase.passing("success + extra")(
-          "--first-name",
-          "First",
-          "--last-name",
-          "Last",
-          "--age",
-          "100",
-          "unrelated-value",
-        )(
-          Arg.Value("unrelated-value"),
-        )(Person("First", "Last", 100.some, true)),
-        TestCase.failing("malformatted")(
-          "--first-name",
-          "First",
-          "--last-name",
-          "Last",
-          "--age",
-          "not-an-int",
-        )(
-          reasonAssertion(equalTo(Error.Reason.MalformattedValue("not-an-int"))),
-        ),
-        TestCase.failing("malformatted + missing 1")(
-          "--first-name",
-          "First",
-          "--age",
-          "not-an-int",
-        )(
-          reasonAssertion(equalTo(Error.Reason.MissingRequired)),
-          reasonAssertion(equalTo(Error.Reason.MalformattedValue("not-an-int"))),
-        ),
+  private def makeHelpTest[P: BuiltParser](name: String)(args: String*)(isHelpExtra: Boolean): TestSpec =
+    makeTest(
+      name,
+      args.toList,
+      isSubtype[BuiltParser.Result.Help](equalTo(isHelpExtra).imap("isHelpExtra", _.isHelpExtra)),
+    )
+
+  // =====|  |=====
+
+  private val helpSpec: TestSpec =
+    makeSuite("help") {
+      Parser.unit.disallowExtras
+    }(
+      suite("single")(
+        makeHelpTest("--help-extra")("--help-extra")(true),
+        makeHelpTest("-H")("-H")(true),
+        makeHelpTest("--help")("--help")(false),
+        makeHelpTest("-h")("-h")(false),
+      ),
+      suite("multi")(
+        makeHelpTest("--help-extra > --help")("--help-extra", "--help")(true),
+        makeHelpTest("--help-extra > -h")("--help-extra", "-h")(true),
+        makeHelpTest("-H > --help")("-H", "--help")(true),
+        makeHelpTest("-H > -h")("-H", "-h")(true),
+      ),
+    )
+
+  private val requirementSpec: TestSpec = {
+    val requiredSpec: TestSpec =
+      makeSuite("required") {
+        Parser.singleValue[String]("string").required.disallowExtras
+      }(
       )
-      .toSuite
+
+    val defaultSpec: TestSpec =
+      makeSuite("required") {
+        Parser.singleValue[String]("string").default("DEFAULT").disallowExtras
+      }()
+
+    val optionalSpec: TestSpec =
+      makeSuite("required") {
+        Parser.singleValue[String]("string").optional.disallowExtras
+      }()
+
+    suite("requirement")(
+      requiredSpec,
+      defaultSpec,
+      optionalSpec,
+    )
   }
+
+  // =====|  |=====
 
   override def spec: TestSpec =
     suite("ParserTests")(
-      personSpec1,
-      personSpec2,
+      helpSpec,
+      requirementSpec,
     )
 
 }

@@ -13,6 +13,7 @@ object Error {
     case object MissingRequired extends Reason
     final case class MalformattedValue(value: String) extends Reason
     final case class UnexpectedArg(arg: Indexed[Arg]) extends Reason
+    final case class ViolatedExclusiveOr(names: Set[String]) extends Reason
   }
 
 }

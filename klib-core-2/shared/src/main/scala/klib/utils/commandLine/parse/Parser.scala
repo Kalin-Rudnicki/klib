@@ -42,7 +42,7 @@ final case class BuiltParser[+T](
     }
 
     helpExtra.attemptToFind(args).map(_.arg) match {
-      case Some(helpExtra) => BuiltParser.Result.Help(helpString(HelpConfig.default(helpExtra)))
+      case Some(helpExtra) => BuiltParser.Result.Help(helpExtra, helpString(HelpConfig.default(helpExtra)))
       case None =>
         parseF(args) match {
           case Left(errors) => BuiltParser.Result.Failure(errors)
@@ -58,7 +58,7 @@ object BuiltParser {
   object Result {
     final case class Success[+T](result: T) extends Result[T]
     final case class Failure(errors: NonEmptyList[Error]) extends Result[Nothing]
-    final case class Help(helpString: String) extends Result[Nothing] {
+    final case class Help(isHelpExtra: Boolean, helpString: String) extends Result[Nothing] {
       override def toString: String = helpString
     }
   }
@@ -259,38 +259,75 @@ object Parser {
     )
 
   private def ofParser[T](parsers: NonEmptyList[(String, Parser[T])])(
-      withRes: NonEmptyList[Parser.Result[T]] => Parser.Result[T],
+      resF: NonEmptyList[(String, Parser[T])] => IndexedArgs => Parser.Result[T],
   ): Parser[T] =
     Parser(
-      parseF = args => withRes(parsers.map(_._2.parseF(args))),
+      parseF = resF(parsers),
       elements = parsers.toList.flatMap { (n, p) => p.section(s"$n:").elements },
     )
 
   def firstOf[T](p0: (String, Parser[T]), p1: (String, Parser[T]), pN: (String, Parser[T])*): Parser[T] =
-    ofParser(NonEmptyList(p0, p1 :: pN.toList)) { results =>
-      results.tail.foldLeft(results.head) { (acc, r) =>
-        acc.res match {
-          case Right(_) => acc
-          case Left(accErrors) =>
-            r.res match {
-              case Right(_) => r
-              case Left(rErrors) =>
-                Parser.Result.failure(accErrors ::: rErrors, Arg.remainingInBoth(acc.remainingArgs, r.remainingArgs))
-            }
+    ofParser(NonEmptyList(p0, p1 :: pN.toList)) { case NonEmptyList((_, hParser), tail) =>
+      args =>
+        tail.foldLeft(hParser.parseF(args)) { case (acc, (_, tParser)) =>
+          acc.res match {
+            case Right(_) => acc
+            case Left(accErrors) =>
+              val r = tParser.parseF(args)
+              r.res match {
+                case Right(_) => r
+                case Left(rErrors) =>
+                  Parser.Result.failure(accErrors ::: rErrors, Arg.remainingInBoth(acc.remainingArgs, r.remainingArgs))
+              }
+          }
         }
-      }
     }
 
   def exclusiveOf[T](p0: (String, Parser[T]), p1: (String, Parser[T]), pN: (String, Parser[T])*): Parser[T] =
-    ofParser(NonEmptyList(p0, p1 :: pN.toList))(???)
+    ofParser(NonEmptyList(p0, p1 :: pN.toList)) { case NonEmptyList((hName, hParser), tail) =>
+      args =>
+        val hRes = hParser.parseF(args)
+        val (accRes, accNames) =
+          tail.foldLeft((hRes, Option.when(hRes.res.isRight)(hName).toSet)) { case ((acc, names), (tName, tParser)) =>
+            val r = tParser.parseF(args)
+            (
+              Parser.Result.fromEither(
+                acc.res match {
+                  case Right(accRes) => accRes.asRight
+                  case Left(accErrors) =>
+                    r.res match {
+                      case Right(rRes)   => rRes.asRight
+                      case Left(rErrors) => (accErrors ::: rErrors).asLeft
+                    }
+                },
+                Arg.remainingInBoth(acc.remainingArgs, r.remainingArgs),
+              ),
+              names | Option.when(r.res.isRight)(tName).toSet,
+            )
+          }
 
-  def firstEither[L, R](leftParser: (String, Parser[L]), rightParser: (String, Parser[R])): Parser[Either[L, R]] =
+        accRes.flatMapResult { res =>
+          Either.cond(
+            accNames.size == 1,
+            res,
+            NonEmptyList.one(Error(None, Error.Reason.ViolatedExclusiveOr(accNames))),
+          )
+        }
+    }
+
+  def eitherFirstLeft[L, R](leftParser: (String, Parser[L]), rightParser: (String, Parser[R])): Parser[Either[L, R]] =
     firstOf(
       leftParser._1 -> leftParser._2.map(_.asLeft),
       rightParser._1 -> rightParser._2.map(_.asRight),
     )
 
-  def exclusiveEither[L, R](leftParser: (String, Parser[L]), rightParser: (String, Parser[R])): Parser[Either[L, R]] =
+  def eitherFirstRight[L, R](leftParser: (String, Parser[L]), rightParser: (String, Parser[R])): Parser[Either[L, R]] =
+    firstOf(
+      rightParser._1 -> rightParser._2.map(_.asRight),
+      leftParser._1 -> leftParser._2.map(_.asLeft),
+    )
+
+  def eitherExclusive[L, R](leftParser: (String, Parser[L]), rightParser: (String, Parser[R])): Parser[Either[L, R]] =
     exclusiveOf(
       leftParser._1 -> leftParser._2.map(_.asLeft),
       rightParser._1 -> rightParser._2.map(_.asRight),

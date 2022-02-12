@@ -160,17 +160,17 @@ object Arg {
     def find(name: Char): Builder[Char] =
       Builder {
         findGeneric {
-          case p: ShortParamMulti           => (p.name, false).asLeft
-          case p: ShortParamSingle          => (p.name, true).asLeft
-          case p: ShortParamSingleWithValue => (p.name, p.value).asRight
+          case p: ShortParamMulti if p.name == name           => (p.name, false).asLeft
+          case p: ShortParamSingle if p.name == name          => (p.name, true).asLeft
+          case p: ShortParamSingleWithValue if p.name == name => (p.name, p.value).asRight
         }
       }
 
     def find(name: String): Builder[String] =
       Builder {
         findGeneric {
-          case p: LongParam          => (p.name, true).asLeft
-          case p: LongParamWithValue => (p.name, p.value).asRight
+          case p: LongParam if p.name == name          => (p.name, true).asLeft
+          case p: LongParamWithValue if p.name == name => (p.name, p.value).asRight
         }
       }
 
