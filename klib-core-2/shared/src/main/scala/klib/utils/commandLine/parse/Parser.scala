@@ -23,25 +23,25 @@ final case class BuiltParser[+T](
     parse(argStrings.toList)
 
   def parse(argStrings: List[String]): BuiltParser.Result[T] = {
+    import Arg.find.*
+
     val args: IndexedArgs = Arg.parse(argStrings)
 
-    val helpExtra: Option[Boolean] = {
-      import Arg.find.basic.*
+    val helpExtra: Arg.find.FindFunction[Boolean] = {
+      def lp(name: String, value: => Boolean): FindFunction[Boolean] =
+        find(name).constValue(value)
+      def sp(name: Char, value: => Boolean): FindFunction[Boolean] =
+        find(name).constValue(value)
 
-      def lp(name: String, value: Boolean): Option[Boolean] =
-        longParam(name)(args).map(_ => value)
-
-      def sp(name: Char, value: Boolean): Option[Boolean] =
-        shortParamSingle(name)(args).map(_ => value) orElse
-          shortParamMulti(name)(args).map(_ => value)
-
-      lp("help-extra", true) orElse
-        sp('H', true) orElse
-        lp("help", false) orElse
-        sp('h', false)
+      FindFunction.first(
+        lp("help-extra", true),
+        sp('H', true),
+        lp("help", false),
+        sp('h', false),
+      )
     }
 
-    helpExtra match {
+    helpExtra.attemptToFind(args).map(_.arg) match {
       case Some(helpExtra) => BuiltParser.Result.Help(helpString(HelpConfig.default(helpExtra)))
       case None =>
         parseF(args) match {
@@ -111,7 +111,6 @@ final case class Parser[+T](
         (result.res, extras).parMapN(zip.zip)
       },
       helpString = { helpConfig =>
-
         def makeHelpElement(
             longName: String,
             shortName: Char,
@@ -358,25 +357,15 @@ object Parser {
       override protected def optionalParseFunction(args: IndexedArgs, element: Element): Result[Option[T]] = {
         import Arg.find.*
 
-        @tailrec
-        def findLoop[T](queue: List[T])(find: T => Option[Found[String]]): Option[Found[String]] =
-          queue match {
-            case head :: tail =>
-              find(head) match {
-                case some @ Some(_) => some
-                case None           => findLoop(tail)(find)
-              }
-            case Nil =>
-              None
+        val findFunction: FindFunction[String] =
+          FindFunction.first {
+            FindFunction.fromParam(_primaryLongParam) ::
+              _primaryShortParam.map(FindFunction.fromParam(_)).toList :::
+              _longParamAliases.map(FindFunction.fromParam(_)) :::
+              _shortParamAliases.map(FindFunction.fromParam(_))
           }
 
-        def foundFromLongParams: Option[Found[String]] =
-          findLoop(_primaryLongParam :: _longParamAliases)(p => combined.longParamWithValue(p.name)(args))
-        def foundFromShortParams: Option[Found[String]] =
-          findLoop(_primaryShortParam.toList ::: _shortParamAliases)(p => combined.shortParamWithValue(p.name)(args))
-        def foundFromAny: Option[Found[String]] = foundFromLongParams orElse foundFromShortParams
-
-        foundFromAny match {
+        findFunction.attemptToFind(args) match {
           case Some(found) =>
             Result.fromEither(
               res = _decodeFromString.decode(found.arg) match {
@@ -467,36 +456,15 @@ object Parser {
       override protected def optionalParseFunction(args: IndexedArgs, element: Element): Result[Option[Boolean]] = {
         import Arg.find.*
 
-        val allLongParams: List[Param.LongToggle] = _primaryLongParam :: _longParamAliases
-        val allShortParams: List[Param.ShortToggle] = _primaryShortParam.toList ::: _shortParamAliases
-
-        @tailrec
-        def findLoop[T](queue: List[T])(find: T => Option[Found[Boolean]]): Option[Found[Boolean]] =
-          queue match {
-            case head :: tail =>
-              find(head) match {
-                case some @ Some(_) => some
-                case None           => findLoop(tail)(find)
-              }
-            case Nil =>
-              None
+        val findFunction: FindFunction[Boolean] =
+          FindFunction.first {
+            FindFunction.fromParam(_primaryLongParam) ::
+              _primaryShortParam.map(FindFunction.fromParam(_)).toList :::
+              _longParamAliases.map(FindFunction.fromParam(_)) :::
+              _shortParamAliases.map(FindFunction.fromParam(_))
           }
 
-        def foundFromLongParams: Option[Found[Boolean]] =
-          findLoop(_primaryLongParam :: _longParamAliases) { p =>
-            basic.longParam(p.trueName)(args).map(_.map(_ => true)) orElse
-              basic.longParam(p.falseName)(args).map(_.map(_ => false))
-          }
-        def foundFromShortParams: Option[Found[Boolean]] =
-          findLoop(_primaryShortParam.toList ::: _shortParamAliases) { p =>
-            basic.shortParamSingle(p.trueName)(args).map(_.map(_ => true)) orElse
-              basic.shortParamMulti(p.trueName)(args).map(_.map(_ => true)) orElse
-              basic.shortParamSingle(p.falseName)(args).map(_.map(_ => false)) orElse
-              basic.shortParamMulti(p.falseName)(args).map(_.map(_ => false))
-          }
-        def foundFromAny: Option[Found[Boolean]] = foundFromLongParams orElse foundFromShortParams
-
-        foundFromAny match {
+        findFunction.attemptToFind(args) match {
           case Some(found) => Result.success(found.arg.some, found.remaining)
           case None        => Result.success(None, args)
         }

@@ -62,7 +62,6 @@ object ArgTests extends DefaultKSpec {
 
   private val findSpec: TestSpec = {
     import Arg.find.*
-    import Arg.find.basic.*
 
     val foundSpec: TestSpec = {
       def assertFoundArg[A](arg: A): Assertion[Found[A]] =
@@ -72,16 +71,16 @@ object ArgTests extends DefaultKSpec {
       def assertFoundAfter(after: Arg*): Assertion[Found[Any]] =
         equalTo(after.toList).imap("foundAfter", _.after.map(_.value))
 
-      def makeTest[A](name: String)(args: Arg*)(findF: IndexedArgs => Option[Found[A]])(assertion: Assertion[Found[A]]): TestSpec =
-        test(name)(assert(findF(Indexed.list(args.toList)))(isSome(assertion)))
+      def makeTest[A](name: String)(args: Arg*)(findF: FindFunction[A])(assertion: Assertion[Found[A]]): TestSpec =
+        test(name)(assert(findF.attemptToFind(Indexed.list(args.toList)))(isSome(assertion)))
 
       suite("found")(
         makeTest("short-param-multi")(
           Arg.Value("a"),
           Arg.ShortParamMulti('b', 0),
           Arg.Value("c"),
-        )(shortParamMulti('b'))(
-          assertFoundArg(Arg.ShortParamMulti('b', 0)) &&
+        )(find('b').noValues)(
+          assertFoundArg('b') &&
             assertFoundBefore(Arg.Value("a")) &&
             assertFoundAfter(Arg.Value("c")),
         ),
@@ -89,8 +88,8 @@ object ArgTests extends DefaultKSpec {
           Arg.Value("a"),
           Arg.ShortParamSingle('b'),
           Arg.Value("c"),
-        )(shortParamSingle('b'))(
-          assertFoundArg(Arg.ShortParamSingle('b')) &&
+        )(find('b').noValues)(
+          assertFoundArg('b') &&
             assertFoundBefore(Arg.Value("a")) &&
             assertFoundAfter(Arg.Value("c")),
         ),
@@ -98,8 +97,8 @@ object ArgTests extends DefaultKSpec {
           Arg.Value("a"),
           Arg.ShortParamSingleWithValue('b', "value"),
           Arg.Value("c"),
-        )(shortParamSingleWithValue('b'))(
-          assertFoundArg(Arg.ShortParamSingleWithValue('b', "value")) &&
+        )(find('b').singleValueWithName)(
+          assertFoundArg(('b', "value")) &&
             assertFoundBefore(Arg.Value("a")) &&
             assertFoundAfter(Arg.Value("c")),
         ),
@@ -107,8 +106,8 @@ object ArgTests extends DefaultKSpec {
           Arg.Value("a"),
           Arg.LongParam("b"),
           Arg.Value("c"),
-        )(longParam("b"))(
-          assertFoundArg(Arg.LongParam("b")) &&
+        )(find("b").noValues)(
+          assertFoundArg("b") &&
             assertFoundBefore(Arg.Value("a")) &&
             assertFoundAfter(Arg.Value("c")),
         ),
@@ -116,8 +115,8 @@ object ArgTests extends DefaultKSpec {
           Arg.Value("a"),
           Arg.LongParamWithValue("b", "value"),
           Arg.Value("c"),
-        )(longParamWithValue("b"))(
-          assertFoundArg(Arg.LongParamWithValue("b", "value")) &&
+        )(find("b").singleValueWithName)(
+          assertFoundArg(("b", "value")) &&
             assertFoundBefore(Arg.Value("a")) &&
             assertFoundAfter(Arg.Value("c")),
         ),

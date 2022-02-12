@@ -4,6 +4,7 @@ import scala.annotation.tailrec
 import scala.util.matching.Regex
 
 import cats.syntax.option.*
+import cats.syntax.either.*
 
 type IndexedArgs = List[Indexed[Arg]]
 object IndexedArgs {
@@ -73,14 +74,77 @@ object Arg {
       inline def remaining: IndexedArgs = before ::: after
     }
 
-    private def findGeneric[A](f: PartialFunction[Arg, A])(args: IndexedArgs): Option[Found[A]] = {
-      val liftedF: Indexed[Arg] => Option[A] = iArg => f.lift(iArg.value)
+    opaque type FindFunction[+F] = IndexedArgs => Option[Found[F]]
+    extension [F](f: FindFunction[F]) {
+
+      def attemptToFind(args: IndexedArgs): Option[Found[F]] = f(args)
+
+      def map[F2](mapF: F => F2): FindFunction[F2] =
+        f(_).map(_.map(mapF))
+
+      def ||(f2: FindFunction[F]): FindFunction[F] =
+        args => f(args) orElse f2(args)
+
+    }
+    object FindFunction {
+
+      def fromParam(param: Param.LongWithValue): FindFunction[String] =
+        find(param.name).singleValue
+      def fromParam(param: Param.ShortWithValue): FindFunction[String] =
+        find(param.name).singleValue
+      def fromParam(param: Param.LongToggle): FindFunction[Boolean] =
+        find(param.trueName).constValue(true) || find(param.falseName).constValue(false)
+      def fromParam(param: Param.ShortToggle): FindFunction[Boolean] =
+        find(param.trueName).constValue(true) || find(param.falseName).constValue(false)
+
+      def first[F](fs: FindFunction[F]*): FindFunction[F] = first(fs.toList)
+      def first[F](fs: List[FindFunction[F]]): FindFunction[F] =
+        fs.foldRight[FindFunction[F]](_ => None) { (f, acc) => f || acc }
+
+    }
+
+    final case class Builder[+N](private val findF: FindFunction[Either[(N, Boolean), (N, String)]]) {
+
+      def noValues: FindFunction[N] =
+        findF(_).flatMap { case Found(before, found, after) =>
+          found match {
+            case Left((name, _)) => Found(before, name, after).some
+            case Right(_)        => None
+          }
+        }
+
+      inline def constValue[V](v: => V): FindFunction[V] =
+        noValues(_).map(_.map(_ => v))
+
+      def singleValueWithName: FindFunction[(N, String)] =
+        findF(_).flatMap { case Found(before, found, after) =>
+          found match {
+            case Left((name, canHaveValues)) =>
+              if (canHaveValues)
+                after match {
+                  case Indexed(Arg.Value(value), _) :: afterValue => Found(before, (name, value), afterValue).some
+                  case _                                          => None
+                }
+              else None
+            case Right(pair) => Found(before, pair, after).some
+          }
+        }
+
+      inline def singleValue: FindFunction[String] =
+        singleValueWithName(_).map(_.map(_._2))
+
+    }
+
+    // =====|  |=====
+
+    private def findGeneric[N](f: PartialFunction[Arg, N]): FindFunction[N] = {
+      val liftedF: Indexed[Arg] => Option[N] = iArg => f.lift(iArg.value)
 
       @tailrec
       def loop(
           queue: IndexedArgs,
           stack: IndexedArgs,
-      ): Option[Found[A]] =
+      ): Option[Found[N]] =
         queue match {
           case head :: tail =>
             liftedF(head) match {
@@ -90,49 +154,28 @@ object Arg {
           case Nil => None
         }
 
-      loop(args, Nil)
+      loop(_, Nil)
     }
 
-    object basic {
-
-      def shortParamMulti(name: Char)(args: IndexedArgs): Option[Found[ShortParamMulti]] =
-        findGeneric { case p: ShortParamMulti if p.name == name => p }(args)
-      def shortParamSingle(name: Char)(args: IndexedArgs): Option[Found[ShortParamSingle]] =
-        findGeneric { case p: ShortParamSingle if p.name == name => p }(args)
-      def shortParamSingleWithValue(name: Char)(args: IndexedArgs): Option[Found[ShortParamSingleWithValue]] =
-        findGeneric { case p: ShortParamSingleWithValue if p.name == name => p }(args)
-
-      def longParam(name: String)(args: IndexedArgs): Option[Found[LongParam]] =
-        findGeneric { case p: LongParam if p.name == name => p }(args)
-      def longParamWithValue(name: String)(args: IndexedArgs): Option[Found[LongParamWithValue]] =
-        findGeneric { case p: LongParamWithValue if p.name == name => p }(args)
-
-    }
-
-    object combined {
-
-      private def firstArgIsValue(args: IndexedArgs): Option[(Arg.Value, List[Indexed[Arg]])] =
-        args match {
-          case Indexed(value: Arg.Value, _) :: remaining => (value, remaining).some
-          case _                                         => None
+    def find(name: Char): Builder[Char] =
+      Builder {
+        findGeneric {
+          case p: ShortParamMulti           => (p.name, false).asLeft
+          case p: ShortParamSingle          => (p.name, true).asLeft
+          case p: ShortParamSingleWithValue => (p.name, p.value).asRight
         }
-      private def withFirstArgIsValue[A](
-          find: IndexedArgs => Option[Found[A]],
-      )(args: IndexedArgs): Option[Found[(A, Value)]] =
-        for {
-          found <- find(args)
-          (value, after) <- firstArgIsValue(found.after)
-        } yield Found(found.before, (found.arg, value), after)
+      }
 
-      def shortParamWithValue(name: Char)(args: IndexedArgs): Option[Found[String]] =
-        withFirstArgIsValue(basic.shortParamSingle(name))(args).map(_.map(_._2.value)) orElse
-          basic.shortParamSingleWithValue(name)(args).map(_.map(_.value))
+    def find(name: String): Builder[String] =
+      Builder {
+        findGeneric {
+          case p: LongParam          => (p.name, true).asLeft
+          case p: LongParamWithValue => (p.name, p.value).asRight
+        }
+      }
 
-      def longParamWithValue(name: String)(args: IndexedArgs): Option[Found[String]] =
-        withFirstArgIsValue(basic.longParam(name))(args).map(_.map(_._2.value)) orElse
-          basic.longParamWithValue(name)(args).map(_.map(_.value))
-
-    }
+    inline def apply(name: Char): Builder[Char] = find(name)
+    inline def apply(name: String): Builder[String] = find(name)
 
   }
 
