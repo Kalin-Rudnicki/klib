@@ -111,12 +111,38 @@ object ParserTests extends DefaultKSpec {
     )
   }
 
+  private val andSpec: TestSpec =
+    makeSuite("and") {
+      (
+        Parser.singleValue[String]("value-1", primaryShortParamName = Defaultable.None).required >&>
+          Parser.singleValue[String]("value-2", primaryShortParamName = Defaultable.None).required
+      ).disallowExtras
+    }(
+      makePassingTest("both present")("--value-1=VALUE-1", "--value-2", "VALUE-2")(("VALUE-1", "VALUE-2")),
+      makeFailingTest("1 missing (1)")("--value-2", "VALUE-2")(
+        isSubtype[Error.Reason.MissingRequired.type](anything),
+      ),
+      makeFailingTest("1 missing (2)")("--value-1=VALUE-1")(
+        isSubtype[Error.Reason.MissingRequired.type](anything),
+      ),
+      makeFailingTest("2 missing")()(
+        isSubtype[Error.Reason.MissingRequired.type](anything),
+        isSubtype[Error.Reason.MissingRequired.type](anything),
+      ),
+    )
+
+  private val orSpec: TestSpec =
+    suite("or")(
+    )
+
   // =====|  |=====
 
   override def spec: TestSpec =
     suite("ParserTests")(
       helpSpec,
       requirementSpec,
+      andSpec,
+      orSpec,
     )
 
 }
