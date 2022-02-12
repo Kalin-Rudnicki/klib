@@ -273,10 +273,9 @@ object Parser {
           case Right(_) => acc
           case Left(accErrors) =>
             r.res match {
-              case Right(_)      => r
+              case Right(_) => r
               case Left(rErrors) =>
-                // TODO (KR) :
-                ???
+                Parser.Result.failure(accErrors ::: rErrors, Arg.remainingInBoth(acc.remainingArgs, r.remainingArgs))
             }
         }
       }

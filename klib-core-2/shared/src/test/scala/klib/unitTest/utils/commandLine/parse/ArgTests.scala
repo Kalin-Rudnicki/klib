@@ -139,53 +139,52 @@ object ArgTests extends DefaultKSpec {
 
     suite("remaining-args")(
       makeTest("empty")()()(),
-      makeTest("single-1")(
+      makeTest("only in 1")(
         Arg.Value("A").atIndex(0),
-      )()(
-        Arg.Value("A").atIndex(0),
-      ),
-      makeTest("single-2")()(
+      )()(),
+      makeTest("only in 2")()(
         Arg.Value("B").atIndex(0),
-      )(
-        Arg.Value("B").atIndex(0),
-      ),
-      makeTest("duplicate only shows up once")(
+      )(),
+      makeTest("all in both")(
         Arg.Value("A").atIndex(0),
       )(
         Arg.Value("A").atIndex(0),
       )(
         Arg.Value("A").atIndex(0),
       ),
-      makeTest("non-duplicates all show up")(
+      makeTest("some in both")(
         Arg.Value("A").atIndex(0),
-      )(
         Arg.Value("B").atIndex(1),
       )(
-        Arg.Value("A").atIndex(0),
+        Arg.Value("B").atIndex(1),
+        Arg.Value("C").atIndex(2),
+      )(
         Arg.Value("B").atIndex(1),
       ),
       makeTest("ordering is correct")(
-        Arg.Value("A1").atIndex(0),
-        Arg.Value("A2").atIndex(2),
+        Arg.Value("A").atIndex(0),
+        Arg.Value("B").atIndex(1),
+        Arg.Value("D").atIndex(3),
+        Arg.Value("E").atIndex(4),
       )(
-        Arg.Value("B1").atIndex(1),
-        Arg.Value("B2").atIndex(3),
+        Arg.Value("B").atIndex(1),
+        Arg.Value("C").atIndex(2),
+        Arg.Value("D").atIndex(3),
       )(
-        Arg.Value("A1").atIndex(0),
-        Arg.Value("B1").atIndex(1),
-        Arg.Value("A2").atIndex(2),
-        Arg.Value("B2").atIndex(3),
+        Arg.Value("B").atIndex(1),
+        Arg.Value("D").atIndex(3),
       ),
       makeTest("short-arg-multi ordering is correct")(
         Arg.ShortParamMulti('a', 0).atIndex(0),
-        Arg.ShortParamMulti('c', 2).atIndex(0),
-      )(
         Arg.ShortParamMulti('b', 1).atIndex(0),
         Arg.ShortParamMulti('d', 3).atIndex(0),
+        Arg.ShortParamMulti('e', 4).atIndex(0),
       )(
-        Arg.ShortParamMulti('a', 0).atIndex(0),
         Arg.ShortParamMulti('b', 1).atIndex(0),
         Arg.ShortParamMulti('c', 2).atIndex(0),
+        Arg.ShortParamMulti('d', 3).atIndex(0),
+      )(
+        Arg.ShortParamMulti('b', 1).atIndex(0),
         Arg.ShortParamMulti('d', 3).atIndex(0),
       ),
     )

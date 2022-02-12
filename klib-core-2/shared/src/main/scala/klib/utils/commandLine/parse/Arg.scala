@@ -37,7 +37,7 @@ object Arg {
   // =====| Remaining Args |=====
 
   def remainingInBoth(remainingArgs1: IndexedArgs, remainingArgs2: IndexedArgs): IndexedArgs =
-    (remainingArgs1 ::: remainingArgs2).distinct.sorted(IndexedArgs.ordering)
+    (remainingArgs1.toSet & remainingArgs2.toSet).toList.sorted(IndexedArgs.ordering)
 
   // =====| Parse / Find |=====
 
