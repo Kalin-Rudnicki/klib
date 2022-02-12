@@ -39,7 +39,7 @@ object DecodeFromString {
     _.asRight
 
   def fromOptionF[R](name: String, f: String => Option[R]): DecodeFromString[R] =
-    str => f(str).toRight(Message(s"Malformatted $name '$str'"))
+    str => f(str).toRight(Message.same(s"Malformatted $name '$str'"))
 
   implicit val booleanDecodeString: DecodeFromString[Boolean] =
     fromOptionF("boolean", _.toBooleanOption)

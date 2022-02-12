@@ -14,7 +14,7 @@ final case class Message(
     for {
       message <-
         ZIO.service[RunMode].map {
-          case RunMode.Dev  => s"$devMessage [$userMessage]"
+          case RunMode.Dev  => s"$devMessage${userMessage.fold("")(m => s" [$m]")}"
           case RunMode.User => userMessage.getOrElse("Unexpected Error")
         }
       causeEvent <-
@@ -32,24 +32,30 @@ final case class Message(
             ZIO.succeed(Logger.Event.empty)
         }
     } yield Logger.Event(
-      Logger.println.info.event(message),
-      Logger.Event(
-        Message.stackTraceEvent(stackTrace),
-        causeEvent,
-      ),
+      Logger.println.fatal.event(message),
+      Logger
+        .Event(
+          Message.stackTraceEvent(stackTrace),
+          causeEvent,
+        )
+        .indented(1),
     )
 
 }
 object Message {
 
-  inline def apply(
-      devMessage: String,
-      userMessage: Option[String] = None,
-      cause: Option[Message] = None,
-  ): Message =
+  inline def unexpected(devMessage: String, cause: Option[Message] = None): Message =
     Message(
       devMessage = devMessage,
-      userMessage = userMessage,
+      userMessage = None,
+      stackTrace = Thread.currentThread().getStackTrace,
+      cause = cause,
+    )
+
+  inline def withUserMessage(devMessage: String, userMessage: String, cause: Option[Message] = None): Message =
+    Message(
+      devMessage = devMessage,
+      userMessage = userMessage.some,
       stackTrace = Thread.currentThread().getStackTrace,
       cause = cause,
     )
@@ -58,6 +64,7 @@ object Message {
     Message(
       devMessage = message,
       userMessage = message.some,
+      stackTrace = Thread.currentThread().getStackTrace,
       cause = cause,
     )
 
@@ -73,6 +80,7 @@ object Message {
     Message(
       devMessage = "This should never happen...",
       userMessage = None,
+      stackTrace = Thread.currentThread().getStackTrace,
       cause = None,
     )
 

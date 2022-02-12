@@ -17,7 +17,19 @@ object IndexedArgs {
 
 }
 
-sealed trait Arg
+sealed trait Arg {
+
+  override def toString: String =
+    this match {
+      case Arg.ShortParamMulti(name, _)               => s"-$name"
+      case Arg.ShortParamSingle(name)                 => s"-$name"
+      case Arg.ShortParamSingleWithValue(name, value) => s"-$name=$value"
+      case Arg.LongParam(name)                        => s"--$name"
+      case Arg.LongParamWithValue(name, value)        => s"--$name=$value"
+      case Arg.Value(value)                           => if (value.startsWith("-")) s"[-]$value" else value
+    }
+
+}
 object Arg {
 
   // TODO (KR) : Some way to stop this from happening...

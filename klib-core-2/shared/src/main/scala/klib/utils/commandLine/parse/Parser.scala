@@ -219,6 +219,7 @@ object Parser {
 
   sealed trait GenBuilder[T] {
 
+    protected def primaryParamName: ColorString
     protected def makeElement(requirementLevel: RequirementLevel): Element
     protected def optionalParseFunction(args: IndexedArgs, element: Element): Result[Option[T]]
 
@@ -240,7 +241,7 @@ object Parser {
       build[T](RequirementLevel.Required) { (res, element) =>
         res match {
           case Some(value) => value.asRight
-          case None        => NonEmptyList.one(Error(element.some, Error.Reason.MissingRequired)).asLeft
+          case None        => NonEmptyList.one(Error(element.some, Error.Reason.MissingRequired(primaryParamName.toString))).asLeft
         }
       }
     final def default(default: T): Parser[T] =
@@ -351,6 +352,8 @@ object Parser {
 
       // =====| Build |=====
 
+      override protected def primaryParamName: ColorString = _primaryLongParam.formattedName
+
       override protected def makeElement(requirementLevel: RequirementLevel): Element =
         Element.ParamElement(
           baseName = _baseName,
@@ -376,7 +379,7 @@ object Parser {
           case Some(found) =>
             Result.fromEither(
               res = _decodeFromString.decode(found.arg) match {
-                case Left(error)  => NonEmptyList.one(Error(element.some, Error.Reason.MalformattedValue(found.arg))).asLeft
+                case Left(error)  => NonEmptyList.one(Error(element.some, Error.Reason.MalformattedValue(found.arg, error))).asLeft
                 case Right(value) => value.some.asRight
               },
               remainingArgs = found.remaining,
@@ -418,7 +421,7 @@ object Parser {
         val upcaseValues = values.map { (s, t) => (s.toUpperCase, t) }
         upcaseValues.toMap.get(str.toUpperCase) match {
           case Some(value) => value.asRight
-          case None        => Message(s"Invalid value ${str.unesc}, valid: ${upcaseValues.map(_._1).mkString(", ")}").asLeft
+          case None        => Message.same(s"Invalid value ${str.unesc}, valid: ${upcaseValues.map(_._1).mkString(", ")}").asLeft
         }
       }
 
@@ -489,6 +492,8 @@ object Parser {
         this.copy(_description = _description ::: description.toList)
 
       // =====| Build |=====
+
+      override protected def primaryParamName: ColorString = _primaryLongParam.formattedName
 
       override protected def makeElement(requirementLevel: RequirementLevel): Element =
         Element.ParamElement(

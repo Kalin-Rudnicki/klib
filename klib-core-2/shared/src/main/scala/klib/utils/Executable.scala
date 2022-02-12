@@ -12,7 +12,24 @@ import klib.utils.commandLine.parse.*
 
 trait ExecutableApp extends ZIOAppDefault {
 
-  override def run: ZIO[Environment with ZEnv with ZIOAppArgs, Any, Any] = {
+  override def run: ZIO[Environment with ZEnv with ZIOAppArgs, Any, Any] =
+    for {
+      zioAppArgs <- ZIO.service[ZIOAppArgs]
+      exitCode <- executable.execute(zioAppArgs.getArgs.toList)
+      _ <- exit(exitCode)
+    } yield ()
+
+  val executable: Executable
+
+}
+
+opaque type Executable = (List[String], List[String]) => ZIO[Executable.Env & ZEnv, NonEmptyList[Message], Unit]
+extension (executable: Executable) {
+
+  def execute(subCommands: List[String], programArgs: List[String]): ZIO[Executable.Env & ZEnv, NonEmptyList[Message], Unit] =
+    executable(subCommands, programArgs)
+
+  def execute(args: List[String]): URIO[ZEnv, ExitCode] = {
     def defaultLayer: ULayer[Executable.Env] =
       FileSystem.live.orDie ++
         Logger.live(Logger.LogLevel.Info) ++
@@ -58,22 +75,11 @@ trait ExecutableApp extends ZIOAppDefault {
       }
     }
 
-    for {
-      zioAppArgs <- ZIO.service[ZIOAppArgs]
-      splitArgs = Executable.SplitArgs.fromArgs(zioAppArgs.getArgs.toList)
-      (layer, other) = parseConf(splitArgs.configArgs)
-      exitCode <- runProgram(splitArgs.subCommands, splitArgs.programArgs, other).provideSomeLayer(layer)
-    } yield ()
+    val splitArgs = Executable.SplitArgs.fromArgs(args)
+    val (layer, other) = parseConf(splitArgs.configArgs)
+    runProgram(splitArgs.subCommands, splitArgs.programArgs, other).provideSomeLayer(layer)
   }
 
-  val executable: Executable
-
-}
-
-opaque type Executable = (List[String], List[String]) => ZIO[Executable.Env & ZEnv, NonEmptyList[Message], Unit]
-extension (executable: Executable) {
-  def execute(subCommands: List[String], programArgs: List[String]): ZIO[Executable.Env & ZEnv, NonEmptyList[Message], Unit] =
-    executable(subCommands, programArgs)
 }
 object Executable {
 

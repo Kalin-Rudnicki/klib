@@ -74,10 +74,10 @@ object ParserTests extends DefaultKSpec {
       }(
         makePassingTest("present")("--string", "VALUE")("VALUE"),
         makeFailingTest("missing")()(
-          isSubtype[Error.Reason.MissingRequired.type](anything),
+          isSubtype[Error.Reason.MissingRequired](anything),
         ),
         makeFailingTest("missing value")("--string")(
-          isSubtype[Error.Reason.MissingRequired.type](anything),
+          isSubtype[Error.Reason.MissingRequired](anything),
           isSubtype[Error.Reason.UnexpectedArg](anything),
         ),
       )
@@ -120,14 +120,14 @@ object ParserTests extends DefaultKSpec {
     }(
       makePassingTest("both present")("--value-1=VALUE-1", "--value-2", "VALUE-2")(("VALUE-1", "VALUE-2")),
       makeFailingTest("1 missing (1)")("--value-2", "VALUE-2")(
-        isSubtype[Error.Reason.MissingRequired.type](anything),
+        isSubtype[Error.Reason.MissingRequired](anything),
       ),
       makeFailingTest("1 missing (2)")("--value-1=VALUE-1")(
-        isSubtype[Error.Reason.MissingRequired.type](anything),
+        isSubtype[Error.Reason.MissingRequired](anything),
       ),
       makeFailingTest("2 missing")()(
-        isSubtype[Error.Reason.MissingRequired.type](anything),
-        isSubtype[Error.Reason.MissingRequired.type](anything),
+        isSubtype[Error.Reason.MissingRequired](anything),
+        isSubtype[Error.Reason.MissingRequired](anything),
       ),
     )
 
@@ -146,8 +146,8 @@ object ParserTests extends DefaultKSpec {
       makePassingTest("left")("--int=1")(1.asLeft),
       makePassingTest("right")("--double=2")(2d.asRight),
       makeFailingTest("neither")()(
-        isSubtype[Error.Reason.MissingRequired.type](anything),
-        isSubtype[Error.Reason.MissingRequired.type](anything),
+        isSubtype[Error.Reason.MissingRequired](anything),
+        isSubtype[Error.Reason.MissingRequired](anything),
       ),
     )
 
