@@ -132,7 +132,23 @@ object ParserTests extends DefaultKSpec {
     )
 
   private val orSpec: TestSpec =
-    suite("or")(
+    makeSuite("or") {
+      Parser
+        .eitherExclusive(
+          "int" -> Parser.singleValue[Int]("int").required,
+          "double" -> Parser.singleValue[Double]("double").required,
+        )
+        .disallowExtras
+    }(
+      makeFailingTest("both")("--int=1", "--double=2")(
+        isSubtype[Error.Reason.ViolatedExclusiveOr](anything),
+      ),
+      makePassingTest("left")("--int=1")(1.asLeft),
+      makePassingTest("right")("--double=2")(2d.asRight),
+      makeFailingTest("neither")()(
+        isSubtype[Error.Reason.MissingRequired.type](anything),
+        isSubtype[Error.Reason.MissingRequired.type](anything),
+      ),
     )
 
   // =====|  |=====
