@@ -8,6 +8,11 @@ import cats.syntax.list.*
 import cats.syntax.option.*
 import zio.*
 
+type TaskM[A] = ZIO[Any, Message, A]
+type TaskMNel[A] = ZIO[Any, NonEmptyList[Message], A]
+type RIOM[R, A] = ZIO[R, Message, A]
+type RIOMNel[R, A] = ZIO[R, NonEmptyList[Message], A]
+
 extension (zio: ZIO.type) {
 
   def traverse[R, E, A, B](nel: NonEmptyList[A])(f: A => ZIO[R, E, B]): ZIO[R, NonEmptyList[E], NonEmptyList[B]] =
@@ -49,19 +54,20 @@ extension (zio: ZIO.type) {
           case Left(error)  => loopErrors(nec.tail.toList, NonEmptyList.one(error))
         }
       }
+  def traverseNEL[R, E, A, B](nel: NonEmptyList[A])(f: A => ZIO[R, NonEmptyList[E], B]): ZIO[R, NonEmptyList[E], NonEmptyList[B]] =
+    traverse(nel)(f).mapError(_.flatMap(identity))
 
   def traverse[R, E, A, B](list: List[A])(f: A => ZIO[R, E, B]): ZIO[R, NonEmptyList[E], List[B]] =
     list.toNel match {
       case Some(nel) => traverse(nel)(f).map(_.toList)
       case None      => ZIO.succeed(Nil)
     }
+  def traverseNEL[R, E, A, B](list: List[A])(f: A => ZIO[R, NonEmptyList[E], B]): ZIO[R, NonEmptyList[E], List[B]] =
+    traverse(list)(f).mapError(_.flatMap(identity))
 
 }
 
 extension [R, A](zio: ZIO[R, Throwable, A]) {
-
-  def messageError(userMessage: String): ZIO[R, Message, A] =
-    zio.mapError(Message.fromThrowable(_, userMessage.some))
 
   def messageError: ZIO[R, Message, A] =
     zio.mapError(Message.fromThrowable(_))

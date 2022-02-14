@@ -84,6 +84,8 @@ object Message {
       cause = None,
     )
 
+  inline def ??? : Message = unexpected("Unimplemented")
+
   // TODO (KR) : Improve?
   private def stackTraceEvent(stackTrace: Array[StackTraceElement]): Logger.Event =
     Logger.println.event.all(stackTrace.toList).requireLogLevel(Logger.LogLevel.Debug)
