@@ -70,11 +70,11 @@ lazy val `klib-core` =
           ).map(_ % Test),
     )
 
-lazy val `klib-core-2` =
+lazy val klib =
   crossProject(JSPlatform, JVMPlatform)
-    .in(file("klib-core-2"))
+    .in(file("klib"))
     .settings(
-      name := "klib-core-2",
+      name := "klib",
       Compile / unmanagedSourceDirectories +=
         baseDirectory.value / "shared" / "main" / "scala",
       scalaVersion := Scala_3,
@@ -108,6 +108,6 @@ lazy val `klib-root` =
     .aggregate(
       `klib-core`.js,
       `klib-core`.jvm,
-      `klib-core-2`.js,
-      `klib-core-2`.jvm,
+      klib.js,
+      klib.jvm,
     )
