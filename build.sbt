@@ -75,8 +75,11 @@ lazy val klib =
     .in(file("klib"))
     .settings(
       name := "klib",
+      version := "1.0.1",
       Compile / unmanagedSourceDirectories +=
         baseDirectory.value / "shared" / "main" / "scala",
+      Test / unmanagedSourceDirectories +=
+        baseDirectory.value / "shared" / "test" / "scala",
       scalaVersion := Scala_3,
       // TODO (KR) : Cross Version?
       sonatypeCredentialHost := "s01.oss.sonatype.org",
