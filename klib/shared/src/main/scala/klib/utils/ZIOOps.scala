@@ -79,3 +79,17 @@ extension [R, E, A](zio: ZIO[R, E, A]) {
     zio.mapError(NonEmptyList.one)
 
 }
+
+extension [R, A](zlayer: ZLayer[R, Throwable, A]) {
+
+  def messageError: ZLayer[R, Message, A] =
+    zlayer.mapError(Message.fromThrowable(_))
+
+}
+
+extension [R, E, A](zlayer: ZLayer[R, E, A]) {
+
+  def nelError: ZLayer[R, NonEmptyList[E], A] =
+    zlayer.mapError(NonEmptyList.one)
+
+}
