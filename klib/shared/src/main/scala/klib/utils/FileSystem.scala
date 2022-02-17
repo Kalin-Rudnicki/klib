@@ -17,10 +17,10 @@ object FileSystem {
     new FileSystem {
 
       override def createFileObject(path: String): TaskM[File] =
-        ZIO.attemptM(new File(fs.getPath(path)))
+        ZIO.attemptM(File.fromNIOPath(fs.getPath(path)))
 
       override def roots: TaskM[Array[File]] =
-        ZIO.attemptM(fs.getRootDirectories.asScala.toArray.map(File(_)))
+        ZIO.attemptM(fs.getRootDirectories.asScala.toArray.map(File.fromNIOPath))
 
     }
 
