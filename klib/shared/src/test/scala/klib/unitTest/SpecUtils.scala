@@ -13,7 +13,7 @@ object SpecUtils {
 
   type TestEnv = Logger with FileSystem with RunMode
 
-  val testLayers: Layer[Throwable, TestEnv] =
+  val testLayers: Layer[Message, TestEnv] =
     FileSystem.live ++
       Logger.live(Logger.LogLevel.Debug) ++
       ZLayer.succeed(RunMode.Dev)
@@ -36,7 +36,8 @@ object SpecUtils {
 
   abstract class DefaultKSpec extends KSpec[TestEnv] {
 
-    override protected final def layers: ZLayer[TestEnvironment, Nothing, TestEnv] = testLayers.orDie
+    override protected final def layers: ZLayer[TestEnvironment, Nothing, TestEnv] =
+      testLayers.mapError(_ => new RuntimeException).orDie // TODO (KR) : ...
 
   }
 

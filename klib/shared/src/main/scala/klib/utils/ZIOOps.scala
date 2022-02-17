@@ -65,6 +65,9 @@ extension (zio: ZIO.type) {
   def traverseNEL[R, E, A, B](list: List[A])(f: A => ZIO[R, NonEmptyList[E], B]): ZIO[R, NonEmptyList[E], List[B]] =
     traverse(list)(f).mapError(_.flatMap(identity))
 
+  def attemptM[A](effect: => A): TaskM[A] =
+    ZIO.attempt(effect).messageError
+
 }
 
 extension [R, A](zio: ZIO[R, Throwable, A]) {

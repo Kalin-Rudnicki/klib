@@ -31,12 +31,12 @@ extension (executable: Executable) {
 
   def execute(args: List[String]): URIO[ZEnv, ExitCode] = {
     def defaultLayer: ULayer[Executable.Env] =
-      FileSystem.live.orDie ++
+      FileSystem.live.mapError(_ => new RuntimeException).orDie ++ // TODO (KR) : ...
         Logger.live(Logger.LogLevel.Info) ++
         ZLayer.succeed(RunMode.User)
 
     def configToLayer(conf: Executable.KLibConf): ULayer[Executable.Env] =
-      FileSystem.live.orDie ++
+      FileSystem.live.mapError(_ => new RuntimeException).orDie ++ // TODO (KR) : ...
         Logger.live(conf.logTolerance, defaultIndent = conf.idtStr, flags = conf.flags) ++
         ZLayer.succeed(conf.runMode)
 

@@ -356,11 +356,12 @@ object Logger {
       }
 
       for {
-        _ <- file.createIfDNE.orDie
+        _ <- file.createIfDNE.orDieWith(_ => new RuntimeException) // TODO (KR) : ...
         queuedBreak <- Ref.make(initialQueuedBreak)
       } yield new Source(file.toString, logTolerance, queuedBreak) {
         override type Src = BufferedWriterOps
-        override protected val acquire: UIO[Src] = file.bufferedWriter(StandardOpenOption.APPEND).map(BufferedWriterOps(_)).orDie
+        override protected val acquire: UIO[Src] =
+          file.bufferedWriter(StandardOpenOption.APPEND).map(BufferedWriterOps(_)).orDieWith(_ => new RuntimeException) // TODO (KR) : ...
         override protected def release(src: Src): UIO[Unit] = ZIO.attempt(src.bw.close()).orDie
       }
     }

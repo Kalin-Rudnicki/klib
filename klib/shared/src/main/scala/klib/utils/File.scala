@@ -19,96 +19,96 @@ import zio.*
 
 final class File(val path: Path) {
 
-  def createFile(fileAttributes: FileAttribute[_]*): Task[Unit] =
-    ZIO.attempt(Files.createFile(this.path, fileAttributes*))
-  def createDirectory(fileAttributes: FileAttribute[_]*): Task[Unit] =
-    ZIO.attempt(Files.createDirectory(this.path, fileAttributes*))
-  def createDirectories(fileAttributes: FileAttribute[_]*): Task[Unit] =
-    ZIO.attempt(Files.createDirectories(this.path, fileAttributes*))
+  def createFile(fileAttributes: FileAttribute[_]*): TaskM[Unit] =
+    ZIO.attemptM(Files.createFile(this.path, fileAttributes*))
+  def createDirectory(fileAttributes: FileAttribute[_]*): TaskM[Unit] =
+    ZIO.attemptM(Files.createDirectory(this.path, fileAttributes*))
+  def createDirectories(fileAttributes: FileAttribute[_]*): TaskM[Unit] =
+    ZIO.attemptM(Files.createDirectories(this.path, fileAttributes*))
 
-  def createSymbolicLink(target: File, fileAttributes: FileAttribute[_]*): Task[Unit] =
-    ZIO.attempt(Files.createSymbolicLink(this.path, target.path, fileAttributes*))
-  def createLink(existing: File): Task[Unit] =
-    ZIO.attempt(Files.createLink(this.path, existing.path))
+  def createSymbolicLink(target: File, fileAttributes: FileAttribute[_]*): TaskM[Unit] =
+    ZIO.attemptM(Files.createSymbolicLink(this.path, target.path, fileAttributes*))
+  def createLink(existing: File): TaskM[Unit] =
+    ZIO.attemptM(Files.createLink(this.path, existing.path))
 
-  def delete: Task[Boolean] =
-    ZIO.attempt(Files.deleteIfExists(this.path))
+  def delete: TaskM[Boolean] =
+    ZIO.attemptM(Files.deleteIfExists(this.path))
 
-  def copyTo(target: File, copyOptions: CopyOption*): Task[Unit] =
-    ZIO.attempt(Files.copy(this.path, target.path, copyOptions*))
-  def moveTo(target: File, copyOptions: CopyOption*): Task[Unit] =
-    ZIO.attempt(Files.move(this.path, target.path, copyOptions*))
+  def copyTo(target: File, copyOptions: CopyOption*): TaskM[Unit] =
+    ZIO.attemptM(Files.copy(this.path, target.path, copyOptions*))
+  def moveTo(target: File, copyOptions: CopyOption*): TaskM[Unit] =
+    ZIO.attemptM(Files.move(this.path, target.path, copyOptions*))
 
-  def exists: Task[Boolean] =
-    ZIO.attempt(Files.exists(this.path))
-  def isFile: Task[Boolean] =
-    ZIO.attempt(Files.isRegularFile(this.path))
-  def isDirectory: Task[Boolean] =
-    ZIO.attempt(Files.isDirectory(this.path))
-  def isSymbolicLink: Task[Boolean] =
-    ZIO.attempt(Files.isSymbolicLink(this.path))
+  def exists: TaskM[Boolean] =
+    ZIO.attemptM(Files.exists(this.path))
+  def isFile: TaskM[Boolean] =
+    ZIO.attemptM(Files.isRegularFile(this.path))
+  def isDirectory: TaskM[Boolean] =
+    ZIO.attemptM(Files.isDirectory(this.path))
+  def isSymbolicLink: TaskM[Boolean] =
+    ZIO.attemptM(Files.isSymbolicLink(this.path))
 
-  def outputStream(openOptions: OpenOption*): Task[OutputStream] =
-    ZIO.attempt(Files.newOutputStream(this.path, openOptions*))
-  def inputStream(openOptions: OpenOption*): Task[InputStream] =
-    ZIO.attempt(Files.newInputStream(this.path, openOptions*))
-  def bufferedWriter(openOptions: OpenOption*): Task[BufferedWriter] =
-    ZIO.attempt(Files.newBufferedWriter(this.path, openOptions*))
-  def bufferedReader: Task[BufferedReader] =
-    ZIO.attempt(Files.newBufferedReader(this.path))
+  def outputStream(openOptions: OpenOption*): TaskM[OutputStream] =
+    ZIO.attemptM(Files.newOutputStream(this.path, openOptions*))
+  def inputStream(openOptions: OpenOption*): TaskM[InputStream] =
+    ZIO.attemptM(Files.newInputStream(this.path, openOptions*))
+  def bufferedWriter(openOptions: OpenOption*): TaskM[BufferedWriter] =
+    ZIO.attemptM(Files.newBufferedWriter(this.path, openOptions*))
+  def bufferedReader: TaskM[BufferedReader] =
+    ZIO.attemptM(Files.newBufferedReader(this.path))
 
-  def getLastModifiedTime: Task[Long] =
-    ZIO.attempt(Files.getLastModifiedTime(this.path)).map(_.toMillis)
-  def setLastModifiedTime(millis: Long): Task[Unit] =
-    ZIO.attempt(Files.setLastModifiedTime(this.path, FileTime.fromMillis(millis)))
+  def getLastModifiedTime: TaskM[Long] =
+    ZIO.attemptM(Files.getLastModifiedTime(this.path)).map(_.toMillis)
+  def setLastModifiedTime(millis: Long): TaskM[Unit] =
+    ZIO.attemptM(Files.setLastModifiedTime(this.path, FileTime.fromMillis(millis)))
 
-  def size: Task[Long] =
-    ZIO.attempt(Files.size(this.path))
+  def size: TaskM[Long] =
+    ZIO.attemptM(Files.size(this.path))
 
-  def children: Task[Array[File]] =
-    ZIO.attempt(Files.list(this.path)).map(_.iterator().asScala.toArray.map(File(_)))
-  def walk[R, E >: Throwable, A: ClassTag](withFile: File => ZIO[R, E, A]): ZIO[R, E, Array[A]] =
+  def children: TaskM[Array[File]] =
+    ZIO.attemptM(Files.list(this.path)).map(_.iterator().asScala.toArray.map(File(_)))
+  def walk[R, A: ClassTag](withFile: File => ZIO[R, Message, A]): ZIO[R, Message, Array[A]] =
     for {
-      stream <- ZIO.attempt(Files.walk(this.path))
+      stream <- ZIO.attemptM(Files.walk(this.path))
       as <- ZIO.foreach(stream.iterator().asScala.map(File(_)).toArray)(withFile)
     } yield as
 
   // =====|  |=====
 
-  private def bracket[R, E >: Throwable, C <: AutoCloseable, A](
-      acquire: => Task[C],
-      use: C => ZIO[R, E, A],
-  ): ZIO[R, E, A] =
+  private def bracket[R, C <: AutoCloseable, A](
+      acquire: => TaskM[C],
+      use: C => ZIO[R, Message, A],
+  ): ZIO[R, Message, A] =
     ZIO
-      .acquireReleaseWith[R, E, C](acquire)
-      .apply(s => ZIO.attempt(s.close()).orDie)
+      .acquireReleaseWith[R, Message, C](acquire)
+      .apply(s => ZIO.attemptM(s.close()).orDieWith(_ => new RuntimeException)) // TODO (KR) : ...
       .apply(use)
-  def withOutputStream[R, E >: Throwable, A](use: OutputStream => ZIO[R, E, A]): ZIO[R, E, A] =
+  def withOutputStream[R, A](use: OutputStream => ZIO[R, Message, A]): ZIO[R, Message, A] =
     bracket(outputStream(), use)
-  def withInputStream[R, E >: Throwable, A](use: InputStream => ZIO[R, E, A]): ZIO[R, E, A] =
+  def withInputStream[R, A](use: InputStream => ZIO[R, Message, A]): ZIO[R, Message, A] =
     bracket(inputStream(), use)
-  def withBufferedWriter[R, E >: Throwable, A](use: BufferedWriter => ZIO[R, E, A]): ZIO[R, E, A] =
+  def withBufferedWriter[R, A](use: BufferedWriter => ZIO[R, Message, A]): ZIO[R, Message, A] =
     bracket(bufferedWriter(), use)
-  def withBufferedReader[R, E >: Throwable, A](use: BufferedReader => ZIO[R, E, A]): ZIO[R, E, A] =
+  def withBufferedReader[R, A](use: BufferedReader => ZIO[R, Message, A]): ZIO[R, Message, A] =
     bracket(bufferedReader, use)
 
-  def writeBytes(bytes: Array[Byte]): Task[Unit] =
-    withOutputStream(s => ZIO.attempt(s.write(bytes)))
-  def writeString(string: String): Task[Unit] =
-    withOutputStream(s => ZIO.attempt(s.write(string.getBytes)))
+  def writeBytes(bytes: Array[Byte]): TaskM[Unit] =
+    withOutputStream(s => ZIO.attemptM(s.write(bytes)))
+  def writeString(string: String): TaskM[Unit] =
+    withOutputStream(s => ZIO.attemptM(s.write(string.getBytes)))
 
-  def readBytes: Task[Array[Byte]] =
-    withInputStream(s => ZIO.attempt(s.readAllBytes()))
-  def readString: Task[String] =
-    withInputStream(s => ZIO.attempt(new String(s.readAllBytes())))
+  def readBytes: TaskM[Array[Byte]] =
+    withInputStream(s => ZIO.attemptM(s.readAllBytes()))
+  def readString: TaskM[String] =
+    withInputStream(s => ZIO.attemptM(new String(s.readAllBytes())))
 
-  def ensureExists: Task[Unit] =
+  def ensureExists: TaskM[Unit] =
     exists.flatMap {
       case true  => ZIO.unit
-      case false => ZIO.fail(new RuntimeException(s"File ($path) does not exist"))
+      case false => ZIO.fail(Message.same(s"File ($path) does not exist"))
     }
 
-  def createIfDNE: Task[Unit] =
+  def createIfDNE: TaskM[Unit] =
     exists.flatMap {
       case true  => ZIO.unit
       case false => createFile()
@@ -121,10 +121,10 @@ final class File(val path: Path) {
 }
 object File {
 
-  def fromPath(path: String): RIO[FileSystem, File] =
+  def fromPath(path: String): ZIO[FileSystem, Message, File] =
     ZIO.service[FileSystem].flatMap(_.createFileObject(path))
 
-  def homeDirectory: RIO[FileSystem, File] =
-    ZIO.attempt(java.lang.System.getProperty("user.home")).flatMap(fromPath)
+  def homeDirectory: ZIO[FileSystem, Message, File] =
+    ZIO.attemptM(java.lang.System.getProperty("user.home")).flatMap(fromPath)
 
 }
