@@ -73,6 +73,9 @@ extension (self: File) {
   def size: TaskM[Long] =
     ZIO.attemptM(Files.size(self))
 
+  def child(path: String): TaskM[File] =
+    ZIO.attemptM(self.resolve(path))
+
   def children: TaskM[Array[File]] =
     ZIO.attemptM(Files.list(self)).map(_.iterator().asScala.toArray.map(File.fromNIOPath))
   def walk[R, A: ClassTag](withFile: File => ZIO[R, Message, A]): ZIO[R, Message, Array[A]] =
