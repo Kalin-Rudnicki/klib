@@ -333,7 +333,7 @@ object Logger {
         ops = new Ops {
           def print(message: Any): UIO[Unit] = ZIO { scala.Console.print(message) }.orDie
           def println(message: Any): UIO[Unit] = ZIO { scala.Console.println(message) }.orDie
-          def log(message: Any): UIO[Unit] = ZIO { scala.Console.println(message) }.orDie
+          def log(message: Any): UIO[Unit] = ZIO { scala.Console.print(message) }.orDie
         }
       } yield new Source("StdOut", logTolerance, queuedBreak) {
         override type Src = ops.type
@@ -352,7 +352,7 @@ object Logger {
         override def println(message: Any): UIO[Unit] =
           (ZIO.attempt(bw.write(message.toString)) *> ZIO.attempt(bw.write('\n'))).orDie
         override def log(message: Any): UIO[Unit] =
-          (ZIO.attempt(bw.write(message.toString)) *> ZIO.attempt(bw.write('\n'))).orDie
+          ZIO.attempt(bw.write(message.toString)).orDie
       }
 
       for {
