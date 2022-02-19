@@ -126,10 +126,10 @@ object Executable {
         subs.find(_._1 == subCommand) match {
           case Some((_, executable)) => executable(rest, args)
           case None =>
-            ZIO.fail(NonEmptyList.one(Message.same(s"Invalid sub-command ($subCommand), options: ${subs.mkString(", ")}")))
+            ZIO.fail(NonEmptyList.one(Message.same(s"Invalid sub-command ($subCommand), options: ${subs.map(_._1).mkString(", ")}")))
         }
       case Nil =>
-        ZIO.fail(NonEmptyList.one(Message.same(s"Missing sub-command, options: ${subs.mkString(", ")}")))
+        ZIO.fail(NonEmptyList.one(Message.same(s"Missing sub-command, options: ${subs.map(_._1).mkString(", ")}")))
     }
   }
 
