@@ -1,11 +1,11 @@
 package klib.utils
 
-import scala.annotation.tailrec
-
 import cats.data.EitherNel
 import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.option.*
+import scala.annotation.tailrec
+import scala.annotation.targetName
 import zio.*
 
 import klib.utils.commandLine.parse.*
@@ -100,7 +100,8 @@ object Executable {
       private val parser: BuiltParser[P],
       private val layerF: P => ZLayer[Env & ZEnv, NonEmptyList[Message], R],
   ) {
-    def withExecute(execute: P => ZIO[R & Env & ZEnv, NonEmptyList[Message], Unit]): Executable = { (subCommands, args) =>
+
+    def withExecuteNEL(execute: P => ZIO[R & Env & ZEnv, NonEmptyList[Message], Unit]): Executable = { (subCommands, args) =>
       subCommands match {
         case Nil =>
           parser.parse(args) match {
@@ -115,6 +116,10 @@ object Executable {
           ZIO.fail(NonEmptyList.one(Message.same(s"Unknown sub-command: $subCommand")))
       }
     }
+
+    def withExecute(execute: P => ZIO[R & Env & ZEnv, Message, Unit]): Executable =
+      withExecuteNEL(execute(_).nelError)
+
   }
 
   def fromParser[P](parser: BuiltParser[P]): Builder1[P] =

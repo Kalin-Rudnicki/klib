@@ -75,7 +75,7 @@ lazy val klib =
     .in(file("klib"))
     .settings(
       name := "klib",
-      version := "1.0.6",
+      version := "1.0.7",
       Compile / unmanagedSourceDirectories +=
         baseDirectory.value / "shared" / "main" / "scala",
       Test / unmanagedSourceDirectories +=
@@ -99,6 +99,7 @@ lazy val klib =
     .jvmSettings(
       // Dependencies
       Dependencies.`com.google.jimfs`.jimfs,
+      Test / run / fork := true,
     )
 
 lazy val `klib-root` =
