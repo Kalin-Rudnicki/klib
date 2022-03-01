@@ -92,6 +92,9 @@ final case class Parser[+T](
       elements = elements,
     )
 
+  def as[T2](t2: => T2): Parser[T2] =
+    map(_ => t2)
+
   def section(label: ColorString, indentBy: Int = 1): Parser[T] =
     Parser(
       parseF = parseF,
@@ -554,7 +557,7 @@ object Parser {
 
   object flag {
 
-    final case class Builder[T](
+    final case class Builder(
         private val _baseName: String,
         private val _primaryLongParam: Param.Long,
         private val _longParamAliases: List[Param.Long],
@@ -565,31 +568,31 @@ object Parser {
 
       // =====| Modify |=====
 
-      def withPrimaryLongParam(name: String): Builder[T] =
+      def withPrimaryLongParam(name: String): Builder =
         this.copy(_primaryLongParam = Param.Long(name))
 
-      def withLongParamAliases(names: String*): Builder[T] =
+      def withLongParamAliases(names: String*): Builder =
         this.copy(_longParamAliases = names.toList.map(Param.Long.apply))
 
-      def addLongParamAliases(names: String*): Builder[T] =
+      def addLongParamAliases(names: String*): Builder =
         this.copy(_longParamAliases = _longParamAliases ::: names.toList.map(Param.Long.apply))
 
-      def withPrimaryShortParam(name: Char): Builder[T] =
+      def withPrimaryShortParam(name: Char): Builder =
         this.copy(_primaryShortParam = Param.Short(name).some)
 
-      def withoutPrimaryShortParam: Builder[T] =
+      def withoutPrimaryShortParam: Builder =
         this.copy(_primaryShortParam = None)
 
-      def withShortParamAliases(names: Char*): Builder[T] =
+      def withShortParamAliases(names: Char*): Builder =
         this.copy(_shortParamAliases = names.toList.map(Param.Short.apply))
 
-      def addShortParamAliases(names: Char*): Builder[T] =
+      def addShortParamAliases(names: Char*): Builder =
         this.copy(_shortParamAliases = _shortParamAliases ::: names.toList.map(Param.Short.apply))
 
-      def withDescription(description: String*): Builder[T] =
+      def withDescription(description: String*): Builder =
         this.copy(_description = description.toList)
 
-      def addDescription(description: String*): Builder[T] =
+      def addDescription(description: String*): Builder =
         this.copy(_description = _description ::: description.toList)
 
       // =====| Build |=====
@@ -625,14 +628,100 @@ object Parser {
 
     }
 
-    def apply[T](
+    def apply(
         baseName: String,
         primaryLongParamName: Defaultable[String] = Defaultable.Auto,
         primaryShortParamName: DefaultableOption[Char] = Defaultable.Auto,
-    )(implicit
-        dfs: DecodeFromString[T],
-        ct: ClassTag[T],
-    ): Builder[T] =
+    ): Builder =
+      Builder(
+        _baseName = baseName,
+        _primaryLongParam = Param.Long(primaryLongParamName.toValue(baseName)),
+        _longParamAliases = Nil,
+        _primaryShortParam = primaryShortParamName.toOptionO(baseName.headOption).map(Param.Short.apply),
+        _shortParamAliases = Nil,
+        _description = Nil,
+      )
+
+  }
+
+  object present {
+
+    final case class Builder(
+        private val _baseName: String,
+        private val _primaryLongParam: Param.Long,
+        private val _longParamAliases: List[Param.Long],
+        private val _primaryShortParam: Option[Param.Short],
+        private val _shortParamAliases: List[Param.Short],
+        private val _description: List[String],
+    ) extends GenBuilder[Unit] {
+
+      // =====| Modify |=====
+
+      def withPrimaryLongParam(name: String): Builder =
+        this.copy(_primaryLongParam = Param.Long(name))
+
+      def withLongParamAliases(names: String*): Builder =
+        this.copy(_longParamAliases = names.toList.map(Param.Long.apply))
+
+      def addLongParamAliases(names: String*): Builder =
+        this.copy(_longParamAliases = _longParamAliases ::: names.toList.map(Param.Long.apply))
+
+      def withPrimaryShortParam(name: Char): Builder =
+        this.copy(_primaryShortParam = Param.Short(name).some)
+
+      def withoutPrimaryShortParam: Builder =
+        this.copy(_primaryShortParam = None)
+
+      def withShortParamAliases(names: Char*): Builder =
+        this.copy(_shortParamAliases = names.toList.map(Param.Short.apply))
+
+      def addShortParamAliases(names: Char*): Builder =
+        this.copy(_shortParamAliases = _shortParamAliases ::: names.toList.map(Param.Short.apply))
+
+      def withDescription(description: String*): Builder =
+        this.copy(_description = description.toList)
+
+      def addDescription(description: String*): Builder =
+        this.copy(_description = _description ::: description.toList)
+
+      // =====| Build |=====
+
+      override protected def primaryParamName: ColorString = _primaryLongParam.formattedName
+
+      override protected def makeElement(requirementLevel: RequirementLevel): Element =
+        Element.ParamElement(
+          baseName = _baseName,
+          typeName = "Boolean",
+          primaryParams = NonEmptyList(_primaryLongParam, _primaryShortParam.toList),
+          aliasParams = _longParamAliases ::: _shortParamAliases,
+          requirementLevel = requirementLevel.some,
+          description = _description,
+        )
+
+      override protected def optionalParseFunction(args: IndexedArgs, element: Element): Result[Option[Unit]] = {
+        import Arg.find.*
+
+        val findFunction: FindFunction[Unit] =
+          FindFunction.first {
+            FindFunction.fromParam(_primaryLongParam) ::
+              _primaryShortParam.map(FindFunction.fromParam(_)).toList :::
+              _longParamAliases.map(FindFunction.fromParam(_)) :::
+              _shortParamAliases.map(FindFunction.fromParam(_))
+          }
+
+        findFunction.attemptToFind(args) match {
+          case Some(found) => Result.success(().some, found.remaining)
+          case None        => Result.failure(Error(element.some, Error.Reason.MissingRequired(_baseName)))(args)
+        }
+      }
+
+    }
+
+    def apply(
+        baseName: String,
+        primaryLongParamName: Defaultable[String] = Defaultable.Auto,
+        primaryShortParamName: DefaultableOption[Char] = Defaultable.Auto,
+    ): Builder =
       Builder(
         _baseName = baseName,
         _primaryLongParam = Param.Long(primaryLongParamName.toValue(baseName)),
