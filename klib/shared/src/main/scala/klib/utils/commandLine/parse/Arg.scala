@@ -1,10 +1,9 @@
 package klib.utils.commandLine.parse
 
+import cats.syntax.either.*
+import cats.syntax.option.*
 import scala.annotation.tailrec
 import scala.util.matching.Regex
-
-import cats.syntax.option.*
-import cats.syntax.either.*
 
 type IndexedArgs = List[Indexed[Arg]]
 object IndexedArgs {
@@ -94,6 +93,9 @@ object Arg {
       def map[F2](mapF: F => F2): FindFunction[F2] =
         f(_).map(_.map(mapF))
 
+      def as[F2](mapF: => F2): FindFunction[F2] =
+        map(_ => mapF)
+
       def ||(f2: FindFunction[F]): FindFunction[F] =
         args => f(args) orElse f2(args)
 
@@ -108,6 +110,10 @@ object Arg {
         find(param.trueName).constValue(true) || find(param.falseName).constValue(false)
       def fromParam(param: Param.ShortToggle): FindFunction[Boolean] =
         find(param.trueName).constValue(true) || find(param.falseName).constValue(false)
+      def fromParam(param: Param.Long): FindFunction[Unit] =
+        find(param.name).constValue(())
+      def fromParam(param: Param.Short): FindFunction[Unit] =
+        find(param.name).constValue(())
 
       def first[F](fs: FindFunction[F]*): FindFunction[F] = first(fs.toList)
       def first[F](fs: List[FindFunction[F]]): FindFunction[F] =
