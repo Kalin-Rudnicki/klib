@@ -64,8 +64,8 @@ object DynamicJarLoader {
       def getJarClass(jar: Jar, classLoader: ClassLoader, classPath: String): TaskM[Option[JarClass[T]]] =
         (for {
           c <- ZIO.attemptM(classLoader.loadClass(classPath)).asSomeError
-          _ <- ZIO.whenZIO(ZIO.attemptM(klass.isAssignableFrom(c)))(ZIO.unit).some
-          constructors <- ZIO.attemptM(klass.getDeclaredConstructors).asSomeError
+          _ <- ZIO.whenZIO(ZIO.attemptM(klass.isAssignableFrom(c) && klass.toString != c.toString))(ZIO.unit).some
+          constructors <- ZIO.attemptM(c.getDeclaredConstructors).asSomeError
           zeroArgConstructor <-
             ZIO
               .fromOption(constructors.find(_.getParameterCount == 0))
@@ -87,7 +87,7 @@ object DynamicJarLoader {
       } yield jarClasses.flatten
     }
 
-    def inDir(file: File): TaskM[List[JarClass[T]]] =
+    def inDir(file: File): RIOM[Logger, List[JarClass[T]]] =
       for {
         children <- file.children.map(_.toList)
         jarChildren = children.toList.filter { f => f.fileName.ext == "jar".some }
