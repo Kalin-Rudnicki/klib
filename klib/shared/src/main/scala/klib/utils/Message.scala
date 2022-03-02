@@ -32,7 +32,7 @@ final case class Message(
             ZIO.succeed(Logger.Event.empty)
         }
     } yield Logger.Event(
-      Logger.println.fatal.event(message),
+      Logger.println.event(message).requireLogLevel(errorLevel),
       Logger
         .Event(
           Message.stackTraceEvent(stackTrace),

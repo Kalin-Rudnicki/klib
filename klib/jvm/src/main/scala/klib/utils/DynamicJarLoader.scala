@@ -87,7 +87,7 @@ object DynamicJarLoader {
       } yield jarClasses.flatten
     }
 
-    def inDir(file: File): RIOM[Logger, List[JarClass[T]]] =
+    def inDir(file: File): TaskM[List[JarClass[T]]] =
       for {
         children <- file.children.map(_.toList)
         jarChildren = children.toList.filter { f => f.fileName.ext == "jar".some }
