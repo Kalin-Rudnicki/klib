@@ -2,6 +2,7 @@ package klib.utils
 
 export OpaqueFile.File
 import cats.syntax.option.*
+import io.circe.*
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File as JavaFile
@@ -117,11 +118,19 @@ object OpaqueFile {
       withOutputStream(s => ZIO.attemptM(s.write(bytes)))
     def writeString(string: String): TaskM[Unit] =
       withOutputStream(s => ZIO.attemptM(s.write(string.getBytes)))
+    def writeJson(json: Json, toString: Json => String = _.toString): TaskM[Unit] =
+      writeString(toString(json))
+    def writeEncodedJson[T: Encoder](t: T, toString: Json => String = _.toString): TaskM[Unit] =
+      writeJson(Encoder[T].apply(t), toString)
 
     def readBytes: TaskM[Array[Byte]] =
       withInputStream(s => ZIO.attemptM(s.readAllBytes()))
     def readString: TaskM[String] =
       withInputStream(s => ZIO.attemptM(new String(s.readAllBytes())))
+    def readJson: TaskM[Json] =
+      readString.flatMap(s => ZIO.fromEither(parser.parse(s)).messageError)
+    def readDecodedJson[T: Decoder]: TaskM[T] =
+      readJson.flatMap(j => ZIO.fromEither(Decoder[T].decodeJson(j)).messageError)
 
     def ensureExists: TaskM[Unit] =
       existsWrapped.flatMap {
