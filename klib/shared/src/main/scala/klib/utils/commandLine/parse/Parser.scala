@@ -269,6 +269,32 @@ object Parser {
       elements = parsers.toList.flatMap { (n, p) => p.section(s"$n:").elements },
     )
 
+  def firstOf[T](p0: (String, Parser[T]), p1: (String, Parser[T]), pN: (String, Parser[T])*): Parser[T] =
+    ofParser(NonEmptyList(p0, p1 :: pN.toList)) { case NonEmptyList((hName, hParser), tail) =>
+      args =>
+        val hRes = hParser.parseF(args)
+        tail.foldLeft(hRes) { case (acc, (tName, tParser)) =>
+          val r = tParser.parseF(args)
+          Parser.Result.fromEither(
+            acc.res match {
+              case Right(accRes) => accRes.asRight
+              case Left(accErrors) =>
+                r.res match {
+                  case Right(rRes)   => rRes.asRight
+                  case Left(rErrors) => (accErrors ::: rErrors).asLeft
+                }
+            },
+            Arg.remainingInBoth(acc.remainingArgs, r.remainingArgs),
+          )
+        }
+    }
+
+  def eitherFirst[L, R](leftParser: (String, Parser[L]), rightParser: (String, Parser[R])): Parser[Either[L, R]] =
+    firstOf(
+      leftParser._1 -> leftParser._2.map(_.asLeft),
+      rightParser._1 -> rightParser._2.map(_.asRight),
+    )
+
   def exclusiveOf[T](p0: (String, Parser[T]), p1: (String, Parser[T]), pN: (String, Parser[T])*): Parser[T] =
     ofParser(NonEmptyList(p0, p1 :: pN.toList)) { case NonEmptyList((hName, hParser), tail) =>
       args =>
