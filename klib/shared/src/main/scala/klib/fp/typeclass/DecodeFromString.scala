@@ -1,13 +1,11 @@
 package klib.fp.typeclass
 
-import java.util.UUID
-
-import scala.util.Try
-
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import io.circe.*
 import io.circe.parser.*
+import java.util.UUID
+import scala.util.Try
 
 import klib.utils.Message
 
@@ -23,8 +21,10 @@ trait DecodeFromString[+T] {
   final def fMap[T2](f: T => Either[Message, T2]): DecodeFromString[T2] =
     decode(_).flatMap(f)
 
-  final def commaSeparatedList: DecodeFromString[List[T]] =
-    _.split("\n").toList.traverse(decode)
+  final def commaSeparatedList: DecodeFromString[List[T]] = { str =>
+    if (str.isEmpty) Nil.asRight
+    else str.split(",").toList.traverse(decode)
+  }
 
 }
 object DecodeFromString {

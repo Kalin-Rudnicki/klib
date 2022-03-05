@@ -75,7 +75,7 @@ lazy val klib =
     .in(file("klib"))
     .settings(
       name := "klib",
-      version := "1.2.1",
+      version := "1.2.3",
       Compile / unmanagedSourceDirectories +=
         baseDirectory.value / "shared" / "main" / "scala",
       Test / unmanagedSourceDirectories +=
