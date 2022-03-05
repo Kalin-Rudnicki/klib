@@ -1,8 +1,8 @@
 // ...
 
+import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
 import sbt._
 import sbt.Keys._
-import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
 
 object Dependencies {
 
@@ -32,6 +32,7 @@ object Dependencies {
     private val version = "2.0.0-RC1"
 
     val zio = crossDep("zio", version)
+    val `zio-streams` = crossDep("zio-streams", version)
     val `zio-test` = crossDep("zio-test", version, _ % Test)
     val `zio-test-sbt` = crossDep("zio-test-sbt", version, _ % Test)
   }

@@ -1,12 +1,12 @@
 package klib.utils
 
-import scala.annotation.tailrec
-
 import cats.data.*
 import cats.syntax.either.*
 import cats.syntax.list.*
 import cats.syntax.option.*
+import scala.annotation.tailrec
 import zio.*
+import zio.stream.*
 
 type TaskM[A] = ZIO[Any, Message, A]
 type TaskMNel[A] = ZIO[Any, NonEmptyList[Message], A]
@@ -70,6 +70,8 @@ extension (zio: ZIO.type) {
 
 }
 
+// =====| Error Mapping |=====
+
 extension [R, A](zio: ZIO[R, Throwable, A]) {
 
   def messageError: ZIO[R, Message, A] =
@@ -83,16 +85,46 @@ extension [R, E, A](zio: ZIO[R, E, A]) {
 
 }
 
-extension [R, A](zlayer: ZLayer[R, Throwable, A]) {
+extension [R, A](zLayer: ZLayer[R, Throwable, A]) {
 
   def messageError: ZLayer[R, Message, A] =
-    zlayer.mapError(Message.fromThrowable(_))
+    zLayer.mapError(Message.fromThrowable(_))
 
 }
 
-extension [R, E, A](zlayer: ZLayer[R, E, A]) {
+extension [R, E, A](zLayer: ZLayer[R, E, A]) {
 
   def nelError: ZLayer[R, NonEmptyList[E], A] =
-    zlayer.mapError(NonEmptyList.one)
+    zLayer.mapError(NonEmptyList.one)
+
+}
+
+extension [R, A](zStream: ZStream[R, Throwable, A]) {
+
+  def messageError: ZStream[R, Message, A] =
+    zStream.mapError(Message.fromThrowable(_))
+
+}
+
+extension [R, E, A](zStream: ZStream[R, E, A]) {
+
+  def nelError: ZStream[R, NonEmptyList[E], A] =
+    zStream.mapError(NonEmptyList.one)
+
+}
+
+// =====| Misc |=====
+
+extension [A](self: Iterator[A]) {
+
+  def nextOptionZIO: UIO[Option[A]] =
+    ZIO.succeed(self.nextOption)
+
+}
+
+extension [R, E, A](zStream: ZStream[R, E, A]) {
+
+  def toZStreamIterator: UIO[ZStreamIterator[R, E, A]] =
+    ZStreamIterator.fromZStream(zStream)
 
 }

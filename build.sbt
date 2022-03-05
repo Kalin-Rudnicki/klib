@@ -75,7 +75,7 @@ lazy val klib =
     .in(file("klib"))
     .settings(
       name := "klib",
-      version := "1.1.3",
+      version := "1.2.1",
       Compile / unmanagedSourceDirectories +=
         baseDirectory.value / "shared" / "main" / "scala",
       Test / unmanagedSourceDirectories +=
@@ -86,6 +86,7 @@ lazy val klib =
       scalacOptions += "-source:future",
       // Dependencies
       Dependencies.`dev.zio`.zio,
+      Dependencies.`dev.zio`.`zio-streams`,
       Dependencies.`dev.zio`.`zio-test`,
       Dependencies.`dev.zio`.`zio-test-sbt`,
       Dependencies.`io.circe`.`circe-core`,
