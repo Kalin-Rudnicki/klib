@@ -13,7 +13,7 @@ object DynamicJarLoader {
 
   final class Jar(file: File) {
 
-    def use[R, A](useF: ClassLoader => RIOM[R, A]): RIOM[R, A] =
+    private[DynamicJarLoader] def managed: ZManaged[Any, Message, ClassLoader] =
       ZManaged
         .fromAutoCloseable {
           for {
@@ -21,14 +21,19 @@ object DynamicJarLoader {
             classLoader <- ZIO.attemptM(URLClassLoader(Array(url), getClass.getClassLoader))
           } yield classLoader
         }
-        .use(useF)
+
+    def use[R, A](useF: ClassLoader => RIOM[R, A]): RIOM[R, A] =
+      managed.use(useF)
+
+    def reserve: UIO[Reservation[Any, Message, ClassLoader]] =
+      managed.reserve
 
   }
 
   final class JarClass[T](jar: Jar, classPath: String, klass: Class[T]) {
 
-    def use[R, A](useF: T => RIOM[R, A]): RIOM[R, A] =
-      jar.use { classLoader =>
+    private[DynamicJarLoader] def managed: ZManaged[Any, Message, T] =
+      jar.managed.mapZIO { classLoader =>
         for {
           c <- ZIO.attemptM(classLoader.loadClass(classPath))
           constructors <- ZIO.attemptM(c.getDeclaredConstructors)
@@ -38,9 +43,14 @@ object DynamicJarLoader {
           inst <- ZIO.attemptM(constructor.newInstance())
           isInstance <- ZIO.attemptM(klass.isInstance(inst))
           casted <- ZIO.cond(isInstance, inst.asInstanceOf[T], Message.same(s"'$classPath' is not an instance of $klass"))
-          res <- useF(casted)
-        } yield res
+        } yield casted
       }
+
+    def use[R, A](useF: T => RIOM[R, A]): RIOM[R, A] =
+      managed.use(useF)
+
+    def reserve: UIO[Reservation[Any, Message, T]] =
+      managed.reserve
 
   }
 
