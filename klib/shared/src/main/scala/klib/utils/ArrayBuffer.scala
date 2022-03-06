@@ -1,292 +1,436 @@
 package klib.utils
 
+import cats.syntax.either.*
+import cats.syntax.option.*
 import scala.reflect.ClassTag
+import zio.*
 
-/** Write access limited to head/last. Read access of entire Array. Never needs to copy unless size grows above max. (aka: efficient usage
-  * for fixed size queue)
+/**
+  * Write access limited to head/last.
+  * Read access of entire Array.
+  * Never needs to copy unless size grows above max. (aka: efficient usage for fixed size queue)
   */
-final class ArrayBuffer[T: ClassTag] private (
-    initialArray: Array[T],
-    initialOffset: Int,
-    initialSize: Int,
-) {
+final class ArrayBuffer[T: ClassTag] private (ref: Ref[ArrayBuffer.State[T]]) {
 
-  private var _array: Array[T] = initialArray
-  private var _offset: Int = initialOffset
-  private var _size: Int = initialSize
+  // =====| private |=====
 
-  def arrayLength: Int =
-    _array.length
+  private def readUIO[T2](
+      readF: ArrayBuffer.State[T] => T2,
+  ): UIO[T2] =
+    ref.get.map(readF)
 
-  def size: Int =
-    _size
+  private def readTaskM[T2](
+      readF: ArrayBuffer.State[T] => Either[Message, T2],
+  ): TaskM[T2] =
+    ref.get.flatMap(state => ZIO.fromEither(readF(state)))
 
-  def offset: Int =
-    _offset
+  private def writeUIO[T2](
+      writeF: ArrayBuffer.State[T] => (T2, ArrayBuffer.State[T]),
+  ): UIO[T2] =
+    ref.modify(writeF)
 
-  // =====|  |=====
-
-  private def unsafeActualIdx(idx: Int): Int =
-    (idx + _offset) % _array.length
-
-  private def actualIdx(idx: Int): Option[Int] =
-    Option.when(idx >= 0 && idx < _size)(unsafeActualIdx(idx))
-
-  private def elemAllocation: (Int, Int) = {
-    val elemsAtEnd = (_array.length - _offset).min(_size)
-    val elemsAtStart = _size - elemsAtEnd
-
-    (elemsAtEnd, elemsAtStart)
-  }
-
-  // =====|  |=====
-
-  def apply(idx: Int): Option[T] =
-    actualIdx(idx).map(_array)
-
-  def head: Option[T] =
-    apply(0)
-
-  def last: Option[T] =
-    apply(_size - 1)
-
-  def popHead: Option[T] =
-    actualIdx(0).map { idx =>
-      val elem = _array(idx)
-      _array(idx) = null.asInstanceOf[T]
-      _offset = (_offset + 1) % _array.length
-      _size -= 1
-      elem
-    }
-
-  def popLast: Option[T] =
-    actualIdx(_size - 1).map { idx =>
-      val elem = _array(idx)
-      _array(idx) = null.asInstanceOf[T]
-      _size -= 1
-      elem
-    }
-
-  private def growIfFull(): Unit =
-    if (_size == _array.length) {
-      _array = toArray((_array.length * 2).max(1))
-      _offset = 0
-    }
-
-  def prepend(elem: T): Unit = {
-    growIfFull()
-
-    _offset = (_offset - 1 + _array.length) % _array.length
-    _size += 1
-    _array(_offset) = elem
-  }
-
-  def prependFixed(elem: T): Option[T] =
-    if (_array.length == 0) None
-    else if (_size < _array.length) {
-      prepend(elem)
-      None
-    } else {
-      val r = popLast
-      prepend(elem)
-      r
-    }
-
-  def append(elem: T): Unit = {
-    growIfFull()
-
-    _array((_size + _offset) % _array.length) = elem
-    _size += 1
-  }
-
-  def appendFixed(elem: T): Option[T] =
-    if (_array.length == 0) None
-    else if (_size < _array.length) {
-      append(elem)
-      None
-    } else {
-      val r = popHead
-      append(elem)
-      r
-    }
-
-  def filterInPlace(p: T => Boolean): Unit = {
-    var delta = 0
-    0.until(_size).foreach { idx =>
-      val aIdx = unsafeActualIdx(idx)
-      val elem = _array(aIdx)
-      if (p(elem)) {
-        if (delta != 0) {
-          _array(unsafeActualIdx(idx - delta)) = elem
-          _array(aIdx) = null.asInstanceOf[T]
+  private def writeTaskM[T2](
+      writeF: ArrayBuffer.State[T] => Either[Message, (T2, ArrayBuffer.State[T])],
+  ): TaskM[T2] =
+    ref
+      .modify { state =>
+        writeF(state) match {
+          case Left(message)       => (message.asLeft, state)
+          case Right((t2, state2)) => (t2.asRight, state2)
         }
-      } else {
-        _array(aIdx) = null.asInstanceOf[T]
-        delta += 1
       }
-    }
-    _size -= delta
-  }
+      .flatMap(ZIO.fromEither)
 
-  // filter in place, and get removed elements
-  def removedFromFilterInPlace(p: T => Boolean): List[T] = {
-    var list = List.empty[T]
-    var delta = 0
-    0.until(_size).foreach { idx =>
-      val aIdx = unsafeActualIdx(idx)
-      val elem = _array(aIdx)
-      if (p(elem)) {
-        if (delta != 0) {
-          _array(unsafeActualIdx(idx - delta)) = elem
-          _array(aIdx) = null.asInstanceOf[T]
-        }
-      } else {
-        list = elem :: list
-        _array(aIdx) = null.asInstanceOf[T]
-        delta += 1
-      }
-    }
-    _size -= delta
-    list.reverse
-  }
+  // =====| misc |=====
 
-  def mapInPlace(f: T => T): Unit =
-    0.until(_size).foreach { idx =>
-      val aIdx = unsafeActualIdx(idx)
-      _array(aIdx) = f(_array(aIdx))
-    }
+  def size: UIO[Int] =
+    readUIO(_.size)
 
-  def distinctInPlaceBy[T2](f: T => T2): Unit = {
-    val seen = scala.collection.mutable.Set[T2]()
+  // TODO : REMOVE
 
-    filterInPlace { elem =>
-      val mapped = f(elem)
-      if (seen.contains(mapped)) false
-      else {
-        seen.add(mapped)
-        true
-      }
-    }
-  }
+  def getRawArray: UIO[Array[T]] =
+    ref.get.map(_.array)
 
-  def distinctInPlace(): Unit =
-    distinctInPlaceBy(identity)
+  // =====| get |=====
 
-  // =====|  |=====
+  def apply(idx: Int): TaskM[T] =
+    readTaskM(_.apply(idx))
 
-  def filterToList(p: T => Boolean): List[T] = {
-    var list = List.empty[T]
+  def get(idx: Int): UIO[Option[T]] =
+    readUIO(_.get(idx))
 
-    0.until(_size).reverse.foreach { idx =>
-      val aIdx = unsafeActualIdx(idx)
-      val elem = _array(aIdx)
-      if (p(elem))
-        list = elem :: list
-    }
+  def head: TaskM[T] =
+    readTaskM(_.head)
 
-    list
-  }
+  def headOption: UIO[Option[T]] =
+    readUIO(_.headOption)
 
-  def mapToList[T2](f: T => T2): List[T2] = {
-    var list = List.empty[T2]
+  def last: TaskM[T] =
+    readTaskM(_.last)
 
-    0.until(_size).reverse.foreach { idx =>
-      list = f(_array(unsafeActualIdx(idx))) :: list
-    }
+  def lastOption: UIO[Option[T]] =
+    readUIO(_.lastOption)
 
-    list
-  }
+  // =====| pop |=====
 
-  // =====|  |=====
+  def popHead: TaskM[T] =
+    writeTaskM(_.popHead)
 
-  private def toArray(newSize: Int): Array[T] = {
-    val resArray = new Array[T](newSize)
-    val (elemsAtEnd, elemsAtStart) = elemAllocation
-    Array.copy(_array, _offset, resArray, 0, elemsAtEnd)
-    Array.copy(_array, 0, resArray, elemsAtEnd, elemsAtStart)
-    resArray
-  }
+  def popHeadOption: UIO[Option[T]] =
+    writeUIO(_.popHeadOption)
 
-  def toArray: Array[T] =
-    toArray(_size)
+  def popLast: TaskM[T] =
+    writeTaskM(_.popLast)
 
-  def toString(showInternalOrder: Boolean): String = {
-    val stringBuilder = new StringBuilder
-    var first = true
-    def append(any: Any): Unit = {
-      if (first)
-        first = false
-      else
-        stringBuilder.append(", ")
-      stringBuilder.append(if (any == null) "null" else any.toString)
-    }
+  def popLastOption: UIO[Option[T]] =
+    writeUIO(_.popLastOption)
 
-    stringBuilder.append("ArrayBuffer(")
+  // =====| insert |=====
 
-    val (elemsAtEnd, elemsAtStart) = elemAllocation
-    if (showInternalOrder) {
-      0.until(elemsAtStart).foreach { i =>
-        append(_array(i))
-      }
+  def prepend(elem: T): UIO[Unit] =
+    writeUIO(_.prepend(elem))
 
-      if (elemsAtStart < _offset)
-        append(s"[EMPTY_SPACE:${_offset - elemsAtStart}]")
+  def prependFixed(elem: T): TaskM[Option[T]] =
+    writeTaskM(_.prependFixed(elem))
 
-      append("[START]")
+  def append(elem: T): UIO[Unit] =
+    writeUIO(_.append(elem))
 
-      0.until(elemsAtEnd).foreach { i =>
-        append(_array(i + _offset))
-      }
+  def appendFixed(elem: T): TaskM[Option[T]] =
+    writeTaskM(_.appendFixed(elem))
 
-      if (_offset + _size < _array.length)
-        append(s"[EMPTY_SPACE:${_array.length - (_offset + _size)}]")
+  // =====| _____InPlace |=====
 
-    } else {
-      0.until(elemsAtEnd).foreach { i =>
-        append(_array(i + _offset))
-      }
+  def filterInPlace(p: T => Boolean): UIO[Unit] =
+    writeUIO(_.filterInPlace(p))
 
-      0.until(elemsAtStart).foreach { i =>
-        append(_array(i))
-      }
-    }
+  def removedFromFilterInPlace(p: T => Boolean): UIO[List[T]] =
+    writeUIO(_.removedFromFilterInPlace(p))
 
-    stringBuilder.append(")")
+  def mapInPlace(f: T => T): UIO[Unit] =
+    writeUIO(_.mapInPlace(f))
 
-    stringBuilder.toString
-  }
+  def distinctInPlaceBy[T2](f: T => T2): UIO[Unit] =
+    writeUIO(_.distinctInPlaceBy(f))
 
-  override def toString: String =
-    toString(false)
+  def distinctInPlace: UIO[Unit] =
+    writeUIO(_.distinctInPlace)
+
+  // =====| to_____ |=====
+
+  def toArray: UIO[Array[T]] =
+    readUIO(_.toArray)
+
+  def filterToList(p: T => Boolean): UIO[List[T]] =
+    readUIO(_.filterToList(p))
+
+  def mapToList[T2](f: T => T2): UIO[List[T2]] =
+    readUIO(_.mapToList(f))
+
+  // =====| mkString |=====
+
+  def mkString(showInternalOrder: Boolean): UIO[String] =
+    readUIO(_.mkString(showInternalOrder))
 
 }
 
 object ArrayBuffer {
 
-  def ofInitialSize[T: ClassTag](size: Int): ArrayBuffer[T] =
-    new ArrayBuffer[T](
-      initialArray = new Array[T](size.max(0)),
-      initialOffset = 0,
-      initialSize = 0,
-    )
+  private final case class State[T: ClassTag](
+      array: Array[T],
+      offset: Int,
+      size: Int,
+  ) {
 
-  def of[T: ClassTag](elems: T*): ArrayBuffer[T] = {
-    val elemArray = elems.toArray
-    new ArrayBuffer[T](
-      initialArray = elemArray,
-      initialOffset = 0,
-      initialSize = elemArray.length,
-    )
+    // =====| private |=====
+
+    private type ReadUIO[T2] = T2
+    private type ReadTaskM[T2] = Either[Message, T2]
+    private type WriteUIO[T2] = (T2, State[T])
+    private type WriteTaskM[T2] = Either[Message, (T2, State[T])]
+
+    private def unsafeActualIndex(idx: Int): Int =
+      (idx + offset) % array.length
+
+    private def actualIndex(idx: Int): Option[Int] =
+      Option.when(idx >= 0 && idx < size)(unsafeActualIndex(idx))
+
+    private def elemAllocation: (Int, Int) = {
+      val elemsAtEnd = (array.length - offset).min(size)
+      val elemsAtStart = size - elemsAtEnd
+      (elemsAtEnd, elemsAtStart)
+    }
+
+    private def readUIOToTaskM[T2](uio: ReadUIO[Option[T2]], message: => Message): ReadTaskM[T2] =
+      uio match {
+        case Some(res) => res.asRight
+        case None      => message.asLeft
+      }
+
+    private def writeUIOToTaskM[T2](uio: WriteUIO[Option[T2]], message: => Message): WriteTaskM[T2] =
+      uio match {
+        case (res, state) =>
+          res match {
+            case Some(res) => (res, state).asRight
+            case None      => message.asLeft
+          }
+      }
+
+    // =====| get |=====
+
+    def apply(idx: Int): ReadTaskM[T] =
+      readUIOToTaskM(get(idx), Message.same(s"Index out of bounds: $idx"))
+
+    def get(idx: Int): ReadUIO[Option[T]] =
+      actualIndex(idx).map(array(_))
+
+    def head: ReadTaskM[T] =
+      apply(0)
+
+    def headOption: ReadUIO[Option[T]] =
+      get(0)
+
+    def last: ReadTaskM[T] =
+      apply(size - 1)
+
+    def lastOption: ReadUIO[Option[T]] =
+      get(size - 1)
+
+    // =====| pop |=====
+
+    def popHead: WriteTaskM[T] =
+      writeUIOToTaskM(popHeadOption, Message.same("No head to pop in ArrayBuffer"))
+
+    def popHeadOption: WriteUIO[Option[T]] =
+      actualIndex(0) match {
+        case Some(idx) =>
+          val elem = array(idx)
+          array(idx) = null.asInstanceOf[T]
+          (elem.some, copy(offset = (offset + 1) % array.length, size = size - 1))
+        case None =>
+          (None, this)
+      }
+
+    def popLast: WriteTaskM[T] =
+      writeUIOToTaskM(popLastOption, Message.same("No last to pop in ArrayBuffer"))
+
+    def popLastOption: WriteUIO[Option[T]] =
+      actualIndex(size - 1) match {
+        case Some(idx) =>
+          val elem = array(idx)
+          array(idx) = null.asInstanceOf[T]
+          (elem.some, copy(size = size - 1))
+        case None =>
+          (None, this)
+      }
+
+    // =====| insert |=====
+
+    private def growIfFull: WriteUIO[Unit] =
+      if (size < array.length) ((), this)
+      else
+        ((), copy(array = toArray((array.length * 2).max(1)), offset = 0))
+
+    def prepend(elem: T): WriteUIO[Unit] = {
+      val (_, newState) = growIfFull
+      val newOffset = (newState.offset - 1 + newState.array.length) % newState.array.length
+      newState.array(newOffset) = elem
+      ((), newState.copy(offset = newOffset, size = newState.size + 1))
+    }
+
+    def prependFixed(elem: T): WriteTaskM[Option[T]] =
+      if (array.length == 0) Message.same("Can not run 'prependFixed' on an 0-length array").asLeft
+      else if (size < array.length) {
+        val (_, newState) = prepend(elem)
+        (None, newState).asRight
+      } else
+        for {
+          (last, newState) <- popLast
+          (_, newState2) = newState.prepend(elem)
+        } yield (last.some, newState2)
+
+    def append(elem: T): WriteUIO[Unit] = {
+      val (_, newState) = growIfFull
+      newState.array((newState.size + newState.offset) % newState.array.length) = elem
+      ((), newState.copy(size = newState.size + 1))
+    }
+
+    def appendFixed(elem: T): WriteTaskM[Option[T]] =
+      if (array.length == 0) Message.same("Can not run 'appendFixed' on an 0-length array").asLeft
+      else if (size < array.length) {
+        val (_, newState) = append(elem)
+        (None, newState).asRight
+      } else
+        for {
+          (head, newState) <- popHead
+          (_, newState2) = newState.append(elem)
+        } yield (head.some, newState2)
+
+    // =====| _____InPlace |=====
+
+    def filterInPlace(p: T => Boolean): WriteUIO[Unit] = {
+      var delta = 0
+      0.until(size).foreach { idx =>
+        val aIdx = unsafeActualIndex(idx)
+        val elem = array(aIdx)
+        if (p(elem)) {
+          if (delta != 0) {
+            array(unsafeActualIndex(idx - delta)) = elem
+            array(aIdx) = null.asInstanceOf[T]
+          }
+        } else {
+          array(aIdx) = null.asInstanceOf[T]
+          delta += 1
+        }
+      }
+      ((), copy(size = size - delta))
+    }
+
+    def removedFromFilterInPlace(p: T => Boolean): WriteUIO[List[T]] = {
+      var list = List.empty[T]
+      var delta = 0
+      0.until(size).foreach { idx =>
+        val aIdx = unsafeActualIndex(idx)
+        val elem = array(aIdx)
+        if (p(elem)) {
+          if (delta != 0) {
+            array(unsafeActualIndex(idx - delta)) = elem
+            array(aIdx) = null.asInstanceOf[T]
+          }
+        } else {
+          list = elem :: list
+          array(aIdx) = null.asInstanceOf[T]
+          delta += 1
+        }
+      }
+      (list.reverse, copy(size = size - delta))
+    }
+
+    def mapInPlace(f: T => T): WriteUIO[Unit] = {
+      0.until(size).foreach { idx =>
+        val aIdx = unsafeActualIndex(idx)
+        array(aIdx) = f(array(aIdx))
+      }
+      ((), this)
+    }
+
+    def distinctInPlaceBy[T2](f: T => T2): WriteUIO[Unit] = {
+      val seen = scala.collection.mutable.Set[T2]()
+      filterInPlace { elem =>
+        val mapped = f(elem)
+        if (seen.contains(mapped)) false
+        else {
+          seen.add(mapped)
+          true
+        }
+      }
+    }
+
+    def distinctInPlace: WriteUIO[Unit] =
+      distinctInPlaceBy(identity)
+
+    // =====| to_____ |=====
+
+    private def toArray(newSize: Int): ReadUIO[Array[T]] = {
+      val resArray = new Array[T](newSize)
+      def copyArray(srcPos: Int, destPos: Int, length: Int): Unit =
+        Array.copy(array, srcPos, resArray, destPos, length)
+
+      val (elemsAtEnd, elemsAtStart) = elemAllocation
+
+      copyArray(offset, 0, elemsAtEnd)
+      copyArray(0, elemsAtEnd, elemsAtStart)
+      resArray
+    }
+
+    def toArray: ReadUIO[Array[T]] =
+      toArray(size)
+
+    def filterToList(p: T => Boolean): ReadUIO[List[T]] = {
+      var list = List.empty[T]
+      0.until(size).reverse.foreach { idx =>
+        val aIdx = unsafeActualIndex(idx)
+        val elem = array(aIdx)
+        if (p(elem))
+          list = elem :: list
+      }
+      list
+    }
+
+    def mapToList[T2](f: T => T2): ReadUIO[List[T2]] = {
+      var list = List.empty[T2]
+      0.until(size).reverse.foreach { idx =>
+        list = f(array(unsafeActualIndex(idx))) :: list
+      }
+      list
+    }
+
+    // =====| mkString |=====
+
+    def mkString(showInternalOrder: Boolean): ReadUIO[String] = {
+      val stringBuilder = new StringBuilder
+      var first = true
+      def append(any: Any): Unit = {
+        if (first)
+          first = false
+        else
+          stringBuilder.append(", ")
+        stringBuilder.append(if (any == null) "null" else any.toString)
+      }
+
+      val (elemsAtEnd, elemsAtStart) = elemAllocation
+      if (showInternalOrder) {
+        stringBuilder.append(s"ArrayBuffer<$offset, $size, ${array.length}>(")
+
+        0.until(elemsAtStart).foreach { i =>
+          append(array(i))
+        }
+
+        if (elemsAtStart < offset)
+          append(s"[EMPTY_SPACE:${offset - elemsAtStart}]")
+
+        append("[START]")
+
+        0.until(elemsAtEnd).foreach { i =>
+          append(array(i + offset))
+        }
+
+        if (offset + size < array.length)
+          append(s"[EMPTY_SPACE:${array.length - (offset + size)}]")
+
+      } else {
+        stringBuilder.append("ArrayBuffer(")
+
+        0.until(elemsAtEnd).foreach { i =>
+          append(array(i + offset))
+        }
+
+        0.until(elemsAtStart).foreach { i =>
+          append(array(i))
+        }
+      }
+
+      stringBuilder.append(")")
+
+      stringBuilder.toString
+    }
+
+    override def toString: String =
+      mkString(true)
+
   }
 
-  def wrapFullArray[T: ClassTag](array: Array[T]): ArrayBuffer[T] = {
-    val dupeArray = array.clone
+  def ofInitialSize[T: ClassTag](size: Int): UIO[ArrayBuffer[T]] =
+    Ref.make(State(new Array[T](size.max(0)), 0, 0)).map(ArrayBuffer(_))
 
-    new ArrayBuffer[T](
-      initialArray = dupeArray,
-      initialOffset = 0,
-      initialSize = dupeArray.length,
-    )
+  def of[T: ClassTag](elems: T*): UIO[ArrayBuffer[T]] = {
+    val elemArray = elems.toArray
+    Ref.make(State(elemArray, 0, elemArray.length)).map(ArrayBuffer(_))
+  }
+
+  def wrapFullArray[T: ClassTag](array: Array[T]): UIO[ArrayBuffer[T]] = {
+    val dupeArray = array.clone
+    Ref.make(State(dupeArray, 0, dupeArray.length)).map(ArrayBuffer(_))
   }
 
 }
