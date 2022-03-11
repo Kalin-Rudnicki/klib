@@ -1,5 +1,6 @@
 package klib.utils.swing
 
+export OpaqueDimensions.{Height, Width}
 import java.awt.*
 
 /**
@@ -33,14 +34,34 @@ extension (self: Graphics2D) {
   def fillRectWY(x0: Int, y0: Int, w: Int, y1: Int): Unit = fillRectWH(x0, y0, w, y1 - y0)
   def fillRectXY(x0: Int, y0: Int, x1: Int, y1: Int): Unit = fillRectWH(x0, y0, x1 - x0, y1 - y0)
 
-  def usingClipWH(x0: Int, y0: Int, w: Int, h: Int)(thunk: => Unit): Unit = {
+  def subAreaWH(x0: Int, y0: Int, w: Int, h: Int)(thunk: (Width, Height) ?=> Unit): Unit = {
     val clip = self.getClip
+    val transform = self.getTransform
     self.setClip(x0, y0, w, h)
-    thunk
+    self.translate(x0, y0)
+    thunk(using Width(w), Height(h))
+    self.setTransform(transform)
     self.setClip(clip)
   }
-  def usingClipXH(x0: Int, y0: Int, x1: Int, h: Int)(thunk: => Unit): Unit = usingClipWH(x0, y0, x1 - x0, h)(thunk)
-  def usingClipWY(x0: Int, y0: Int, w: Int, y1: Int)(thunk: => Unit): Unit = usingClipWH(x0, y0, w, y1 - y0)(thunk)
-  def usingClipXY(x0: Int, y0: Int, x1: Int, y1: Int)(thunk: => Unit): Unit = usingClipWH(x0, y0, x1 - x0, y1 - y0)(thunk)
+  def subAreaXH(x0: Int, y0: Int, x1: Int, h: Int)(thunk: (Width, Height) ?=> Unit): Unit = subAreaWH(x0, y0, x1 - x0, h)(thunk)
+  def subAreaWY(x0: Int, y0: Int, w: Int, y1: Int)(thunk: (Width, Height) ?=> Unit): Unit = subAreaWH(x0, y0, w, y1 - y0)(thunk)
+  def subAreaXY(x0: Int, y0: Int, x1: Int, y1: Int)(thunk: (Width, Height) ?=> Unit): Unit = subAreaWH(x0, y0, x1 - x0, y1 - y0)(thunk)
+
+}
+
+def areaWidth(implicit width: Width): Int = width
+def areaHeight(implicit height: Height): Int = height
+
+object OpaqueDimensions {
+
+  opaque type Width <: Int = Int
+  object Width {
+    def apply(width: Int): Width = width
+  }
+
+  opaque type Height <: Int = Int
+  object Height {
+    def apply(height: Int): Height = height
+  }
 
 }
