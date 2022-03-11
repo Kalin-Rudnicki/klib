@@ -10,7 +10,7 @@ import java.awt.*
   */
 extension (self: Graphics2D) {
 
-  def `make (0, 0) bottomLeft`(height: Int): Unit = {
+  def `make (0, 0) bottomLeft`(implicit height: Height): Unit = {
     self.translate(0, height)
     self.scale(1, -1)
   }
