@@ -36,19 +36,20 @@ extension (self: Graphics2D) {
   def fillRectXY(x0: Int, y0: Int, x1: Int, y1: Int): Unit = fillRectWH(x0, y0, x1 - x0, y1 - y0)
   def fillRectR(r: Rectangle): Unit = fillRectWH(r.x, r.y, r.width, r.height)
 
-  def subAreaWH(x0: Int, y0: Int, w: Int, h: Int)(thunk: (Width, Height) ?=> Unit): Unit = {
+  def subAreaWH[T](x0: Int, y0: Int, w: Int, h: Int)(thunk: (Width, Height) ?=> T): T = {
     val clip = self.getClip
     val transform = self.getTransform
     self.setClip(x0, y0, w, h)
     self.translate(x0, y0)
-    thunk(using Width(w), Height(h))
+    val t = thunk(using Width(w), Height(h))
     self.setTransform(transform)
     self.setClip(clip)
+    t
   }
-  def subAreaXH(x0: Int, y0: Int, x1: Int, h: Int)(thunk: (Width, Height) ?=> Unit): Unit = subAreaWH(x0, y0, x1 - x0, h)(thunk)
-  def subAreaWY(x0: Int, y0: Int, w: Int, y1: Int)(thunk: (Width, Height) ?=> Unit): Unit = subAreaWH(x0, y0, w, y1 - y0)(thunk)
-  def subAreaXY(x0: Int, y0: Int, x1: Int, y1: Int)(thunk: (Width, Height) ?=> Unit): Unit = subAreaWH(x0, y0, x1 - x0, y1 - y0)(thunk)
-  def subAreaR(r: Rectangle)(thunk: (Width, Height) ?=> Unit): Unit = subAreaWH(r.x, r.y, r.width, r.height)(thunk)
+  def subAreaXH[T](x0: Int, y0: Int, x1: Int, h: Int)(thunk: (Width, Height) ?=> T): T = subAreaWH(x0, y0, x1 - x0, h)(thunk)
+  def subAreaWY[T](x0: Int, y0: Int, w: Int, y1: Int)(thunk: (Width, Height) ?=> T): T = subAreaWH(x0, y0, w, y1 - y0)(thunk)
+  def subAreaXY[T](x0: Int, y0: Int, x1: Int, y1: Int)(thunk: (Width, Height) ?=> T): T = subAreaWH(x0, y0, x1 - x0, y1 - y0)(thunk)
+  def subAreaR[T](r: Rectangle)(thunk: (Width, Height) ?=> T): T = subAreaWH(r.x, r.y, r.width, r.height)(thunk)
 
 }
 
