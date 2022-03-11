@@ -30,4 +30,16 @@ extension (self: Double) {
     }
   }
 
+  def roundTo(numPlaces: Int): Double =
+    roundTo(Math.pow(10, numPlaces))
+
+  def roundTo(mult: Double): Double =
+    (self * mult).round.toDouble / mult
+
+  def floorTo(mult: Double): Double =
+    (self * mult).floor / mult
+
+  def ceilTo(mult: Double): Double =
+    (self * mult).ceil / mult
+
 }
