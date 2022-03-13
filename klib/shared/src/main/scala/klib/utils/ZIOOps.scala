@@ -68,6 +68,12 @@ extension (zio: ZIO.type) {
   def attemptM[A](effect: => A): TaskM[A] =
     ZIO.attempt(effect).messageError
 
+  def failIf[E](pred: Boolean, e: => E): IO[E, Unit] =
+    ZIO.cond(pred, (), e)
+
+  def failUnless[E](pred: Boolean, e: => E): IO[E, Unit] =
+    ZIO.cond(!pred, (), e)
+
 }
 
 // =====| Error Mapping |=====
