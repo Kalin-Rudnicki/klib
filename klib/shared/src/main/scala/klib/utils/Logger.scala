@@ -1,15 +1,13 @@
 package klib.utils
 
+import cats.data.*
+import cats.syntax.either.*
+import cats.syntax.list.*
+import cats.syntax.option.*
 import java.io.BufferedWriter
 import java.nio.file.OpenOption
 import java.nio.file.StandardOpenOption
-
 import scala.annotation.tailrec
-
-import cats.data.*
-import cats.syntax.either.*
-import cats.syntax.option.*
-import cats.syntax.list.*
 import zio.*
 
 import klib.fp.typeclass.DecodeFromString

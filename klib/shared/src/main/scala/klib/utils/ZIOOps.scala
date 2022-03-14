@@ -134,3 +134,15 @@ extension [R, E, A](zStream: ZStream[R, E, A]) {
     ZStreamIterator.fromZStream(zStream)
 
 }
+
+extension [A](self: Ref[A]) {
+
+  def modifyEither[E, B](f: A => Either[E, (B, A)]): IO[E, B] =
+    self
+      .modify { a =>
+        val res = f(a)
+        (res.map(_._1), res.fold(_ => a, _._2))
+      }
+      .flatMap(ZIO.fromEither)
+
+}
