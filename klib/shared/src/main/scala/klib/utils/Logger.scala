@@ -209,6 +209,8 @@ object Logger {
         execute(wll.event(message))
       def apply(message0: Any, message1: Any, messageN: Any*): URIO[Logger, Unit] =
         execute(wll.event.all(message0 :: message1 :: messageN.toList))
+      def pairs(pairs: (String, Any)*): URIO[Logger, Unit] =
+        execute(wll.event(pairs.map { (k, v) => s"$k -> $v" }.mkString(", ")))
       def all(messages: List[Any]): URIO[Logger, Unit] =
         execute(wll.event.all(messages))
 
