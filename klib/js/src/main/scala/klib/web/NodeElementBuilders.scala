@@ -1,5 +1,8 @@
 package klib.web
 
+import org.scalajs.dom.*
+import scala.scalajs.js
+
 import klib.web.VDom.*
 
 object ModifierBuilders {
@@ -33,6 +36,8 @@ object ModifierBuilders {
     object backgroundColor extends ColorCSSAttrBuilder("background-color")
     object width extends CSSAttrBuilder("width")
     object height extends CSSAttrBuilder("height")
+    object cursor extends CSSAttrBuilder("cursor")
+    object userSelect extends CSSAttrBuilder("user-select")
     // TODO:
   }
 
@@ -45,11 +50,11 @@ object ModifierBuilders {
   }
 
   object KeyAttrBuilders {
-    abstract class KeyAttrBuilder[T](name: String) {
-      def :=(value: T): KeyAttr = KeyAttr(name, value)
+    abstract class KeyAttrBuilder[T](name: String, convert: T => js.Any) {
+      def :=(value: T): KeyAttr = KeyAttr(name, convert(value))
     }
 
-    object onClick extends KeyAttrBuilder[Unit => Unit]("onClick")
+    object onClick extends KeyAttrBuilder[MouseEvent => Unit]("onclick", identity(_))
     // TODO:
   }
 

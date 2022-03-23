@@ -4,6 +4,7 @@ import cats.syntax.option.*
 import org.scalajs.dom.{document, window, Element as DomElement, HTMLHtmlElement, Node}
 import scala.annotation.tailrec
 import scala.scalajs.js.JSON
+import scalajs.js.Dynamic
 
 import klib.utils.{given, *}
 import klib.web.ModifierBuilders.NodeElementBuilders
@@ -15,12 +16,15 @@ object VDomActions {
     element match {
       case nodeElement: NodeElement =>
         val node = document.createElement(nodeElement.tagName)
+        val nodeDynamic = node.asInstanceOf[Dynamic]
         val (elements, classNames, cssAttrs, stdAttrs, keyAttrs) = nodeElement.splitModifiers
 
         setClassNames(node, classNames)
         setStyle(node, cssAttrs)
         stdAttrs.foreach { (name, value) => node.setAttribute(name.toString, value) }
-        // TODO: keyAttrs
+        keyAttrs.foreach { (key, value) =>
+          nodeDynamic.updateDynamic(key)(value)
+        }
 
         elements.foreach(element => node.appendChild(build(element)))
 
@@ -37,7 +41,7 @@ object VDomActions {
     if (cssAttrs.nonEmpty) element.setAttribute("style", cssAttrs.toList.map { (sn, v) => s"$sn: $v" }.mkString("; "))
     else element.removeAttribute("style")
 
-  def diffElements(
+  private def diffElements(
       parent: Node,
       newVDoms: List[Element],
       oldVDoms: List[Element],
@@ -57,6 +61,7 @@ object VDomActions {
               if (newNodeElement.tagName != oldNodeElement.tagName) parent.replaceChild(build(newNodeElement), children(idx))
               else {
                 val node = children(idx).asInstanceOf[DomElement]
+                val nodeDynamic = node.asInstanceOf[Dynamic]
                 val (newElements, newClassNames, newCSSAttrs, newStdAttrs, newKeyAttrs) = newNodeElement.splitModifiers
                 val (oldElements, oldClassNames, oldCSSAttrs, oldStdAttrs, oldKeyAttrs) = oldNodeElement.splitModifiers
 
@@ -64,7 +69,18 @@ object VDomActions {
                   setClassNames(node, newClassNames)
                 if (newCSSAttrs != oldCSSAttrs)
                   setStyle(node, newCSSAttrs)
-                // TODO: keyAttrs
+                (newKeyAttrs.keySet ++ oldKeyAttrs.keySet).foreach { key =>
+                  (newKeyAttrs.get(key), oldKeyAttrs.get(key)) match {
+                    case (Some(newValue), Some(oldValue)) =>
+                      if (newValue != oldValue)
+                        nodeDynamic.updateDynamic(key)(newValue)
+                    case (Some(newValue), None) =>
+                      nodeDynamic.updateDynamic(key)(newValue)
+                    case (None, Some(_)) =>
+                      nodeDynamic.updateDynamic(key)(null)
+                    case (None, None) =>
+                  }
+                }
 
                 diffElements(node, newElements, oldElements)
 
@@ -88,10 +104,10 @@ object VDomActions {
     loop(newVDoms, oldVDoms, 0)
   }
 
-  def setBody(elements: List[Element]): Unit =
+  private def setBody(elements: List[Element]): Unit =
     document.body = build(NodeElementBuilders.body(elements*)).asInstanceOf[HTMLHtmlElement]
 
-  final class BodyTracker {
+  final class Renderer {
 
     private var oldVDoms: Option[List[Element]] = None
 
@@ -110,27 +126,36 @@ object VDomActions {
 def main(args: Array[String]): Unit = {
   import org.scalajs.dom.console
   import ModifierBuilders.*
+  import VDom.given
 
-  val bodyTracker = VDomActions.BodyTracker()
+  val renderer = VDomActions.Renderer()
 
   def render(elements: Element*): Unit = {
-    bodyTracker.render(elements.toList)
+    renderer.render(elements.toList)
   }
 
   def rec(idx: Int): Unit = {
     render(
-      if (true)
+      div(
         ul(
           (1 to idx).map { i =>
             if (i == idx) li(color.blue, "[", i.toString, "]")
-            else li(i.toString)
-          } *,
-        )
-      else
-        ul,
-      div(
-        height := "50px",
-        backgroundColor.red,
+            else if (idx % 5 == 0 && i % 5 == 0) li(color.red, "(", i.toString, ")")
+            else
+              li(
+                i.toString,
+                onClick := { _ => println(i) },
+                cursor := "crosshair",
+                userSelect := "none",
+              )
+          },
+        ),
+        Option.when(idx % 7 != 0)(
+          div(
+            height := "50px",
+            backgroundColor.red,
+          ),
+        ),
       ),
     )
     if (idx < 20)

@@ -2,6 +2,7 @@ package klib.web
 
 import cats.syntax.option.*
 import scala.annotation.tailrec
+import scala.scalajs.js
 
 import klib.utils.*
 
@@ -18,29 +19,21 @@ object VDom {
 
   sealed trait Modifier {
 
-    def toIdtStr: IndentedString = {
-      import IndentedString.*
+    def toBasics: List[Modifier.Basic] =
       this match {
-        case textElement: TextElement => textElement.text.unesc
-        case nodeElement: NodeElement =>
-          val (elements, modifiers) = nodeElement.modifiers.partition(_.isInstanceOf[Element])
-
-          `inline`(
-            nodeElement.tagName,
-            indented(
-              modifiers.map(_.toIdtStr),
-              indented(elements.map(_.toIdtStr)),
-            ),
-          )
-        case className: ClassName => s"[className] ${className.classNames.mkString(" ")}"
-        case cssAttr: CSSAttr     => s"[cssAttr] ${cssAttr.scopedName} => ${cssAttr.value}"
-        case stdAttr: StdAttr     => s"[stdAttr] ${stdAttr.scopedName} => ${stdAttr.value}"
-        case keyAttr: KeyAttr     => s"[keyAttr] ${keyAttr.name} => ${keyAttr.value}"
+        case basic: Modifier.Basic      => basic :: Nil
+        case Modifier.Wrapped(children) => children
       }
-    }
 
   }
-  sealed trait Element extends Modifier {
+  object Modifier {
+    sealed trait Basic extends Modifier
+    final case class Wrapped(children: List[Basic]) extends Modifier
+  }
+  given Conversion[Unit, Modifier] = _ => Modifier.Wrapped(Nil)
+  given Conversion[IterableOnce[Modifier.Basic], Modifier] = iter => Modifier.Wrapped(iter.toList)
+
+  sealed trait Element extends Modifier.Basic {
     def nodeName: String =
       this match {
         case NodeElement(tagName, _) => tagName.toUpperCase
@@ -58,12 +51,12 @@ object VDom {
 
     def apply(modifiers: Modifier*): NodeElement = copy(reversedModifierLists = modifiers.toList :: reversedModifierLists)
 
-    def modifiers: List[Modifier] = reversedModifierLists.reverse.flatten
+    def modifiers: List[Modifier.Basic] = reversedModifierLists.reverse.flatten.flatMap(_.toBasics)
 
-    def splitModifiers: (List[Element], Set[String], Map[ScopedName, String], Map[ScopedName, String], Map[String, Any]) = {
+    def splitModifiers: (List[Element], Set[String], Map[ScopedName, String], Map[ScopedName, String], Map[String, js.Any]) = {
       val values =
         modifiers.foldLeft(
-          (List.empty[Element], Set.empty[String], Map.empty[ScopedName, String], Map.empty[ScopedName, String], Map.empty[String, Any]),
+          (List.empty[Element], Set.empty[String], Map.empty[ScopedName, String], Map.empty[ScopedName, String], Map.empty[String, js.Any]),
         ) { (values, elem) =>
           elem match {
             case element: Element     => values.copy(_1 = element :: values._1)
@@ -82,7 +75,7 @@ object VDom {
     def apply(nodeName: String): NodeElement = NodeElement(nodeName, Nil)
   }
 
-  enum ClassName extends Modifier {
+  enum ClassName extends Modifier.Basic {
     case Block(block: String, modifiers: Set[String])
     case Element(block: String, element: String, modifiers: Set[String])
 
@@ -103,8 +96,8 @@ object VDom {
 
   }
 
-  final case class CSSAttr(scopedName: ScopedName, value: String) extends Modifier
-  final case class StdAttr(scopedName: ScopedName, value: String) extends Modifier
-  final case class KeyAttr(name: String, value: Any) extends Modifier
+  final case class CSSAttr(scopedName: ScopedName, value: String) extends Modifier.Basic
+  final case class StdAttr(scopedName: ScopedName, value: String) extends Modifier.Basic
+  final case class KeyAttr(name: String, value: js.Any) extends Modifier.Basic
 
 }
