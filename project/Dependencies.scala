@@ -41,4 +41,19 @@ object Dependencies {
     val `cats-effect` = crossDep("cats-effect", "3.3.3")
   }
 
+  object `io.github.cquiroz` extends Org("io.github.cquiroz") {
+    val `scala-java-time` = crossDep("scala-java-time", "2.3.0")
+  }
+
+  object `com.lihaoyi` extends Org("com.lihaoyi") {
+    val scalatags = crossDep("scalatags", "0.11.1")
+  }
+
+  object `com.github.julien-truffaut` extends Org("com.github.julien-truffaut") {
+    private val version = "3.0.0-M6"
+
+    val `monocle-core` = crossDep("monocle-core", version)
+    val `monocle-macro` = crossDep("monocle-macro", version)
+  }
+
 }

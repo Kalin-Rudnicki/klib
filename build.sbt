@@ -81,7 +81,6 @@ lazy val klib =
       Test / unmanagedSourceDirectories +=
         baseDirectory.value / "shared" / "test" / "scala",
       scalaVersion := Scala_3,
-      // TODO (KR) : Cross Version?
       sonatypeCredentialHost := "s01.oss.sonatype.org",
       scalacOptions += "-source:future",
       // Dependencies
@@ -93,10 +92,17 @@ lazy val klib =
       Dependencies.`io.circe`.`circe-generic`,
       Dependencies.`io.circe`.`circe-parser`,
       Dependencies.`org.typelevel`.`cats-effect`,
+      Dependencies.`com.github.julien-truffaut`.`monocle-core`,
+      Dependencies.`com.github.julien-truffaut`.`monocle-macro`,
       // Testing
       testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")),
     )
-    .jsSettings()
+    .jsSettings(
+      Dependencies.`io.github.cquiroz`.`scala-java-time`,
+      Dependencies.`com.lihaoyi`.scalatags,
+      // TODO: Remove
+      scalaJSUseMainModuleInitializer := true,
+    )
     .jvmSettings(
       // Dependencies
       Dependencies.`com.google.jimfs`.jimfs,
