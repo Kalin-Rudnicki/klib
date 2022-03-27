@@ -5,7 +5,7 @@ import scala.scalajs.js
 
 import klib.web.VDom.*
 
-object ModifierBuilders {
+object VDomBuilders {
   export CSSAttrBuilders.*
   export KeyAttrBuilders.*
   export NodeElementBuilders.*

@@ -16,9 +16,14 @@ import zio.stream.*
 // =====| ZIOM |=====
 type ZIOM[-R, +E, +A] = ZIO[R, KError[E], A]
 
-type TaskM[        +A] = ZIOM[Any, Nothing, A]
-type   IOM[    +E, +A] = ZIOM[Any, E,       A]
-type  RIOM[-R,     +A] = ZIOM[R,   Nothing, A]
+type  TaskM[        +A] = ZIOM[Any, Nothing, A]
+type    IOM[    +E, +A] = ZIOM[Any, E,       A]
+type   RIOM[-R,     +A] = ZIOM[R,   Nothing, A]
+
+type  SZIOM[-R, +E, +A] = ZIOM[Executable.BaseEnv & R, E,       A]
+type STaskM[        +A] = ZIOM[Executable.BaseEnv,     Nothing, A]
+type   SIOM[    +E, +A] = ZIOM[Executable.BaseEnv,     E,       A]
+type  SRIOM[-R,     +A] = ZIOM[Executable.BaseEnv & R, Nothing, A]
 
 // =====| ZManagedM |=====
 type ZManagedM[-R, +E, +A] = ZManaged[R, KError[E], A]

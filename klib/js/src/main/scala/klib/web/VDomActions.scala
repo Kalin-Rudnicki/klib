@@ -5,10 +5,11 @@ import org.scalajs.dom.{document, window, Element as DomElement, HTMLHtmlElement
 import scala.annotation.tailrec
 import scala.scalajs.js.JSON
 import scalajs.js.Dynamic
+import zio.*
 
 import klib.utils.{given, *}
-import klib.web.ModifierBuilders.NodeElementBuilders
 import klib.web.VDom.*
+import klib.web.VDomBuilders.NodeElementBuilders
 
 object VDomActions {
 
@@ -83,7 +84,6 @@ object VDomActions {
                 }
 
                 diffElements(node, newElements, oldElements)
-
               }
             case (newTextElement: TextElement, oldTextElement: TextElement) =>
               if (newTextElement.text != oldTextElement.text)
@@ -107,66 +107,29 @@ object VDomActions {
   private def setBody(elements: List[Element]): Unit =
     document.body = build(NodeElementBuilders.body(elements*)).asInstanceOf[HTMLHtmlElement]
 
-  final class Renderer {
+  final class Renderer private (ref: Ref.Synchronized[Option[List[Element]]]) {
 
-    private var oldVDoms: Option[List[Element]] = None
+    final def setPageTitle(title: String): TaskM[Unit] =
+      ZIOM.attempt(window.document.title = title)
 
-    def render(newVDoms: List[Element]): Unit = {
-      oldVDoms match {
-        case Some(oldVDoms) => diffElements(document.body, newVDoms, oldVDoms)
-        case None           => setBody(newVDoms)
+    def render(newVDoms: List[Element]): TaskM[Unit] =
+      ref.updateZIO { oldVDoms =>
+        ZIOM
+          .attempt {
+            oldVDoms match {
+              case Some(oldVDoms) => diffElements(document.body, newVDoms, oldVDoms)
+              case None           => setBody(newVDoms)
+            }
+          }
+          .as(newVDoms.some)
       }
-      oldVDoms = newVDoms.some
-    }
 
   }
+  object Renderer {
 
-}
+    val Initial: UIO[Renderer] =
+      Ref.Synchronized.make(Option.empty[List[Element]]).map(Renderer(_))
 
-def main(args: Array[String]): Unit = {
-  import org.scalajs.dom.console
-  import ModifierBuilders.*
-  import VDom.given
-
-  val renderer = VDomActions.Renderer()
-
-  def render(elements: Element*): Unit = {
-    renderer.render(elements.toList)
   }
-
-  def rec(idx: Int): Unit = {
-    render(
-      div(
-        ul(
-          (1 to idx).map { i =>
-            if (i == idx) li(color.blue, "[", i.toString, "]")
-            else if (idx % 5 == 0 && i % 5 == 0) li(color.red, "(", i.toString, ")")
-            else
-              li(
-                i.toString,
-                onClick := { _ => println(i) },
-                cursor := "crosshair",
-                userSelect := "none",
-              )
-          },
-        ),
-        Option.when(idx % 7 != 0)(
-          div(
-            height := "50px",
-            backgroundColor.red,
-          ),
-        ),
-      ),
-    )
-    if (idx < 20)
-      window.setTimeout(
-        { () =>
-          rec(idx + 1)
-        },
-        500,
-      )
-  }
-
-  rec(0)
 
 }
