@@ -36,30 +36,30 @@ final class ParamMap(mapType: String, map: Map[String, String]) {
 
   // =====| Get |=====
 
-  private def genGet[T](key: String)(f: Option[String] => Either[Message, T]): EitherNel[Message, T] =
-    f(map.get(key)).leftMap(NonEmptyList.one)
+  private def genGet[T](key: String)(f: Option[String] => EitherError[T]): EitherError[T] =
+    f(map.get(key))
 
-  private def getRequired[T](key: String, f: String => Either[Message, T]): EitherNel[Message, T] =
+  private def getRequired[T](key: String, f: String => EitherError[T]): EitherError[T] =
     genGet[T](key) { mString =>
       for {
-        string <- mString.toRight(Message.same(s"Missing required $mapType '$key'"))
+        string <- mString.toRight(KError.message.same(s"Missing required $mapType '$key'"))
         t <- f(string)
       } yield t
     }
 
-  private def getOption[T](key: String, f: String => Either[Message, T]): EitherNel[Message, Option[T]] =
+  private def getOption[T](key: String, f: String => EitherError[T]): EitherError[Option[T]] =
     genGet[Option[T]](key)(_.traverse(f))
 
-  def getParam[T: DecodeFromString](key: String): EitherNel[Message, T] =
+  def getParam[T: DecodeFromString](key: String): EitherError[T] =
     getRequired(key, implicitly[DecodeFromString[T]].decode)
 
-  def getParamO[T: DecodeFromString](key: String): EitherNel[Message, Option[T]] =
+  def getParamO[T: DecodeFromString](key: String): EitherError[Option[T]] =
     getOption(key, implicitly[DecodeFromString[T]].decode)
 
-  def getJsonParam[T: Decoder](key: String): EitherNel[Message, T] =
+  def getJsonParam[T: Decoder](key: String): EitherError[T] =
     getRequired(key, DecodeFromString.fromCirceDecoder[T].decode)
 
-  def getJsonParamO[T: Decoder](key: String): EitherNel[Message, Option[T]] =
+  def getJsonParamO[T: Decoder](key: String): EitherError[Option[T]] =
     getOption(key, DecodeFromString.fromCirceDecoder[T].decode)
 
 }

@@ -28,64 +28,59 @@ object OpaqueFile {
     def toJavaFile: JavaFile = self.toFile
 
     def createFile(fileAttributes: FileAttribute[_]*): TaskM[Unit] =
-      ZIO.attemptM(Files.createFile(self, fileAttributes*))
+      ZIOM.attempt(Files.createFile(self, fileAttributes*))
     def createDirectory(fileAttributes: FileAttribute[_]*): TaskM[Unit] =
-      ZIO.attemptM(Files.createDirectory(self, fileAttributes*))
+      ZIOM.attempt(Files.createDirectory(self, fileAttributes*))
     def createDirectories(fileAttributes: FileAttribute[_]*): TaskM[Unit] =
-      ZIO.attemptM(Files.createDirectories(self, fileAttributes*))
+      ZIOM.attempt(Files.createDirectories(self, fileAttributes*))
 
     def createSymbolicLink(target: File, fileAttributes: FileAttribute[_]*): TaskM[Unit] =
-      ZIO.attemptM(Files.createSymbolicLink(self, target, fileAttributes*))
+      ZIOM.attempt(Files.createSymbolicLink(self, target, fileAttributes*))
     def createLink(existing: File): TaskM[Unit] =
-      ZIO.attemptM(Files.createLink(self, existing))
+      ZIOM.attempt(Files.createLink(self, existing))
 
     def delete: TaskM[Boolean] =
-      ZIO.attemptM(Files.deleteIfExists(self))
+      ZIOM.attempt(Files.deleteIfExists(self))
 
     def copyTo(target: File, copyOptions: CopyOption*): TaskM[Unit] =
-      ZIO.attemptM(Files.copy(self, target, copyOptions*))
+      ZIOM.attempt(Files.copy(self, target, copyOptions*))
     def moveTo(target: File, copyOptions: CopyOption*): TaskM[Unit] =
-      ZIO.attemptM(Files.move(self, target, copyOptions*))
+      ZIOM.attempt(Files.move(self, target, copyOptions*))
 
     def existsWrapped: TaskM[Boolean] =
-      ZIO.attemptM(Files.exists(self))
+      ZIOM.attempt(Files.exists(self))
 
     def exists: TaskM[Boolean] =
-      ZIO.attemptM(Files.exists(self))
+      ZIOM.attempt(Files.exists(self))
     def isFile: TaskM[Boolean] =
-      ZIO.attemptM(Files.isRegularFile(self))
+      ZIOM.attempt(Files.isRegularFile(self))
     def isDirectory: TaskM[Boolean] =
-      ZIO.attemptM(Files.isDirectory(self))
+      ZIOM.attempt(Files.isDirectory(self))
     def isSymbolicLink: TaskM[Boolean] =
-      ZIO.attemptM(Files.isSymbolicLink(self))
+      ZIOM.attempt(Files.isSymbolicLink(self))
 
     def outputStream(openOptions: OpenOption*): TaskM[OutputStream] =
-      ZIO.attemptM(Files.newOutputStream(self, openOptions*))
+      ZIOM.attempt(Files.newOutputStream(self, openOptions*))
     def inputStream(openOptions: OpenOption*): TaskM[InputStream] =
-      ZIO.attemptM(Files.newInputStream(self, openOptions*))
+      ZIOM.attempt(Files.newInputStream(self, openOptions*))
     def bufferedWriter(openOptions: OpenOption*): TaskM[BufferedWriter] =
-      ZIO.attemptM(Files.newBufferedWriter(self, openOptions*))
+      ZIOM.attempt(Files.newBufferedWriter(self, openOptions*))
     def bufferedReader: TaskM[BufferedReader] =
-      ZIO.attemptM(Files.newBufferedReader(self))
+      ZIOM.attempt(Files.newBufferedReader(self))
 
     def getLastModifiedTime: TaskM[Long] =
-      ZIO.attemptM(Files.getLastModifiedTime(self)).map(_.toMillis)
+      ZIOM.attempt(Files.getLastModifiedTime(self)).map(_.toMillis)
     def setLastModifiedTime(millis: Long): TaskM[Unit] =
-      ZIO.attemptM(Files.setLastModifiedTime(self, FileTime.fromMillis(millis)))
+      ZIOM.attempt(Files.setLastModifiedTime(self, FileTime.fromMillis(millis)))
 
     def size: TaskM[Long] =
-      ZIO.attemptM(Files.size(self))
+      ZIOM.attempt(Files.size(self))
 
     def child(path: String): TaskM[File] =
-      ZIO.attemptM(self.resolve(path))
+      ZIOM.attempt(self.resolve(path))
 
     def children: TaskM[Array[File]] =
-      ZIO.attemptM(Files.list(self)).map(_.iterator().asScala.toArray.map(File.fromNIOPath))
-    def walk[R, A: ClassTag](withFile: File => ZIO[R, Message, A]): ZIO[R, Message, Array[A]] =
-      for {
-        stream <- ZIO.attemptM(Files.walk(self))
-        as <- ZIO.foreach(stream.iterator().asScala.map(File.fromNIOPath).toArray)(withFile)
-      } yield as
+      ZIOM.attempt(Files.list(self)).map(_.iterator().asScala.toArray.map(File.fromNIOPath))
 
     def fileName: File.Name = {
       val name = self.getFileName.toString
@@ -98,44 +93,44 @@ object OpaqueFile {
     // =====|  |=====
 
     private def bracket[R, C <: AutoCloseable, A](
-        acquire: => TaskM[C],
-        use: C => ZIO[R, Message, A],
-    ): ZIO[R, Message, A] =
+        acquire: => RIOM[R, C],
+        use: C => RIOM[R, A],
+    ): RIOM[R, A] =
       ZIO
-        .acquireReleaseWith[R, Message, C](acquire)
-        .apply(s => ZIO.attemptM(s.close()).orDieWith(_ => new RuntimeException)) // TODO (KR) : ...
+        .acquireReleaseWith[R, KError[Nothing], C](acquire)
+        .apply(s => ZIOM.attempt(s.close()).orDieKlib)
         .apply(use)
-    def withOutputStream[R, A](use: OutputStream => ZIO[R, Message, A]): ZIO[R, Message, A] =
+    def withOutputStream[R, A](use: OutputStream => RIOM[R, A]): RIOM[R, A] =
       bracket(outputStream(), use)
-    def withInputStream[R, A](use: InputStream => ZIO[R, Message, A]): ZIO[R, Message, A] =
+    def withInputStream[R, A](use: InputStream => RIOM[R, A]): RIOM[R, A] =
       bracket(inputStream(), use)
-    def withBufferedWriter[R, A](use: BufferedWriter => ZIO[R, Message, A]): ZIO[R, Message, A] =
+    def withBufferedWriter[R, A](use: BufferedWriter => RIOM[R, A]): RIOM[R, A] =
       bracket(bufferedWriter(), use)
-    def withBufferedReader[R, A](use: BufferedReader => ZIO[R, Message, A]): ZIO[R, Message, A] =
+    def withBufferedReader[R, A](use: BufferedReader => RIOM[R, A]): RIOM[R, A] =
       bracket(bufferedReader, use)
 
     def writeBytes(bytes: Array[Byte]): TaskM[Unit] =
-      withOutputStream(s => ZIO.attemptM(s.write(bytes)))
+      withOutputStream(s => ZIOM.attempt(s.write(bytes)))
     def writeString(string: String): TaskM[Unit] =
-      withOutputStream(s => ZIO.attemptM(s.write(string.getBytes)))
+      withOutputStream(s => ZIOM.attempt(s.write(string.getBytes)))
     def writeJson(json: Json, toString: Json => String = _.toString): TaskM[Unit] =
       writeString(toString(json))
     def writeEncodedJson[T: Encoder](t: T, toString: Json => String = _.toString): TaskM[Unit] =
       writeJson(Encoder[T].apply(t), toString)
 
     def readBytes: TaskM[Array[Byte]] =
-      withInputStream(s => ZIO.attemptM(s.readAllBytes()))
+      withInputStream(s => ZIOM.attempt(s.readAllBytes()))
     def readString: TaskM[String] =
-      withInputStream(s => ZIO.attemptM(new String(s.readAllBytes())))
+      withInputStream(s => ZIOM.attempt(new String(s.readAllBytes())))
     def readJson: TaskM[Json] =
-      readString.flatMap(s => ZIO.fromEither(parser.parse(s)).messageError)
+      readString.flatMap(s => ZIO.fromEither(parser.parse(s)).toKlibError)
     def readDecodedJson[T: Decoder]: TaskM[T] =
-      readJson.flatMap(j => ZIO.fromEither(Decoder[T].decodeJson(j)).messageError)
+      readJson.flatMap(j => ZIO.fromEither(Decoder[T].decodeJson(j)).toKlibError)
 
     def ensureExists: TaskM[Unit] =
       existsWrapped.flatMap {
         case true  => ZIO.unit
-        case false => ZIO.fail(Message.same(s"File ($self) does not exist"))
+        case false => ZIO.fail(KError.message.unexpected("File does not exist"))
       }
 
     def createIfDNE: TaskM[Unit] =
@@ -147,13 +142,13 @@ object OpaqueFile {
   }
   object File {
 
-    def fromPath(path: String): ZIO[FileSystem, Message, File] =
+    def fromPath(path: String): RIOM[FileSystem, File] =
       ZIO.service[FileSystem].flatMap(_.createFileObject(path))
 
     def fromNIOPath(path: Path): File = path
 
-    def homeDirectory: ZIO[FileSystem, Message, File] =
-      ZIO.attemptM(java.lang.System.getProperty("user.home")).flatMap(fromPath)
+    def homeDirectory: RIOM[FileSystem, File] =
+      ZIOM.attempt(java.lang.System.getProperty("user.home")).flatMap(fromPath)
 
     final case class Name(
         name: String,

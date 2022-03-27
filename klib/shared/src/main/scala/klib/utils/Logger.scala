@@ -262,6 +262,15 @@ object Logger {
 
   object withIndent {
 
+    object event {
+
+      def apply(by: Int)(events: Event*): Event =
+        Event.Compound(events.toList).indented(by)
+      def apply(idt: String)(events: Event*): Event =
+        Event.Compound(events.toList).indented(idt)
+
+    }
+
     def apply[R, E, A](by: Int)(zio: ZIO[R, E, A]): ZIO[Logger with R, E, A] =
       indent(by).bracket(_ => popIndent())(_ => zio)
     def apply[R, E, A](idt: String)(zio: ZIO[R, E, A]): ZIO[Logger with R, E, A] =
@@ -356,12 +365,12 @@ object Logger {
       }
 
       for {
-        _ <- file.createIfDNE.orDieWith(_ => new RuntimeException) // TODO (KR) : ...
+        _ <- file.createIfDNE.orDieKlib
         queuedBreak <- Ref.make(initialQueuedBreak)
       } yield new Source(file.toString, logTolerance, queuedBreak) {
         override type Src = BufferedWriterOps
         override protected val acquire: UIO[Src] =
-          file.bufferedWriter(StandardOpenOption.APPEND).map(BufferedWriterOps(_)).orDieWith(_ => new RuntimeException) // TODO (KR) : ...
+          file.bufferedWriter(StandardOpenOption.APPEND).map(BufferedWriterOps(_)).orDieKlib
         override protected def release(src: Src): UIO[Unit] = ZIO.attempt(src.bw.close()).orDie
       }
     }
@@ -564,6 +573,9 @@ object Logger {
 
     def apply(event0: Event, event1: Event, eventN: Event*): Event =
       Compound(event0 :: event1 :: eventN.toList)
+
+    def all(events: List[Event]): Event =
+      Compound(events)
 
     val empty: Event =
       Compound(Nil)

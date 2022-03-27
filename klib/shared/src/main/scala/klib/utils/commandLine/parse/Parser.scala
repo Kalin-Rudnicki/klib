@@ -449,7 +449,7 @@ object Parser {
         val upcaseValues = values.map { (s, t) => (s.toUpperCase, t) }
         upcaseValues.toMap.get(str.toUpperCase) match {
           case Some(value) => value.asRight
-          case None        => Message.same(s"Invalid value ${str.unesc}, valid: ${upcaseValues.map(_._1).mkString(", ")}").asLeft
+          case None        => KError.message.same(s"Invalid value ${str.unesc}, valid: ${upcaseValues.map(_._1).mkString(", ")}").asLeft
         }
       }
 

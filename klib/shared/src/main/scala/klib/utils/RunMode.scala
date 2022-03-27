@@ -1,3 +1,3 @@
 package klib.utils
 
-enum RunMode { case Dev, User }
+enum RunMode { case Dev, Prod }

@@ -6,10 +6,16 @@ import cats.syntax.option.*
 import zio.*
 import zio.stream.*
 
-type StreamIterator[+E, +A] = ZStreamIterator[Any, E, A]
-type UStreamIterator[+A] = ZStreamIterator[Any, Nothing, A]
-type RStreamIteratorM[-R, +A] = ZStreamIterator[R, Message, A]
-type URStreamIterator[-R, +A] = ZStreamIterator[R, Nothing, A]
+// format: off
+type ZStreamIteratorM[-R, +E, +A] = ZStreamIterator[R, KError[E], A]
+
+type TaskStreamIteratorM[        +A] = ZStreamIteratorM[Any, Nothing, A]
+type     StreamIteratorM[    +E, +A] = ZStreamIteratorM[Any, E,       A]
+type    RStreamIteratorM[-R,     +A] = ZStreamIteratorM[R,   Nothing, A]
+
+type     UStreamIterator[    +A] = ZStreamIterator[Any, Nothing, A]
+type    URStreamIterator[-R, +A] = ZStreamIterator[R,   Nothing, A]
+// format: on
 
 final class ZStreamIterator[-R, +E, +A] private (state: Ref[ZStreamIterator.State[R, E, A]]) {
 
