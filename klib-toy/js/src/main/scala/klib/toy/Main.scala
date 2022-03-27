@@ -1,9 +1,10 @@
 package klib.toy
 
-import monocle.macros.GenLens
+import cats.data.NonEmptyList
+import cats.syntax.either.*
 
 import klib.utils.*
-import klib.web.*
+import klib.web.{given, *}
 import klib.web.VDom.given
 import klib.web.VDomBuilders.*
 
@@ -25,26 +26,32 @@ object Main extends PageApp {
       }
       .titleF(env => s"${env.str} : ${env.counter}")
       .body {
-        Widget[String](s => div(s)).imapState(GenLens[Env](_.str)) >>
-          Widget[String](s => div(s + " : " + s)).imapState(GenLens[Env](_.str)) >> {
-            CWidget(span("[")) >>
-              Widget[String](s => span(s.toUpperCase)).imapState(GenLens[Env](_.str)) >>
-              CWidget(span("]"))
-          }.wrapped(div(padding := "25px")(_)) >>
-          CWidget("counter: ") >>
-          Widget[Int](i => span(color.red)(i.toString)).imapState(GenLens[Env](_.counter)) >>
+        def incButton(text: String, modify: Int => Int): Widget[Int] =
           AWidget[Nothing, Int] { (rh, s) =>
             button(
-              onClick := { _ => rh.modifyState(_ + 1) },
-              "+",
+              text,
+              onClick := { _ => rh.modifyState(modify) },
             )
-          }.imapState(GenLens[Env](_.counter)) >>
-          AWidget[Nothing, Int] { (rh, s) =>
-            button(
-              onClick := { _ => rh.modifyState(_ - 1) },
-              "-",
-            )
-          }.imapState(GenLens[Env](_.counter))
+          }
+
+        val header: Widget[Env] =
+          CWidget(div("HEADER")) >>
+            Widget[Env](s => div(s"${s.str} : ${s.counter}"))
+
+        val counter: Widget[Int] =
+          CWidget("Counter: ") >>
+            incButton("+", _ + 1) >>
+            Widget[Int] { s => span(display := "inline-block", textAlign := "center", width := "25px")(s.toString) } >>
+            incButton("-", _ - 1)
+
+        val all: VWidget[Env, Int] = {
+          header >>
+            counter.zoomOut[Env](_.counter)
+        }.eitherValueFromState(env => Option.when(env.counter >= 0)(env.counter).toRight(NonEmptyList.one("Counter must be >= 0")))
+
+        all.placeBeforeWithEitherValue { e =>
+          CWidget(div(s"Value: $e"))
+        }
       }
       .logA
 

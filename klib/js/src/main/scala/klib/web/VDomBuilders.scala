@@ -23,6 +23,7 @@ object VDomBuilders {
     // TODO:
   }
 
+  // ex: div.style(_) = _
   object CSSAttrBuilders {
     abstract class CSSAttrBuilder(scopedName: ScopedName) {
       def :=(value: String): CSSAttr = CSSAttr(scopedName, value)
@@ -41,9 +42,12 @@ object VDomBuilders {
     object userSelect extends CSSAttrBuilder("user-select")
     object padding extends CSSAttrBuilder("padding")
     object margin extends CSSAttrBuilder("margin")
+    object display extends CSSAttrBuilder("display")
+    object textAlign extends CSSAttrBuilder("text-align")
     // TODO:
   }
 
+  // ex: div.setAttr(_, _)
   object StdAttrBuilders {
     abstract class StdAttrBuilder(scopedName: ScopedName) {
       def :=(value: String): StdAttr = StdAttr(scopedName, value)
@@ -52,6 +56,7 @@ object VDomBuilders {
     // TODO:
   }
 
+  // ex: div._ = _
   object KeyAttrBuilders {
     abstract class KeyAttrBuilder[T](name: String, convert: T => js.Any) {
       def :=(value: T): KeyAttr = KeyAttr(name, convert(value))

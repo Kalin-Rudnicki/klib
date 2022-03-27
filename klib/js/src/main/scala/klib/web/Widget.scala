@@ -3,13 +3,16 @@ package klib.web
 import cats.data.*
 import cats.syntax.either.*
 import monocle.*
+import monocle.Focus.KeywordContext
+import monocle.macros.GenLens
 import scala.annotation.targetName
+import scala.annotation.unchecked.uncheckedVariance
 import scala.quoted.*
 import zio.*
 
 import klib.utils.*
 
-trait PWidget[+Action, -StateGet, +StateSet, +Value] { self =>
+trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
 
   // =====| Helpers |=====
 
@@ -18,7 +21,7 @@ trait PWidget[+Action, -StateGet, +StateSet, +Value] { self =>
 
   // =====| Combinators |=====
 
-  final def placeBefore[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet, Value2](
+  final def placeBefore[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
       other: PWidget[Action2, StateGet2, StateSet2, Value2],
   )(implicit
       zippable: Zippable[Value, Value2],
@@ -27,14 +30,14 @@ trait PWidget[+Action, -StateGet, +StateSet, +Value] { self =>
       (rh, s) => self.elements(rh, s) ::: other.elements(rh, s),
       s => self.value(s) accumulate other.value(s),
     )
-  inline final def >>[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet, Value2](
+  inline final def >>[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
       other: PWidget[Action2, StateGet2, StateSet2, Value2],
   )(implicit
       zippable: Zippable[Value, Value2],
   ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
-    placeBefore(other)
+    placeBefore[Action2, StateGet2, StateSet2, Value2](other)
 
-  final def placeAfter[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet, Value2](
+  final def placeAfter[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
       other: PWidget[Action2, StateGet2, StateSet2, Value2],
   )(implicit
       zippable: Zippable[Value2, Value],
@@ -43,12 +46,12 @@ trait PWidget[+Action, -StateGet, +StateSet, +Value] { self =>
       (rh, s) => other.elements(rh, s) ::: self.elements(rh, s),
       s => other.value(s) accumulate self.value(s),
     )
-  inline final def <<[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet, Value2](
+  inline final def <<[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
       other: PWidget[Action2, StateGet2, StateSet2, Value2],
   )(implicit
       zippable: Zippable[Value2, Value],
   ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
-    placeAfter(other)
+    placeAfter[Action2, StateGet2, StateSet2, Value2](other)
 
   @targetName("wrappedMany")
   final def wrapped(wrapInner: List[VDom.Element] => List[VDom.Element]): PWidget[Action, StateGet, StateSet, Value] =
@@ -62,6 +65,8 @@ trait PWidget[+Action, -StateGet, +StateSet, +Value] { self =>
 
   // =====| Mapping |=====
 
+  // --- Map with Value ---
+
   final def mapEitherValue[Value2](f: Valid[Value] => Valid[Value2]): PWidget[Action, StateGet, StateSet, Value2] =
     PWidget.many(
       elements,
@@ -74,6 +79,46 @@ trait PWidget[+Action, -StateGet, +StateSet, +Value] { self =>
   inline final def flatMapValue[Value2](f: Value => Valid[Value2]): PWidget[Action, StateGet, StateSet, Value2] =
     mapEitherValue(_.flatMap(f))
 
+  inline final def as[Value2](f: => Value2): PWidget[Action, StateGet, StateSet, Value2] =
+    mapValue(_ => f)
+
+  // --- Map with Value & State ---
+
+  final def flatMapEitherValueWithState[StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
+      f: (StateGet2, Valid[Value]) => Valid[Value2],
+  ): PWidget[Action, StateGet2, StateSet2, Value2] =
+    PWidget.many[Action, StateGet2, StateSet2, Value2](
+      elements,
+      s => f(s, value(s)),
+    )
+
+  inline final def flatMapValueWithState[StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
+      f: (StateGet2, Value) => Valid[Value2],
+  ): PWidget[Action, StateGet2, StateSet2, Value2] =
+    flatMapEitherValueWithState[StateGet2, StateSet2, Value2] { (s, v) => v.flatMap(f(s, _)) }
+
+  inline final def mapValueWithState[StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
+      f: (StateGet2, Value) => Value2,
+  ): PWidget[Action, StateGet2, StateSet2, Value2] =
+    flatMapEitherValueWithState[StateGet2, StateSet2, Value2] { (s, v) => v.map(f(s, _)) }
+
+  // --- Map with State ---
+
+  final def eitherValueFromState[StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
+      f: StateGet2 => Valid[Value2],
+  ): PWidget[Action, StateGet2, StateSet2, Value2] =
+    PWidget.many[Action, StateGet2, StateSet2, Value2](
+      elements,
+      f(_),
+    )
+
+  inline final def valueFromState[StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
+      f: StateGet2 => Value2,
+  ): PWidget[Action, StateGet2, StateSet2, Value2] =
+    eitherValueFromState[StateGet2, StateSet2, Value2](f(_).asRight)
+
+  // --- Map State ---
+
   final def imapState[OuterState, InnerState >: StateSet <: StateGet](
       lens: Lens[OuterState, InnerState],
   ): AVWidget[Action, OuterState, Value] =
@@ -82,10 +127,29 @@ trait PWidget[+Action, -StateGet, +StateSet, +Value] { self =>
       s => value(lens.get(s)),
     )
 
+  // TODO (KR) : I cant get the stupid variance to work properly on this one
+  //           : The problem is that this method can not take type-parameters, because the apply method
+  //           : on PWidget.LensBuilder needs to take exactly 1 parameter, in order to be able to infer give the type hint
+  final def zoomOut: PWidget.LensBuilder[Action @uncheckedVariance, StateGet @uncheckedVariance, StateSet @uncheckedVariance, Value @uncheckedVariance] =
+    PWidget.LensBuilder(self)
+
+  final def placeBeforeWithEitherValue[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
+      other: Valid[Value] => PWidget[Action2, StateGet2, StateSet2, Value2],
+  )(implicit
+      zippable: Zippable[Value, Value2],
+  ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
+    PWidget.many(
+      (rh, s) => other(value(s)).elements(rh, s) ::: self.elements(rh, s),
+      { s =>
+        val svs = self.value(s)
+        svs accumulate other(svs).value(s)
+      },
+    )
+
 }
 object PWidget {
 
-  def many[Action, StateGet, StateSet, Value](
+  def many[Action, StateGet, StateSet <: StateGet, Value](
       elementsF: (RaiseHandler[Action, StateSet], StateGet) => List[VDom.Element],
       valueF: StateGet => Valid[Value],
   ): PWidget[Action, StateGet, StateSet, Value] =
@@ -94,11 +158,24 @@ object PWidget {
       override val value: StateGet => Valid[Value] = valueF
     }
 
-  inline def apply[Action, StateGet, StateSet, Value](
+  inline def apply[Action, StateGet, StateSet <: StateGet, Value](
       elementsF: (RaiseHandler[Action, StateSet], StateGet) => VDom.Element,
       valueF: StateGet => Valid[Value],
   ): PWidget[Action, StateGet, StateSet, Value] =
     PWidget.many[Action, StateGet, StateSet, Value](elementsF(_, _) :: Nil, valueF)
+
+  final class LensBuilder[+Action, +StateGet, -StateSet <: StateGet, +Value](
+      widget: PWidget[Action, StateGet, StateSet, Value],
+  ) {
+
+    type InnerState >: StateSet <: StateGet
+
+    transparent inline def apply[OuterState](inline lambda: KeywordContext ?=> OuterState => InnerState): Any =
+      widget.imapState[OuterState, InnerState](
+        GenLens.apply[OuterState].apply[InnerState](lambda).asInstanceOf[Lens[OuterState, InnerState]],
+      )
+
+  }
 
 }
 
