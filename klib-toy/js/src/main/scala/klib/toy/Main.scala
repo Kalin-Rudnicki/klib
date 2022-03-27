@@ -18,12 +18,7 @@ object Main extends PageApp {
   val testPage: Page =
     Page
       .builder("test")
-      .constEnv {
-        Env(
-          "test",
-          0,
-        )
-      }
+      .constEnv { Env("test", 0) }
       .titleF(env => s"${env.str} : ${env.counter}")
       .body {
         def incButton(text: String, modify: Int => Int): Widget[Int] =
@@ -35,7 +30,7 @@ object Main extends PageApp {
           }
 
         val header: Widget[Env] =
-          CWidget(div("HEADER")) >>
+          CWidget(h1("HEADER")) >>
             Widget[Env](s => div(s"${s.str} : ${s.counter}"))
 
         val counter: Widget[Int] =
