@@ -19,6 +19,7 @@ object VDomBuilders {
     val ol: NodeElement = NodeElement("ol")
     val li: NodeElement = NodeElement("li")
     val br: NodeElement = NodeElement("br")
+    val button: NodeElement = NodeElement("button")
     // TODO:
   }
 
@@ -38,6 +39,8 @@ object VDomBuilders {
     object height extends CSSAttrBuilder("height")
     object cursor extends CSSAttrBuilder("cursor")
     object userSelect extends CSSAttrBuilder("user-select")
+    object padding extends CSSAttrBuilder("padding")
+    object margin extends CSSAttrBuilder("margin")
     // TODO:
   }
 

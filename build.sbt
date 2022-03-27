@@ -100,14 +100,29 @@ lazy val klib =
     .jsSettings(
       Dependencies.`io.github.cquiroz`.`scala-java-time`,
       Dependencies.`com.lihaoyi`.scalatags,
-      // TODO: Remove
-      scalaJSUseMainModuleInitializer := true,
     )
     .jvmSettings(
       // Dependencies
       Dependencies.`com.google.jimfs`.jimfs,
       Test / run / fork := true,
     )
+
+lazy val `klib-toy` =
+  crossProject(JSPlatform, JVMPlatform)
+    .in(file("klib-toy"))
+    .settings(
+      name := "klib-toy",
+      version := "0.0.0",
+      Compile / unmanagedSourceDirectories +=
+        baseDirectory.value / "shared" / "main" / "scala",
+      Test / unmanagedSourceDirectories +=
+        baseDirectory.value / "shared" / "test" / "scala",
+      scalaVersion := Scala_3,
+    )
+    .jsSettings(
+      scalaJSUseMainModuleInitializer := true,
+    )
+    .dependsOn(klib)
 
 lazy val `klib-root` =
   project

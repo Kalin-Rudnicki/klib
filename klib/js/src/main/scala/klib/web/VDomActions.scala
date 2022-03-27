@@ -109,19 +109,18 @@ object VDomActions {
 
   final class Renderer private (ref: Ref.Synchronized[Option[List[Element]]]) {
 
-    final def setPageTitle(title: String): TaskM[Unit] =
-      ZIOM.attempt(window.document.title = title)
-
-    def render(newVDoms: List[Element]): TaskM[Unit] =
+    def render(title: String, newVDoms: List[Element]): TaskM[Unit] =
       ref.updateZIO { oldVDoms =>
-        ZIOM
-          .attempt {
+        val runSetTitle = ZIOM.attempt(window.document.title = title)
+        val runRender =
+          ZIOM.attempt {
             oldVDoms match {
               case Some(oldVDoms) => diffElements(document.body, newVDoms, oldVDoms)
               case None           => setBody(newVDoms)
             }
           }
-          .as(newVDoms.some)
+
+        runSetTitle *> runRender *> ZIO.some(newVDoms)
       }
 
   }

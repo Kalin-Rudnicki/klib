@@ -26,6 +26,9 @@ sealed abstract class RaiseHandler[-A, -S](runtime: Runtime[Executable.BaseEnv])
         .dumpErrorsAndContinue(Logger.LogLevel.Error)
     }
 
+  inline def modifyState[S2 <: S](modify: S2 => S2): Unit =
+    raise(Raise.ModifyState(modify, true))
+
   // =====| Helpers |=====
 
   private[web] final def mapRaise[NewA, NewS](f: Raise[NewA, NewS] => TaskM[List[Raise[A, S]]]): RaiseHandler[NewA, NewS] =
@@ -64,7 +67,7 @@ object RaiseHandler {
       envRef: Ref.Synchronized[S],
       widget: AVWidget[A, S, Any],
       handleA: A => STaskM[List[Raise.StandardOrUpdate[S]]],
-      titleF: Option[S => String],
+      titleF: Page.TitleF[S],
       runtime: Runtime[Executable.BaseEnv],
   ): RaiseHandler[A, S] =
     new RaiseHandler[A, S](runtime) {
@@ -85,18 +88,15 @@ object RaiseHandler {
                   for {
                     env <- envRef.get
                     newVDom = widget.elements(this, env)
-                    _ <- renderer.render(newVDom)
+                    _ <- renderer.render(titleF(env), newVDom)
                   } yield ()
               }
             case modifyState: Raise.ModifyState[S] =>
               envRef.updateZIO { env =>
                 val newEnv = modifyState.modify(env)
                 val newVDom = widget.elements(this, newEnv)
-                if (modifyState.reRender)
-                  ZIO.foreachDiscard(titleF)(f => renderer.setPageTitle(f(newEnv))) *>
-                    renderer.render(newVDom).as(newEnv)
-                else
-                  ZIO.succeed(newEnv)
+                if (modifyState.reRender) renderer.render(titleF(newEnv), newVDom).as(newEnv)
+                else ZIO.succeed(newEnv)
               }
           }
 

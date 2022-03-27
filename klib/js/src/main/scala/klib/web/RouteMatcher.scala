@@ -31,7 +31,10 @@ final case class RouteMatcher[T](private val attemptMatch: (List[String], ParamM
     }
 
   def runMatch(path: List[String], params: ParamMap): Option[T] =
-    attemptMatch(path, params).map(_._2)
+    attemptMatch(path, params) match {
+      case Some((Nil, t)) => t.some
+      case _              => None
+    }
 
   def attemptToLoadPage(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv])(implicit ev: T <:< Page): STaskM[Unit] =
     for {
@@ -45,7 +48,10 @@ final case class RouteMatcher[T](private val attemptMatch: (List[String], ParamM
       _ <-
         runMatch(pathnames, paramMap) match {
           case Some(page) => ev(page).replaceNoTrace(renderer, runtime)
-          case None       => Logger.println.error(s"Unable to load page: ${pathnames.mkString("/")}?$params")
+          case None =>
+            val pathStr: String = pathnames.mkString("/")
+            val paramStr: String = params.map { (k, v) => s"$k=$v" }.mkString("&")
+            Logger.println.error(s"Unable to load page: $pathStr${if (paramStr.nonEmpty) "?" else ""}$paramStr")
         }
     } yield ()
 
@@ -82,6 +88,9 @@ object RouteMatcher {
   def paths(path0: String, paths: String*): RouteMatcher[Unit] =
     (path0 :: paths.toList)
       .foldRight(RouteMatcher.pure(()))(_ /: _)
+
+  def consumeEntirePath: RouteMatcher[Unit] =
+    RouteMatcher((_, _) => (Nil, ()).some)
 
   def param[P: DecodeFromString](name: String): RouteMatcher[P] =
     RouteMatcher { (paths, params) =>

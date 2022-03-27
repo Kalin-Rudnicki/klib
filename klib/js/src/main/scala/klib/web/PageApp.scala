@@ -3,32 +3,27 @@ package klib.web
 import zio.*
 
 import klib.utils.*
-import klib.utils.commandLine.parse.*
 
-trait PageApp extends ExecutableApp {
+trait PageApp extends ZIOAppDefault {
 
-  // TODO: Load from url?
-  private val args: TaskM[Chunk[String]] =
-    ZIO.succeed(Chunk("-l=DEBUG", "-r=DEV", "--"))
+  private final type PageEnv = Executable.Env
 
-  override def run: ZIO[Environment with ZEnv with ZIOAppArgs, Any, Any] =
-    super.run.provideSomeLayer(
-      args.map(ZIOAppArgs(_)).toLayer,
-    )
+  private final val pageLayer: RLayerM[ZIOAppArgs & ZEnv, Executable.Env] =
+    FileSystem.jsUnimplemented ++
+      Logger.live(Logger.LogLevel.Debug) ++
+      ZLayer.succeed(RunMode.Dev)
+
+  private final val prog: STaskM[Unit] =
+    for {
+      renderer <- VDomActions.Renderer.Initial
+      runtime <- ZIO.runtime[Executable.BaseEnv]
+
+      _ <- routeMatcher.attemptToLoadPage(renderer, runtime)
+    } yield ()
+
+  override def run: RIOM[ZIOAppArgs & ZEnv, Unit] =
+    prog.provideSomeLayer(pageLayer)
 
   val routeMatcher: RouteMatcher[Page]
-
-  override val executable: Executable =
-    Executable
-      .fromParser(Parser.unit.disallowExtras)
-      .withLayer(_ => ZIO.unit.toLayer)
-      .withExecute { _ =>
-        for {
-          renderer <- VDomActions.Renderer.Initial
-          runtime <- ZIO.runtime[Executable.BaseEnv]
-
-          _ <- routeMatcher.attemptToLoadPage(renderer, runtime)
-        } yield ()
-      }
 
 }

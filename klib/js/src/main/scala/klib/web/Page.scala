@@ -13,7 +13,7 @@ sealed trait Page {
   type A
   val url: String
   val getEnv: TaskM[Env]
-  val titleF: Either[String, Env => String]
+  val titleF: Page.TitleF[Env]
   val widget: AVWidget[A, Env, Any]
   val handleA: A => STaskM[List[Raise.StandardOrUpdate[Env]]]
 
@@ -21,15 +21,10 @@ sealed trait Page {
     for {
       env <- getEnv
       envRef <- Ref.Synchronized.make(env)
-      title =
-        titleF match {
-          case Right(f) => f(env)
-          case Left(s)  => s
-        }
-      raiseHandler = RaiseHandler.root[A, Env](renderer, envRef, widget, handleA, titleF.toOption, runtime)
+
+      raiseHandler = RaiseHandler.root[A, Env](renderer, envRef, widget, handleA, titleF, runtime)
       newVDom = widget.elements(raiseHandler, env)
-      _ <- renderer.render(newVDom)
-      _ <- renderer.setPageTitle(title)
+      _ <- renderer.render(titleF(env), newVDom)
     } yield ()
 
   private[web] final def push(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv]): TaskM[Unit] =
@@ -47,6 +42,11 @@ sealed trait Page {
 
 }
 object Page {
+
+  opaque type TitleF[Env] = Either[String, Env => String]
+  extension [Env](titleF: TitleF[Env]) {
+    def apply(env: Env): String = titleF.fold(identity, _(env))
+  }
 
   object builder {
 
