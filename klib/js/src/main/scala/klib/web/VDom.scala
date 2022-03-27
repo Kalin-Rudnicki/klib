@@ -91,8 +91,13 @@ object VDom {
     private def classNames(base: String, modifiers: Set[String]): Set[String] =
       modifiers.map(modifier => s"$base--$modifier") + base
 
-    def b(block: String, modifiers: String*): ClassName = Block(block, modifiers.toSet)
-    def be(block: String, element: String, modifiers: String*): ClassName = Element(block, element, modifiers.toSet)
+    def b(block: String): ClassName = Block(block, Set.empty)
+    def b(block: String, m0: String, mN: String*): ClassName = Block(block, (m0 :: mN.toList).toSet)
+    def b(block: String, m0: IterableOnce[String], mN: IterableOnce[String]*): ClassName = Block(block, (m0 :: mN.toList).toSet.flatten)
+
+    def be(block: String, element: String): ClassName = Element(block, element, Set.empty)
+    def be(block: String, element: String, m0: String, mN: String*): ClassName = Element(block, element, (m0 :: mN.toList).toSet)
+    def be(block: String, element: String, m0: IterableOnce[String], mN: IterableOnce[String]*): ClassName = Element(block, element, (m0 :: mN.toList).toSet.flatten)
 
   }
 
