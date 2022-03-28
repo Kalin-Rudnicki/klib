@@ -5,8 +5,8 @@ import cats.syntax.either.*
 
 import klib.utils.*
 import klib.web.{given, *}
-import klib.web.VDom.{given, *}
-import klib.web.VDomBuilders.*
+import klib.web.BasicPredef.{given, *}
+import klib.web.widgets.*
 
 object Main extends PageApp {
 
@@ -14,12 +14,13 @@ object Main extends PageApp {
       str: String,
       counter: Int,
       counter2: Int,
+      text: String,
   )
 
   val testPage: Page =
     Page
       .builder("test")
-      .constEnv { Env("test", 0, 0) }
+      .constEnv { Env("test", 0, 0, "init") }
       .titleF(env => s"${env.str} : ${env.counter}")
       .body {
         def incButton(text: String, modify: Int => Int): Widget[Int] =
@@ -48,12 +49,20 @@ object Main extends PageApp {
         val all: VWidget[Env, Int] = {
           header >>
             counter.zoomOut[Env](_.counter)
-        }.eitherValueFromState(env => Option.when(env.counter >= 0)(env.counter).toRight(NonEmptyList.one("Counter must be >= 0")))
+        }.eitherValueFromState(env => Option.when(env.counter >= 0)(env.counter).toRight(KError.message.same("Counter must be >= 0")))
 
-        all.placeAfterWithEitherValue { e =>
-          CWidget(div(s"Value: $e"))
-        } >>
-          counter.zoomOut[Env](_.counter2)
+        TextWidgets.textareaW[String]().zoomOut[Env](_.text) >>
+          all.placeAfterWithEitherValue { e =>
+            CWidget(div(s"Value: $e"))
+          } >>
+          counter.zoomOut[Env](_.counter2) >>
+          TextWidgets
+            .inputW[Int]()
+            .placeAfterWithEitherValue { e =>
+              CWidget(div(s"TextValue: $e"))
+            }
+            .zoomOut[Env](_.text)
+
       }
       .logA
 

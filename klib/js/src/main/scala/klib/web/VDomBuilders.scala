@@ -206,6 +206,8 @@ object VDomBuilders {
     object onDragLeave extends KeyAttrBuilder[DragEvent => Unit]("ondragleave", identity(_))
     object onDragOver extends KeyAttrBuilder[DragEvent => Unit]("ondragover", identity(_))
     object onDrop extends KeyAttrBuilder[DragEvent => Unit]("ondrop", identity(_))
+
+    object value extends KeyAttrBuilder[String]("value", identity(_))
     // TODO: more?
   }
 

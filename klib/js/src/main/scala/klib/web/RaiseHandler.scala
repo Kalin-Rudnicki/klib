@@ -16,7 +16,7 @@ sealed abstract class RaiseHandler[-A, -S](runtime: Runtime[Executable.BaseEnv])
 
   inline final def raise(raise: Raise[A, S]*): Unit = raiseManyZIO(ZIO.succeed(raise.toList))
   inline final def raiseMany(raise: List[Raise[A, S]]): Unit = raiseManyZIO(ZIO.succeed(raise))
-  inline final def raiseZIO(raise: RIOM[Executable.Env, Raise[A, S]]): Unit = raiseManyZIO(raise.map(_ :: Nil))
+  inline final def raiseZIO(raise: STaskM[Raise[A, S]]): Unit = raiseManyZIO(raise.map(_ :: Nil))
   final def raiseManyZIO(raise: STaskM[List[Raise[A, S]]]): Unit =
     runtime.unsafeRun {
       raise
@@ -26,8 +26,15 @@ sealed abstract class RaiseHandler[-A, -S](runtime: Runtime[Executable.BaseEnv])
         .dumpErrorsAndContinue(Logger.LogLevel.Error)
     }
 
-  inline def modifyState[S2 <: S](modify: S2 => S2): Unit =
-    raise(Raise.ModifyState(modify, true))
+  inline final def modifyState[S2 <: S](modify: S2 => S2): Unit = raise(Raise.modifyState(modify))
+  inline final def modifyStateNoReRender[S2 <: S](modify: S2 => S2): Unit = raise(Raise.modifyStateNoReRender(modify))
+  inline final def setState(set: => S): Unit = raise(Raise.setState(set))
+  inline final def setStateNoReRender(set: => S): Unit = raise(Raise.setStateNoReRender(set))
+
+  inline final def raiseAction(raise: A*): Unit = raiseMany(raise.map(Raise.Action(_)).toList)
+  inline final def raiseActionMany(raise: List[A]): Unit = raiseMany(raise.map(Raise.Action(_)))
+  inline final def raiseActionZIO(raise: STaskM[A]): Unit = raiseZIO(raise.map(Raise.Action(_)))
+  inline final def raiseActionManyZIO(raise: STaskM[List[A]]): Unit = raiseManyZIO(raise.map(_.map(Raise.Action(_))))
 
   // =====| Helpers |=====
 

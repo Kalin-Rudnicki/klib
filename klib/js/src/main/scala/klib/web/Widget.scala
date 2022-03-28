@@ -2,6 +2,7 @@ package klib.web
 
 import cats.data.*
 import cats.syntax.either.*
+import cats.syntax.parallel.*
 import monocle.*
 import monocle.Focus.KeywordContext
 import monocle.macros.GenLens
@@ -29,7 +30,7 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
   ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
     PWidget.many(
       (rh, s) => self.elements(rh, s) ::: other.elements(rh, s),
-      s => self.value(s) accumulate other.value(s),
+      s => (self.value(s), other.value(s)).parMapN(zippable.zip),
     )
   inline final def >>[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
       other: PWidget[Action2, StateGet2, StateSet2, Value2],
@@ -45,7 +46,7 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
   ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
     PWidget.many(
       (rh, s) => other.elements(rh, s) ::: self.elements(rh, s),
-      s => other.value(s) accumulate self.value(s),
+      s => (other.value(s), self.value(s)).parMapN(zippable.zip),
     )
   inline final def <<[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
       other: PWidget[Action2, StateGet2, StateSet2, Value2],
@@ -120,7 +121,7 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
   final def asEither[Value2](f: => Valid[Value2]): PWidget[Action, StateGet, StateSet, Value2] =
     mapEitherValue(_ => f)
 
-  inline final def asError(f: => NonEmptyList[String]): PWidget[Action, StateGet, StateSet, Nothing] =
+  inline final def asError(f: => KError[Nothing]): PWidget[Action, StateGet, StateSet, Nothing] =
     asEither(f.asLeft)
 
   inline final def as[Value2](f: => Value2): PWidget[Action, StateGet, StateSet, Value2] =
@@ -151,7 +152,7 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
       (rh, s) => other(value(s)).elements(rh, s) ::: self.elements(rh, s),
       { s =>
         val svs = self.value(s)
-        other(svs).value(s) accumulate svs
+        (other(svs).value(s), svs).parMapN(zippable.zip)
       },
     )
 
@@ -165,7 +166,7 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
       case Left(_) =>
         PWidget[Action2, StateGet2, StateSet2, Value2](
           (_, _) => VDomBuilders.span(display := "none"),
-          _ => NonEmptyList.one("placeBeforeWithValue: value is invalid").asLeft,
+          _ => KError.message.same("placeBeforeWithValue: value is invalid").asLeft,
         )
     }
 
@@ -178,7 +179,7 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
       (rh, s) => self.elements(rh, s) ::: other(value(s)).elements(rh, s),
       { s =>
         val svs = self.value(s)
-        svs accumulate other(svs).value(s)
+        (svs, other(svs).value(s)).parMapN(zippable.zip)
       },
     )
 
@@ -192,7 +193,7 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
       case Left(_) =>
         PWidget[Action2, StateGet2, StateSet2, Value2](
           (_, _) => VDomBuilders.span(display := "none"),
-          _ => NonEmptyList.one("placeAfterWithValue: value is invalid").asLeft,
+          _ => KError.message.same("placeAfterWithValue: value is invalid").asLeft,
         )
     }
 
@@ -231,7 +232,7 @@ object PWidget {
 
 // =====| Type Aliases |=====
 
-type Valid[Value] = EitherNel[String, Value]
+type Valid[Value] = EitherError[Value]
 
 // =====| Stateless Widgets |=====
 
