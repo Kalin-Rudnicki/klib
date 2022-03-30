@@ -13,14 +13,12 @@ object Main extends PageApp {
   final case class Env(
       str: String,
       counter: Int,
-      counter2: Int,
-      text: String,
   )
 
   val testPage: Page =
     Page
       .builder("test")
-      .constEnv { Env("test", 0, 0, "init") }
+      .constEnv { Env("test", 0) }
       .titleF(env => s"${env.str} : ${env.counter}")
       .body {
         def incButton(text: String, modify: Int => Int): Widget[Int] =
@@ -45,10 +43,19 @@ object Main extends PageApp {
             Widget[Int] { s => span(display := "inline-block", textAlign := "center", width := "25px")(s.toString) }.valueFromState(identity) >>
             incButton("+", _ + 1)
 
-        counter
-          .mapValue(_ * 2)
-          .debugStateAndValue
-          .zoomOut[Env](_.counter)
+        {
+          header >>
+            counter
+              .mapValue(_ * 2)
+              .debugStateAndValue
+              .zoomOut[Env](_.counter) >>
+            TextWidgets.input
+              .required[String]("text", TextWidgets.Decorator.labelInFront)
+              .zoomOut[Env](_.str) >>
+            TextWidgets.textArea
+              .optional[String]("text")
+              .zoomOut[Env](_.str)
+        }.debugStateAndValue
       }
       .logA
 
