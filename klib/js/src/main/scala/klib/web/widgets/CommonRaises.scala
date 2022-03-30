@@ -8,4 +8,6 @@ object CommonRaises {
     case class Or[O](value: O) extends SubmitOr[O]
   }
 
+  type Submit = SubmitOr.Submit.type
+
 }

@@ -20,3 +20,13 @@ extension [L, R](self: EitherNel[L, R]) {
     }
 
 }
+
+implicit class EitherOps[L, R](self: Either[L, R]) {
+
+  def cata[A](lF: L => A, rF: R => A): A =
+    self match {
+      case Left(l)  => lF(l)
+      case Right(r) => rF(r)
+    }
+
+}

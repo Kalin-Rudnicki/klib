@@ -39,30 +39,16 @@ object Main extends PageApp {
           CWidget(h1("HEADER")) >>
             Widget[Env](s => div(s"${s.str} : ${s.counter}"))
 
-        val counter: Widget[Int] =
+        val counter: VWidget[Int, Int] =
           CWidget("Counter: ") >>
             incButton("-", i => (i - 1).max(0)) >>
-            Widget[Int] { s => span(display := "inline-block", textAlign := "center", width := "25px")(s.toString) } >>
-            incButton("+", _ + 1) >>
-            CWidget(div("Here is some more text..."))
+            Widget[Int] { s => span(display := "inline-block", textAlign := "center", width := "25px")(s.toString) }.valueFromState(identity) >>
+            incButton("+", _ + 1)
 
-        val all: VWidget[Env, Int] = {
-          header >>
-            counter.zoomOut[Env](_.counter)
-        }.eitherValueFromState(env => Option.when(env.counter >= 0)(env.counter).toRight(KError.message.same("Counter must be >= 0")))
-
-        TextWidgets.textareaW[String]().zoomOut[Env](_.text) >>
-          all.placeAfterWithEitherValue { e =>
-            CWidget(div(s"Value: $e"))
-          } >>
-          counter.zoomOut[Env](_.counter2) >>
-          TextWidgets
-            .inputW[Int]()
-            .placeAfterWithEitherValue { e =>
-              CWidget(div(s"TextValue: $e"))
-            }
-            .zoomOut[Env](_.text)
-
+        counter
+          .mapValue(_ * 2)
+          .debugStateAndValue
+          .zoomOut[Env](_.counter)
       }
       .logA
 

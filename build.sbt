@@ -2,7 +2,7 @@
 
 val Scala_2_12 = "2.12.10"
 val Scala_2_13 = "2.13.4"
-val Scala_3 = "3.1.1"
+val Scala_3 = "3.1.2-RC3"
 val CirceVersion = "0.15.0-M1" // REMOVE : ...
 
 val MyOrg = "io.github.kalin-rudnicki"
@@ -96,6 +96,8 @@ lazy val klib =
       Dependencies.`com.github.julien-truffaut`.`monocle-macro`,
       // Testing
       testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")),
+      // TODO: other
+      // scalacOptions += "-language:experimental.dependent",
     )
     .jsSettings(
       Dependencies.`io.github.cquiroz`.`scala-java-time`,
