@@ -1,5 +1,6 @@
 package klib.web
 
+import cats.Monoid
 import cats.syntax.option.*
 import scala.annotation.tailrec
 import scala.scalajs.js
@@ -29,9 +30,20 @@ object VDom {
   object Modifier {
     sealed trait Basic extends Modifier
     final case class Wrapped(children: List[Basic]) extends Modifier
+
+    def apply(children: Modifier*): Modifier =
+      Wrapped(children.toList.flatMap(_.toBasics))
+
+    val empty: Modifier = Wrapped(Nil)
+
+    given Monoid[Modifier] = new Monoid[Modifier] {
+      override def empty: Modifier = Modifier.empty
+      override def combine(x: Modifier, y: Modifier): Modifier =
+        Modifier(x, y)
+    }
   }
   given Conversion[Unit, Modifier] = _ => Modifier.Wrapped(Nil)
-  given Conversion[IterableOnce[Modifier.Basic], Modifier] = iter => Modifier.Wrapped(iter.toList)
+  given Conversion[IterableOnce[Modifier], Modifier] = iter => Modifier(iter.toList*)
 
   sealed trait Element extends Modifier.Basic {
     def nodeName: String =

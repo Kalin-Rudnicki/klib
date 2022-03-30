@@ -23,6 +23,8 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
 
   // =====| Combinators |=====
 
+  // --- place before/after ---
+
   final def placeBefore[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
       other: PWidget[Action2, StateGet2, StateSet2, Value2],
   )(implicit
@@ -54,6 +56,79 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
       zippable: Zippable[Value2, Value],
   ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
     placeAfter[Action2, StateGet2, StateSet2, Value2](other)
+
+  // --- place before/after with value ---
+
+  final def placeBeforeWithEitherValue[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
+      other: Valid[Value] => PWidget[Action2, StateGet2, StateSet2, Value2],
+  )(implicit
+      zippable: Zippable[Value2, Value],
+  ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
+    PWidget.many(
+      (rh, s) => other(value(s)).elements(rh, s) ::: self.elements(rh, s),
+      { s =>
+        val svs = self.value(s)
+        (other(svs).value(s), svs).parMapN(zippable.zip)
+      },
+    )
+
+  inline final def placeBeforeWithValue[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
+      other: Value => PWidget[Action2, StateGet2, StateSet2, Value2],
+  )(implicit
+      zippable: Zippable[Value2, Value],
+  ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
+    placeBeforeWithEitherValue[Action2, StateGet2, StateSet2, Value2] {
+      case Right(v) => other(v)
+      case Left(_) =>
+        PWidget[Action2, StateGet2, StateSet2, Value2](
+          (_, _) => VDomBuilders.span(display := "none"),
+          _ => KError.message.same("placeBeforeWithValue: value is invalid").asLeft,
+        )
+    }
+
+  final def placeAfterWithEitherValue[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
+      other: Valid[Value] => PWidget[Action2, StateGet2, StateSet2, Value2],
+  )(implicit
+      zippable: Zippable[Value, Value2],
+  ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
+    PWidget.many(
+      (rh, s) => self.elements(rh, s) ::: other(value(s)).elements(rh, s),
+      { s =>
+        val svs = self.value(s)
+        (svs, other(svs).value(s)).parMapN(zippable.zip)
+      },
+    )
+
+  inline final def placeAfterWithValue[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
+      other: Value => PWidget[Action2, StateGet2, StateSet2, Value2],
+  )(implicit
+      zippable: Zippable[Value, Value2],
+  ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
+    placeAfterWithEitherValue[Action2, StateGet2, StateSet2, Value2] {
+      case Right(v) => other(v)
+      case Left(_) =>
+        PWidget[Action2, StateGet2, StateSet2, Value2](
+          (_, _) => VDomBuilders.span(display := "none"),
+          _ => KError.message.same("placeAfterWithValue: value is invalid").asLeft,
+        )
+    }
+
+  inline final def debugState: PWidget[Action, StateGet, StateSet, Value] =
+    self >>
+      PWidget[Action, StateGet, StateSet, Unit](
+        (_, s) => VDomBuilders.div(s"State: $s"),
+        _ => ().asRight,
+      )
+
+  inline final def debugValue: PWidget[Action, StateGet, StateSet, Value] =
+    placeAfterWithEitherValue { e =>
+      CWidget(VDomBuilders.div(s"Value: $e"))
+    }
+
+  inline final def debugStateAndValue: PWidget[Action, StateGet, StateSet, Value] =
+    self.debugState.debugValue
+
+  // --- wrap ---
 
   @targetName("wrappedMany")
   final def wrapped(wrapInner: List[VDom.Element] => List[VDom.Element]): PWidget[Action, StateGet, StateSet, Value] =
@@ -143,60 +218,6 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
   final def zoomOut: PWidget.LensBuilder[Action, StateGet @uncheckedVariance, StateSet @uncheckedVariance, Value] =
     PWidget.LensBuilder(self)
 
-  final def placeBeforeWithEitherValue[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
-      other: Valid[Value] => PWidget[Action2, StateGet2, StateSet2, Value2],
-  )(implicit
-      zippable: Zippable[Value2, Value],
-  ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
-    PWidget.many(
-      (rh, s) => other(value(s)).elements(rh, s) ::: self.elements(rh, s),
-      { s =>
-        val svs = self.value(s)
-        (other(svs).value(s), svs).parMapN(zippable.zip)
-      },
-    )
-
-  inline final def placeBeforeWithValue[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
-      other: Value => PWidget[Action2, StateGet2, StateSet2, Value2],
-  )(implicit
-      zippable: Zippable[Value2, Value],
-  ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
-    placeBeforeWithEitherValue[Action2, StateGet2, StateSet2, Value2] {
-      case Right(v) => other(v)
-      case Left(_) =>
-        PWidget[Action2, StateGet2, StateSet2, Value2](
-          (_, _) => VDomBuilders.span(display := "none"),
-          _ => KError.message.same("placeBeforeWithValue: value is invalid").asLeft,
-        )
-    }
-
-  final def placeAfterWithEitherValue[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
-      other: Valid[Value] => PWidget[Action2, StateGet2, StateSet2, Value2],
-  )(implicit
-      zippable: Zippable[Value, Value2],
-  ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
-    PWidget.many(
-      (rh, s) => self.elements(rh, s) ::: other(value(s)).elements(rh, s),
-      { s =>
-        val svs = self.value(s)
-        (svs, other(svs).value(s)).parMapN(zippable.zip)
-      },
-    )
-
-  inline final def placeAfterWithValue[Action2 >: Action, StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
-      other: Value => PWidget[Action2, StateGet2, StateSet2, Value2],
-  )(implicit
-      zippable: Zippable[Value, Value2],
-  ): PWidget[Action2, StateGet2, StateSet2, zippable.Out] =
-    placeAfterWithEitherValue[Action2, StateGet2, StateSet2, Value2] {
-      case Right(v) => other(v)
-      case Left(_) =>
-        PWidget[Action2, StateGet2, StateSet2, Value2](
-          (_, _) => VDomBuilders.span(display := "none"),
-          _ => KError.message.same("placeAfterWithValue: value is invalid").asLeft,
-        )
-    }
-
 }
 object PWidget {
 
@@ -248,9 +269,9 @@ object CWidget {
     )
 
   inline def apply(
-      elementsF: => VDom.Element,
+      elementsF: => VDom.Element*,
   ): CWidget =
-    CWidget.many(elementsF :: Nil)
+    CWidget.many(elementsF.toList)
 
 }
 
