@@ -82,7 +82,7 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
       case Left(_) =>
         PWidget[Action2, StateGet2, StateSet2, Value2](
           (_, _) => VDomBuilders.span(display := "none"),
-          _ => KError.message.same("placeBeforeWithValue: value is invalid").asLeft,
+          _ => NonEmptyList.one("placeBeforeWithValue: value is invalid").asLeft,
         )
     }
 
@@ -109,7 +109,7 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
       case Left(_) =>
         PWidget[Action2, StateGet2, StateSet2, Value2](
           (_, _) => VDomBuilders.span(display := "none"),
-          _ => KError.message.same("placeAfterWithValue: value is invalid").asLeft,
+          _ => NonEmptyList.one("placeAfterWithValue: value is invalid").asLeft,
         )
     }
 
@@ -140,67 +140,54 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
   inline final def wrapped(wrapInner: List[VDom.Element] => VDom.Element): PWidget[Action, StateGet, StateSet, Value] =
     wrapped(wrapInner(_) :: Nil)
 
-  // =====| Mapping |=====
+  // =====| Value Mapping |=====
 
-  // --- Map with Value ---
-
-  final def mapEitherValue[Value2](f: Valid[Value] => Valid[Value2]): PWidget[Action, StateGet, StateSet, Value2] =
-    PWidget.many(
+  def copySelfWithNewValueF[NewStateGet >: StateSet <: StateGet, NewValue](newValueF: NewStateGet => Valid[NewValue]): PWidget[Action, NewStateGet, StateSet, NewValue] =
+    PWidget.many[Action, NewStateGet, StateSet, NewValue](
       elements,
-      s => f(value(s)),
+      newValueF,
     )
 
-  inline final def mapValue[Value2](f: Value => Value2): PWidget[Action, StateGet, StateSet, Value2] =
-    mapEitherValue(_.map(f))
+  inline final def mapValueSVE[NewStateGet >: StateSet <: StateGet, Value2](f: (NewStateGet, Valid[Value]) => Valid[Value2]): PWidget[Action, NewStateGet, StateSet, Value2] =
+    copySelfWithNewValueF(state => f(state, value(state)))
 
-  inline final def flatMapValue[Value2](f: Value => Valid[Value2]): PWidget[Action, StateGet, StateSet, Value2] =
-    mapEitherValue(_.flatMap(f))
+  inline final def mapValueSVF[NewStateGet >: StateSet <: StateGet, Value2](f: (NewStateGet, Value) => Valid[Value2]): PWidget[Action, NewStateGet, StateSet, Value2] =
+    copySelfWithNewValueF(state => value(state).flatMap(f(state, _)))
 
-  // --- Map with Value & State ---
+  inline final def mapValueSV[NewStateGet >: StateSet <: StateGet, Value2](f: (NewStateGet, Value) => Value2): PWidget[Action, NewStateGet, StateSet, Value2] =
+    copySelfWithNewValueF(state => value(state).map(f(state, _)))
 
-  final def flatMapEitherValueWithState[StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
-      f: (StateGet2, Valid[Value]) => Valid[Value2],
-  ): PWidget[Action, StateGet2, StateSet2, Value2] =
-    PWidget.many[Action, StateGet2, StateSet2, Value2](
-      elements,
-      s => f(s, value(s)),
-    )
+  inline final def setValueSE[NewStateGet >: StateSet <: StateGet, Value2](f: NewStateGet => Valid[Value2]): PWidget[Action, NewStateGet, StateSet, Value2] =
+    copySelfWithNewValueF(f)
 
-  inline final def flatMapValueWithState[StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
-      f: (StateGet2, Value) => Valid[Value2],
-  ): PWidget[Action, StateGet2, StateSet2, Value2] =
-    flatMapEitherValueWithState[StateGet2, StateSet2, Value2] { (s, v) => v.flatMap(f(s, _)) }
+  inline final def setValueS[NewStateGet >: StateSet <: StateGet, Value2](f: NewStateGet => Value2): PWidget[Action, NewStateGet, StateSet, Value2] =
+    copySelfWithNewValueF(f(_).asRight)
 
-  inline final def mapValueWithState[StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
-      f: (StateGet2, Value) => Value2,
-  ): PWidget[Action, StateGet2, StateSet2, Value2] =
-    flatMapEitherValueWithState[StateGet2, StateSet2, Value2] { (s, v) => v.map(f(s, _)) }
+  inline final def mapValueVE[Value2](f: Valid[Value] => Valid[Value2]): PWidget[Action, StateGet, StateSet, Value2] =
+    copySelfWithNewValueF(state => f(value(state)))
 
-  // --- Map with State ---
+  inline final def mapValueVF[Value2](f: Value => Valid[Value2]): PWidget[Action, StateGet, StateSet, Value2] =
+    copySelfWithNewValueF(value(_).flatMap(f))
 
-  final def eitherValueFromState[StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
-      f: StateGet2 => Valid[Value2],
-  ): PWidget[Action, StateGet2, StateSet2, Value2] =
-    PWidget.many[Action, StateGet2, StateSet2, Value2](
-      elements,
-      f(_),
-    )
+  inline final def mapValueV[Value2](f: Value => Value2): PWidget[Action, StateGet, StateSet, Value2] =
+    copySelfWithNewValueF(value(_).map(f))
 
-  inline final def valueFromState[StateGet2 <: StateGet, StateSet2 >: StateSet <: StateGet2, Value2](
-      f: StateGet2 => Value2,
-  ): PWidget[Action, StateGet2, StateSet2, Value2] =
-    eitherValueFromState[StateGet2, StateSet2, Value2](f(_).asRight)
+  inline final def setValueE[Value2](f: => Valid[Value2]): PWidget[Action, StateGet, StateSet, Value2] =
+    copySelfWithNewValueF(_ => f)
 
-  // --- Map with Nothing ---
+  inline final def setValue[Value2](f: => Value2): PWidget[Action, StateGet, StateSet, Value2] =
+    copySelfWithNewValueF(_ => f.asRight)
 
-  final def asEither[Value2](f: => Valid[Value2]): PWidget[Action, StateGet, StateSet, Value2] =
-    mapEitherValue(_ => f)
+  // =====| Aliases |=====
 
-  inline final def asError(f: => KError[Nothing]): PWidget[Action, StateGet, StateSet, Nothing] =
-    asEither(f.asLeft)
+  inline final def asEither[Value2](f: => Valid[Value2]): PWidget[Action, StateGet, StateSet, Value2] =
+    setValueE(f)
 
   inline final def as[Value2](f: => Value2): PWidget[Action, StateGet, StateSet, Value2] =
-    asEither(f.asRight)
+    setValueE(f.asRight)
+
+  inline final def asError(f: => NonEmptyList[String]): PWidget[Action, StateGet, StateSet, Nothing] =
+    setValueE(f.asLeft)
 
   // --- Map State ---
 
@@ -217,6 +204,13 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
   //           : on PWidget.LensBuilder needs to take exactly 1 parameter, in order to be able to infer give the type hint
   final def zoomOut: PWidget.LensBuilder[Action, StateGet @uncheckedVariance, StateSet @uncheckedVariance, Value] =
     PWidget.LensBuilder(self)
+
+  // --- Map Action ---
+
+  /*
+  final def [Action2](f: (StateGet, Action) => Action2): PWidget[Action2, StateGet, StateSet, Value] =
+    ???
+   */
 
 }
 object PWidget {
@@ -253,7 +247,7 @@ object PWidget {
 
 // =====| Type Aliases |=====
 
-type Valid[Value] = EitherError[Value]
+type Valid[Value] = EitherNel[String, Value]
 
 // =====| Stateless Widgets |=====
 

@@ -38,7 +38,7 @@ sealed abstract class RaiseHandler[-A, -S](runtime: Runtime[Executable.BaseEnv])
 
   // =====| Helpers |=====
 
-  private[web] final def mapRaise[NewA, NewS](f: Raise[NewA, NewS] => TaskM[List[Raise[A, S]]]): RaiseHandler[NewA, NewS] =
+  private[web] final def mapRaise[NewA, NewS](f: Raise[NewA, NewS] => STaskM[List[Raise[A, S]]]): RaiseHandler[NewA, NewS] =
     RaiseHandler[NewA, NewS](
       f(_).flatMap(ZIO.foreach(_)(handleRaise)).unit,
       runtime,
@@ -51,7 +51,7 @@ sealed abstract class RaiseHandler[-A, -S](runtime: Runtime[Executable.BaseEnv])
       case action: Raise.Action[A]              => ZIO.succeed(action :: Nil)
     }
 
-  private[web] final def mapAction[NewA](f: NewA => TaskM[List[Raise[A, S]]]): RaiseHandler[NewA, S] =
+  private[web] final def mapAction[NewA](f: NewA => STaskM[List[Raise[A, S]]]): RaiseHandler[NewA, S] =
     mapRaise[NewA, S] {
       case modifyState: Raise.ModifyState[S] => ZIO.succeed(modifyState :: Nil)
       case standard: Raise.Standard          => ZIO.succeed(standard :: Nil)

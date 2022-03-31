@@ -174,6 +174,7 @@ object VDomBuilders {
       def :=(value: String): StdAttr = StdAttr(scopedName, value)
     }
 
+    object `type` extends StdAttrBuilder("type")
     // TODO:
   }
 
