@@ -51,16 +51,16 @@ final class ParamMap(mapType: String, map: Map[String, String]) {
     genGet[Option[T]](key)(_.traverse(f))
 
   def getParam[T: DecodeFromString](key: String): EitherError[T] =
-    getRequired(key, implicitly[DecodeFromString[T]].decode)
+    getRequired(key, implicitly[DecodeFromString[T]].decodeError)
 
   def getParamO[T: DecodeFromString](key: String): EitherError[Option[T]] =
-    getOption(key, implicitly[DecodeFromString[T]].decode)
+    getOption(key, implicitly[DecodeFromString[T]].decodeError)
 
   def getJsonParam[T: Decoder](key: String): EitherError[T] =
-    getRequired(key, DecodeFromString.fromCirceDecoder[T].decode)
+    getRequired(key, DecodeFromString.fromCirceDecoder[T].decodeError)
 
   def getJsonParamO[T: Decoder](key: String): EitherError[Option[T]] =
-    getOption(key, DecodeFromString.fromCirceDecoder[T].decode)
+    getOption(key, DecodeFromString.fromCirceDecoder[T].decodeError)
 
 }
 object ParamMap {

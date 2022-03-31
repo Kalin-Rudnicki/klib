@@ -40,17 +40,20 @@ object Main extends PageApp {
         val counter: VWidget[Int, Int] =
           CWidget("Counter: ") >>
             incButton("-", i => (i - 1).max(0)) >>
-            Widget[Int] { s => span(display := "inline-block", textAlign := "center", width := "25px")(s.toString) }.valueFromState(identity) >>
+            Widget[Int] { s => span(display := "inline-block", textAlign := "center", width := "25px")(s.toString) }.setValueS(identity) >>
             incButton("+", _ + 1)
 
         {
           header >>
             counter
-              .mapValue(_ * 2)
+              .mapValueV(_ * 2)
               .debugStateAndValue
               .zoomOut[Env](_.counter) >>
             TextWidgets.input
               .required[String]("text", TextWidgets.Decorator.labelInFront)
+              .zoomOut[Env](_.str) >>
+            TextWidgets.input
+              .required[Int]("counter", TextWidgets.Decorator.labelInFront.modifyFieldModifier.after(`type` := "number"))
               .zoomOut[Env](_.str) >>
             TextWidgets.textArea
               .optional[String]("text")

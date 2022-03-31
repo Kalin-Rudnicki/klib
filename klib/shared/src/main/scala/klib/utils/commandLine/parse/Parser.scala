@@ -406,7 +406,7 @@ object Parser {
         findFunction.attemptToFind(args) match {
           case Some(found) =>
             Result.fromEither(
-              res = _decodeFromString.decode(found.arg) match {
+              res = _decodeFromString.decodeError(found.arg) match {
                 case Left(error)  => NonEmptyList.one(Error(element.some, Error.Reason.MalformattedValue(found.arg, error))).asLeft
                 case Right(value) => value.some.asRight
               },
@@ -449,7 +449,7 @@ object Parser {
         val upcaseValues = values.map { (s, t) => (s.toUpperCase, t) }
         upcaseValues.toMap.get(str.toUpperCase) match {
           case Some(value) => value.asRight
-          case None        => KError.message.same(s"Invalid value ${str.unesc}, valid: ${upcaseValues.map(_._1).mkString(", ")}").asLeft
+          case None        => NonEmptyList.one(s"Invalid value ${str.unesc}, valid: ${upcaseValues.map(_._1).mkString(", ")}").asLeft
         }
       }
 

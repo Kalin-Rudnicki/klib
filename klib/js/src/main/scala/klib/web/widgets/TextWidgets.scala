@@ -1,5 +1,6 @@
 package klib.web.widgets
 
+import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
@@ -17,6 +18,8 @@ export klib.web.widgets.CommonRaises.*
 
 sealed trait TextBuilder1 { self =>
 
+  type State
+
   type Decorator
 
   protected def defaultDecorator: Decorator
@@ -29,23 +32,23 @@ sealed trait TextBuilder1 { self =>
   )(
       name: String,
       dec: Decorator,
-  ): AVWidget[Submit, String, O]
+  ): AVWidget[Submit, State, O]
 
   final class TextBuilder2 private[TextBuilder1] (baseElement: => NodeElement, requireCtrlForSubmit: Boolean) {
 
     def required[T: DecodeFromString](
         name: String,
         decorator: Decorator = defaultDecorator,
-    ): AVWidget[Submit, String, T] =
+    ): AVWidget[Submit, State, T] =
       generic[T, T](baseElement, requireCtrlForSubmit) {
         case Some(t) => t.asRight
-        case None    => KError.message.same("Missing required field").asLeft
+        case None    => NonEmptyList.one(s"Missing required field: '$name'").asLeft
       }(name, decorator)
 
     def optional[T: DecodeFromString](
         name: String,
         decorator: Decorator = defaultDecorator,
-    ): AVWidget[Submit, String, Option[T]] =
+    ): AVWidget[Submit, State, Option[T]] =
       generic[T, Option[T]](baseElement, requireCtrlForSubmit)(_.asRight)(name, decorator)
 
   }
@@ -56,6 +59,8 @@ sealed trait TextBuilder1 { self =>
 }
 
 object TextWidgets extends TextBuilder1 {
+
+  override type State = String
 
   // A helpful way to think of the naming scheme is this:
   // `before` means that this decorator decorates before the `other` decorator.
@@ -183,7 +188,7 @@ object TextWidgets extends TextBuilder1 {
   )(
       name: String,
       decorator: Decorator,
-  ): AVWidget[Submit, String, O] = {
+  ): AVWidget[Submit, State, O] = {
     val prettyName: String = name.split("-").map(_.capitalize).mkString(" ")
     val labelModifier: Modifier = decorator.labelModifier(name, prettyName)
     val fieldModifier: Modifier = decorator.fieldModifier(name, prettyName)
@@ -207,7 +212,13 @@ object TextWidgets extends TextBuilder1 {
             value := s,
             fieldModifier,
           ),
-        s => Option.when(s.nonEmpty)(s).traverse(DecodeFromString[T].decode(_)).flatMap(tToO),
+        s =>
+          Option
+            .when(s.nonEmpty)(s)
+            .traverse {
+              DecodeFromString[T].decode(_).leftMap(_.map(msg => s"Error in field '$name': $msg"))
+            }
+            .flatMap(tToO),
       )
     val modifiedField: AVSubmit[String, O] = decorator.decorateField(baseField)
 
