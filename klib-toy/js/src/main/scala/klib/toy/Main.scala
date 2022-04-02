@@ -48,7 +48,7 @@ object Main extends PageApp {
       .constTitle("Examples")
       .body {
         def incButton(text: String, modify: Int => Int): Widget[Int] =
-          AWidget[Nothing, Int] { (rh, s) =>
+          PWidget.withNoAction.withState[Int].withNoValue.withElementRS { (rh, s) =>
             button(
               text,
               backgroundColor.aqua,

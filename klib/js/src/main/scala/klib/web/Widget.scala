@@ -260,11 +260,10 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
       s => value(lens.get(s)),
     )
 
-  // TODO (KR) : I cant get the stupid variance to work properly on this one
-  //           : The problem is that this method can not take type-parameters, because the apply method
-  //           : on PWidget.LensBuilder needs to take exactly 1 parameter, in order to be able to infer give the type hint
-  final def zoomOut: PWidget.LensBuilder[Action, StateGet @uncheckedVariance, StateSet @uncheckedVariance, Value] =
-    PWidget.LensBuilder(self)
+  inline final def zoomOut[OuterState](
+      inline f: OuterState => StateGet,
+  ): AVWidget[Action, OuterState, Value] =
+    imapState[OuterState, StateGet](GenLens[OuterState](f).asInstanceOf[Lens[OuterState, StateGet]])
 
   // =====| Map Action |=====
 
@@ -318,18 +317,67 @@ object PWidget {
   ): PWidget[Action, StateGet, StateSet, Value] =
     PWidget.many[Action, StateGet, StateSet, Value](elementsF(_, _) :: Nil, valueF)
 
-  final class LensBuilder[+Action, +StateGet, -StateSet <: StateGet, +Value](
-      widget: PWidget[Action, StateGet, StateSet, Value],
-  ) {
+  final class Builder1[Action] {
+    def withState[State]: Builder2[Action, State, State] = new Builder2[Action, State, State]
+    def withNoState: Builder2[Action, Any, Nothing] = new Builder2[Action, Any, Nothing]
+  }
+  final class Builder2[Action, StateGet, StateSet <: StateGet] {
+    def withValueF[Value](f: StateGet => Valid[Value]): Builder3[Action, StateGet, StateSet, Value] = new Builder3(f)
+    inline def withConstValue[Value](f: => Valid[Value]): Builder3[Action, StateGet, StateSet, Value] = withValueF(_ => f)
+    inline def withNoValue: Builder3[Action, StateGet, StateSet, Unit] = withValueF(_ => ().asRight)
+  }
+  final class Builder3[Action, StateGet, StateSet <: StateGet, Value](valueF: StateGet => Valid[Value]) {
 
-    type InnerState >: StateSet <: StateGet
+    def withElementRS(
+        f: (RaiseHandler[Action, StateSet], StateGet) => VDom.Element,
+    ): PWidget[Action, StateGet, StateSet, Value] =
+      PWidget[Action, StateGet, StateSet, Value](f(_, _), valueF)
 
-    transparent inline def apply[OuterState](inline lambda: KeywordContext ?=> OuterState => InnerState): Any =
-      widget.imapState[OuterState, InnerState](
-        GenLens.apply[OuterState].apply[InnerState](lambda).asInstanceOf[Lens[OuterState, InnerState]],
-      )
+    inline def withElementR(
+        f: RaiseHandler[Action, StateSet] => VDom.Element,
+    ): PWidget[Action, StateGet, StateSet, Value] =
+      withElementRS((rh, _) => f(rh))
+
+    inline def withElementS(
+        f: StateGet => VDom.Element,
+    ): PWidget[Action, StateGet, StateSet, Value] =
+      withElementRS((_, s) => f(s))
+
+    inline def withElement(
+        f: => VDom.Element,
+    ): PWidget[Action, StateGet, StateSet, Value] =
+      withElementRS((_, _) => f)
+
+    def withElementsRS(
+        f: (RaiseHandler[Action, StateSet], StateGet) => List[VDom.Element],
+    ): PWidget[Action, StateGet, StateSet, Value] =
+      PWidget.many[Action, StateGet, StateSet, Value](f(_, _), valueF)
+
+    inline def withElementsR(
+        f: RaiseHandler[Action, StateSet] => List[VDom.Element],
+    ): PWidget[Action, StateGet, StateSet, Value] =
+      withElementsRS((rh, _) => f(rh))
+
+    inline def withElementsS(
+        f: StateGet => List[VDom.Element],
+    ): PWidget[Action, StateGet, StateSet, Value] =
+      withElementsRS((_, s) => f(s))
+
+    inline def withElements(
+        f: => List[VDom.Element],
+    ): PWidget[Action, StateGet, StateSet, Value] =
+      withElementsRS((_, _) => f)
+
+    @targetName("withElements*")
+    inline def withElements(
+        f: => VDom.Element*,
+    ): PWidget[Action, StateGet, StateSet, Value] =
+      withElementsRS((_, _) => f.toList)
 
   }
+
+  def withAction[Action]: Builder1[Action] = new Builder1[Action]
+  inline def withNoAction: Builder1[Nothing] = withAction[Nothing]
 
 }
 
