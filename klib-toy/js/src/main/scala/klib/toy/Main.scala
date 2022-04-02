@@ -2,6 +2,7 @@ package klib.toy
 
 import cats.data.NonEmptyList
 import cats.syntax.either.*
+import io.circe.Encoder
 import io.circe.generic.auto.*
 
 import klib.utils.*
@@ -16,6 +17,7 @@ object Main extends PageApp {
       exInputString: String,
       exInputInt: String,
       exInputStringDoubleReference: String,
+      exFood: Option[Food],
   )
 
   implicit class PWidgetOps[A, SG, SS <: SG, V](widget: PWidget[A, SG, SS, V]) {
@@ -23,6 +25,12 @@ object Main extends PageApp {
     def inSection: PWidget[A, SG, SS, V] =
       widget.wrapped(div(margin := "10px", padding := "10px", border := "1px solid black", _))
 
+  }
+
+  enum Food { case Pizza, Burger, Pasta, Burrito }
+  object Food {
+    implicit val encoder: Encoder[Food] =
+      Encoder[String].contramap[Food](_.toString)
   }
 
   val testPage: Page =
@@ -34,6 +42,7 @@ object Main extends PageApp {
           exInputString = "exInputString",
           exInputInt = "0",
           exInputStringDoubleReference = "exInputStringDoubleReference",
+          exFood = None,
         )
       }
       .constTitle("Examples")
@@ -91,12 +100,26 @@ object Main extends PageApp {
           .zoomOut[Env](_.exInputStringDoubleReference)
           .inSection
 
+        val exFood: VWidget[Env, Option[Food]] =
+          EnumWidgets
+            .radioGroup(
+              Food.values,
+              EnumWidgets.RadioGroupDecorator(
+                buttonModifier = BeforeAfterModifier.after(padding := "5px", border := "2px solid black", cursor.pointer, userSelect.none),
+                buttonModifierSelected = BeforeAfterModifier.after(backgroundColor.aqua),
+              ),
+            )
+            .labeledAbove("ex-food", _.focusLabelModifierAfter.after(marginBottom := "5px"))
+            .zoomOut[Env](_.exFood)
+            .inSection
+
         {
           header >>
             exCounter >>
             exInputString >>
             exInputInt >>
-            exInputStringDoubleReference
+            exInputStringDoubleReference >>
+            exFood
         }.debugStateAndValueJson
       }
       .logA

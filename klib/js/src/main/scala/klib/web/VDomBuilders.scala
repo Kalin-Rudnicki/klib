@@ -131,14 +131,56 @@ object VDomBuilders {
     object backgroundColor extends ColorCSSAttrBuilder("background-color")
     object width extends CSSAttrBuilder("width")
     object height extends CSSAttrBuilder("height")
-    object cursor extends CSSAttrBuilder("cursor")
-    object userSelect extends CSSAttrBuilder("user-select")
+    object cursor extends CSSAttrBuilder("cursor") {
+      def pointer: CSSAttr = this := "pointer"
+      def auto: CSSAttr = this := "auto"
+      def crosshair: CSSAttr = this := "crosshair"
+      def default: CSSAttr = this := "default"
+      def move: CSSAttr = this := "move"
+      def text: CSSAttr = this := "text"
+      def help: CSSAttr = this := "help"
+      def progress: CSSAttr = this := "progress"
+      def noDrop: CSSAttr = this := "noDrop"
+      def notAllowed: CSSAttr = this := "notAllowed"
+      def eResize: CSSAttr = this := "eResize"
+      def nResize: CSSAttr = this := "nResize"
+      def neResize: CSSAttr = this := "neResize"
+      def nwResize: CSSAttr = this := "nwResize"
+      def sResize: CSSAttr = this := "sResize"
+      def seResize: CSSAttr = this := "seResize"
+      def swResize: CSSAttr = this := "swResize"
+      def wResize: CSSAttr = this := "wResize"
+      def ewResize: CSSAttr = this := "ewResize"
+      def nsResize: CSSAttr = this := "nsResize"
+      def neswResize: CSSAttr = this := "neswResize"
+      def nwseResize: CSSAttr = this := "nwseResize"
+      def colResize: CSSAttr = this := "colResize"
+      def rowResize: CSSAttr = this := "rowResize"
+      def allScroll: CSSAttr = this := "allScroll"
+      def zoomIn: CSSAttr = this := "zoomIn"
+      def zoomOut: CSSAttr = this := "zoomOut"
+    }
+    object userSelect extends CSSAttrBuilder("user-select") {
+      def none: CSSAttr = this := "none"
+      def text: CSSAttr = this := "text"
+      def all: CSSAttr = this := "all"
+      def auto: CSSAttr = this := "auto"
+      def contain: CSSAttr = this := "contain"
+      def allScroll: CSSAttr = this := "allScroll"
+      def element: CSSAttr = this := "element"
+      def elements: CSSAttr = this := "elements"
+      def toggle: CSSAttr = this := "toggle"
+    }
     object padding extends CSSAttrBuilder("padding")
     object paddingTop extends CSSAttrBuilder("padding-top")
     object paddingRight extends CSSAttrBuilder("padding-right")
     object paddingBottom extends CSSAttrBuilder("padding-bottom")
     object paddingLeft extends CSSAttrBuilder("padding-left")
     object margin extends CSSAttrBuilder("margin")
+    object marginTop extends CSSAttrBuilder("margin-top")
+    object marginRight extends CSSAttrBuilder("margin-right")
+    object marginBottom extends CSSAttrBuilder("margin-bottom")
+    object marginLeft extends CSSAttrBuilder("margin-left")
     object display extends CSSAttrBuilder("display") {
       def inline: CSSAttr = this := "inline"
       def block: CSSAttr = this := "block"
@@ -243,6 +285,8 @@ object VDomBuilders {
     }
 
     object onClick extends KeyAttrBuilder[MouseEvent => Unit]("onclick", identity(_))
+    object onDblClick extends KeyAttrBuilder[MouseEvent => Unit]("ondblclick", identity(_))
+    object onContextMenu extends KeyAttrBuilder[MouseEvent => Unit]("oncontextmenu", identity(_))
     object onMouseDown extends KeyAttrBuilder[MouseEvent => Unit]("onmousedown", identity(_))
     object onMouseUp extends KeyAttrBuilder[MouseEvent => Unit]("onmouseup", identity(_))
     object onMouseOver extends KeyAttrBuilder[MouseEvent => Unit]("onmouseover", identity(_))
