@@ -36,6 +36,52 @@ object PWidgetDecorator {
     }
 }
 
+final case class BeforeAfterModifier(
+    before: Modifier = (),
+    after: Modifier = (),
+)
+object BeforeAfterModifier {
+
+  def before(modifiers: Modifier*): BeforeAfterModifier = BeforeAfterModifier(before = Modifier.flatten(modifiers.toList))
+  def after(modifiers: Modifier*): BeforeAfterModifier = BeforeAfterModifier(after = Modifier.flatten(modifiers.toList))
+  def beforeAfter(beforeModifiers: Modifier*)(afterModifiers: Modifier*): BeforeAfterModifier =
+    BeforeAfterModifier(
+      before = Modifier.flatten(beforeModifiers.toList),
+      after = Modifier.flatten(afterModifiers.toList),
+    )
+
+  implicit val monoid: Monoid[BeforeAfterModifier] =
+    new Monoid[BeforeAfterModifier] {
+      def empty: BeforeAfterModifier = BeforeAfterModifier()
+      def combine(x: BeforeAfterModifier, y: BeforeAfterModifier): BeforeAfterModifier =
+        BeforeAfterModifier(x.before |+| y.before, x.after |+| y.after)
+    }
+
+}
+
+final case class BeforeAfterNFModifier(
+    before: NameFunction[Modifier] = NameFunction.const[Modifier](()),
+    after: NameFunction[Modifier] = NameFunction.const[Modifier](()),
+)
+object BeforeAfterNFModifier {
+
+  def before(modifiers: Modifier*): BeforeAfterNFModifier = BeforeAfterNFModifier(before = NameFunction.const(Modifier.flatten(modifiers.toList)))
+  def after(modifiers: Modifier*): BeforeAfterNFModifier = BeforeAfterNFModifier(after = NameFunction.const(Modifier.flatten(modifiers.toList)))
+  def beforeAfter(beforeModifiers: Modifier*)(afterModifiers: Modifier*): BeforeAfterNFModifier =
+    BeforeAfterNFModifier(
+      before = NameFunction.const(Modifier.flatten(beforeModifiers.toList)),
+      after = NameFunction.const(Modifier.flatten(afterModifiers.toList)),
+    )
+
+  implicit val monoid: Monoid[BeforeAfterNFModifier] =
+    new Monoid[BeforeAfterNFModifier] {
+      def empty: BeforeAfterNFModifier = BeforeAfterNFModifier()
+      def combine(x: BeforeAfterNFModifier, y: BeforeAfterNFModifier): BeforeAfterNFModifier =
+        BeforeAfterNFModifier(x.before |+| y.before, x.after |+| y.after)
+    }
+
+}
+
 // =====| ... |=====
 
 final class FocusedNameFunctionModifier private[widgets] (
@@ -108,10 +154,8 @@ final class FocusedPWidgetDecorator private[widgets] (
 // I think it is easier to reason about when looking at the symbol `|>|`,
 // which is why all of the other operations are defined in terms of that.
 final case class LabeledFieldDecorator(
-    labelModifierBefore: NameFunction[Modifier] = NameFunction.const(()),
-    labelModifierAfter: NameFunction[Modifier] = NameFunction.const(()),
-    wrappedModifierBefore: NameFunction[Modifier] = NameFunction.const(()),
-    wrappedModifierAfter: NameFunction[Modifier] = NameFunction.const(()),
+    labelModifier: BeforeAfterNFModifier = BeforeAfterNFModifier(),
+    wrappedModifier: BeforeAfterNFModifier = BeforeAfterNFModifier(),
     decorateLabel: CWidgetDecorator = CWidgetDecorator.identity,
     decorateField: PWidgetDecorator = PWidgetDecorator.identity,
     decorateWrapped: PWidgetDecorator = PWidgetDecorator.identity,
@@ -121,10 +165,8 @@ final case class LabeledFieldDecorator(
 
   def |>|(other: LabeledFieldDecorator): LabeledFieldDecorator =
     LabeledFieldDecorator(
-      self.labelModifierBefore |+| other.labelModifierBefore,
-      self.labelModifierAfter |+| other.labelModifierAfter,
-      self.wrappedModifierBefore |+| other.wrappedModifierBefore,
-      self.wrappedModifierAfter |+| other.wrappedModifierAfter,
+      self.labelModifier |+| other.labelModifier,
+      self.wrappedModifier |+| other.wrappedModifier,
       CWidgetDecorator.monoid.combine(self.decorateLabel, other.decorateLabel),
       PWidgetDecorator.monoid.combine(self.decorateField, other.decorateField),
       PWidgetDecorator.monoid.combine(self.decorateWrapped, other.decorateWrapped),
@@ -161,16 +203,16 @@ final case class LabeledFieldDecorator(
   // --- helper focuses ---
 
   def focusLabelModifierBefore: FocusedNameFunctionModifier =
-    focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.labelModifierBefore))
+    focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.labelModifier.before))
 
   def focusLabelModifierAfter: FocusedNameFunctionModifier =
-    focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.labelModifierAfter))
+    focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.labelModifier.after))
 
   def focusWrappedModifierBefore: FocusedNameFunctionModifier =
-    focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.wrappedModifierBefore))
+    focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.wrappedModifier.before))
 
   def focusWrappedModifierAfter: FocusedNameFunctionModifier =
-    focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.wrappedModifierAfter))
+    focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.wrappedModifier.after))
 
   def focusDecorateLabel: FocusedCWidgetDecorator =
     focusCWidgetDecorator(GenLens[LabeledFieldDecorator](_.decorateLabel))
@@ -189,10 +231,10 @@ final case class LabeledFieldDecorator(
       name: String,
   ): PWidget[Action, StateGet, StateSet, Value] = {
     val prettyName: String = LabeledFieldDecorator.prettyName(name)
-    val labelModifierBefore: Modifier = self.labelModifierBefore(name, prettyName)
-    val labelModifierAfter: Modifier = self.labelModifierAfter(name, prettyName)
-    val wrappedModifierBefore: Modifier = self.wrappedModifierBefore(name, prettyName)
-    val wrappedModifierAfter: Modifier = self.wrappedModifierAfter(name, prettyName)
+    val labelModifierBefore: Modifier = self.labelModifier.before(name, prettyName)
+    val labelModifierAfter: Modifier = self.labelModifier.after(name, prettyName)
+    val wrappedModifierBefore: Modifier = self.wrappedModifier.before(name, prettyName)
+    val wrappedModifierAfter: Modifier = self.wrappedModifier.after(name, prettyName)
 
     val baseLabel: CWidget = CWidget(label(labelModifierBefore)(s"$prettyName: ")(labelModifierAfter))
     val modifiedLabel: CWidget = self.decorateLabel(baseLabel)
@@ -210,7 +252,7 @@ final case class LabeledFieldDecorator(
 object LabeledFieldDecorator {
 
   val labelInFront: LabeledFieldDecorator = LabeledFieldDecorator()
-  val labelAbove: LabeledFieldDecorator = LabeledFieldDecorator(labelModifierAfter = NameFunction.const(display := "block"))
+  val labelAbove: LabeledFieldDecorator = LabeledFieldDecorator(labelModifier = BeforeAfterNFModifier(after = NameFunction.const(display := "block")))
 
   def prettyName(name: String): String = name.split("-").map(_.capitalize).mkString(" ")
 

@@ -20,24 +20,13 @@ import klib.web.widgets.CommonRaises.*
 
 object TextWidgets {
 
-  final case class TextFieldDecorator(
-      fieldModifierBefore: Modifier = (),
-      fieldModifierAfter: Modifier = (),
-  )
-  object TextFieldDecorator {
-    def before(modifiers: Modifier*): TextFieldDecorator = TextFieldDecorator(fieldModifierBefore = Modifier.flatten(modifiers.toList))
-    def after(modifiers: Modifier*): TextFieldDecorator = TextFieldDecorator(fieldModifierAfter = Modifier.flatten(modifiers.toList))
-    def beforeAfter(beforeModifiers: Modifier*)(afterModifiers: Modifier*): TextFieldDecorator =
-      TextFieldDecorator(fieldModifierBefore = Modifier.flatten(beforeModifiers.toList), fieldModifierAfter = Modifier.flatten(afterModifiers.toList))
-  }
-
   sealed abstract class TextFieldBuilder1(tagName: String, requireCtrlForSubmit: Boolean) {
 
-    def apply[T: DecodeFromString](decorator: TextFieldDecorator = TextFieldDecorator()): AVWidget[Submit, String, Option[T]] =
+    def apply[T: DecodeFromString](decorator: BeforeAfterModifier = BeforeAfterModifier()): AVWidget[Submit, String, Option[T]] =
       AVWidget[Submit, String, Option[T]](
         (rh, s) =>
           NodeElement(tagName)(
-            decorator.fieldModifierBefore,
+            decorator.before,
           )(
             onKeyUp := { e =>
               val value = e.target.asInstanceOf[Dynamic].value.asInstanceOf[String]
@@ -49,7 +38,7 @@ object TextWidgets {
             },
             value := s,
           )(
-            decorator.fieldModifierAfter,
+            decorator.after,
           ),
         s =>
           Option
