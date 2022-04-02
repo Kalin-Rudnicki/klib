@@ -2,8 +2,7 @@ package klib.toy
 
 import cats.data.NonEmptyList
 import cats.syntax.either.*
-import io.circe.Encoder
-import io.circe.generic.auto.*
+import zio.json.*
 
 import klib.utils.*
 import klib.web.{given, *}
@@ -19,6 +18,9 @@ object Main extends PageApp {
       exInputStringDoubleReference: String,
       exFood: Option[Food],
   )
+  object Env {
+    implicit val encoder: JsonEncoder[Env] = DeriveJsonEncoder.gen[Env]
+  }
 
   implicit class PWidgetOps[A, SG, SS <: SG, V](widget: PWidget[A, SG, SS, V]) {
 
@@ -29,8 +31,7 @@ object Main extends PageApp {
 
   enum Food { case Pizza, Burger, Pasta, Burrito }
   object Food {
-    implicit val encoder: Encoder[Food] =
-      Encoder[String].contramap[Food](_.toString)
+    implicit val encoder: JsonEncoder[Food] = DeriveJsonEncoder.gen[Food]
   }
 
   val testPage: Page =

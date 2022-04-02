@@ -6,10 +6,10 @@ import cats.syntax.either.*
 import cats.syntax.list.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
-import io.circe.Encoder
 import scala.annotation.tailrec
 import scala.annotation.targetName
 import zio.*
+import zio.json.*
 import zio.stream.*
 
 // format: off
@@ -24,13 +24,6 @@ type  SZIOM[-R, +E, +A] = ZIOM[Executable.BaseEnv & R, E,       A]
 type STaskM[        +A] = ZIOM[Executable.BaseEnv,     Nothing, A]
 type   SIOM[    +E, +A] = ZIOM[Executable.BaseEnv,     E,       A]
 type  SRIOM[-R,     +A] = ZIOM[Executable.BaseEnv & R, Nothing, A]
-
-// =====| ZManagedM |=====
-type ZManagedM[-R, +E, +A] = ZManaged[R, KError[E], A]
-
-type TaskManagedM[        +A] = ZManagedM[Any, Nothing, A]
-type     ManagedM[    +E, +A] = ZManagedM[Any, E,       A]
-type    RManagedM[-R,     +A] = ZManagedM[R,   Nothing, A]
 
 // =====| ZLayerM |=====
 type ZLayerM[-R, +E, +A] = ZLayer[R, KError[E], A]
@@ -158,8 +151,8 @@ extension [R, E, A](zioM: ZIOM[R, E, A]) {
   def dumpErrorsAndContinue(errorLevel: Logger.LogLevel): URIO[R & RunMode & Logger, Option[A]] =
     dumpErrorsAndContinue(errorLevel, _.toString)
 
-  def dumpJsonErrorsAndContinue(errorLevel: Logger.LogLevel)(implicit encoder: Encoder[E]): URIO[R & RunMode & Logger, Option[A]] =
-    dumpErrorsAndContinue(errorLevel, encoder(_).spaces4)
+  def dumpJsonErrorsAndContinue(errorLevel: Logger.LogLevel)(implicit encoder: JsonEncoder[E]): URIO[R & RunMode & Logger, Option[A]] =
+    dumpErrorsAndContinue(errorLevel, JsonEncoder[E].encodeJson(_, 4.some).toString)
 
   def recoverFromErrors[B](f: E => RIOM[R, B]): RIOM[R, Either[List[B], A]] = {
     def convertSingleError(error: SingleError[E]): URIO[R, Either[NonEmptyList[SingleError[Nothing]], List[B]]] =

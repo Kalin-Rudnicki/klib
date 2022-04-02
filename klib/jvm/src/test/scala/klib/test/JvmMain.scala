@@ -462,9 +462,6 @@ object JvmMain extends ExecutableApp {
 
   }
 
-  import io.circe.generic.auto.*
-  import io.circe.syntax.*
-
   override val executable: Executable =
     Executable
       .fromParser(Parser.unit.disallowExtras)
@@ -474,10 +471,6 @@ object JvmMain extends ExecutableApp {
           bandIds <- ZIOM.attempt(CopilotTest.Tables.bands.keySet.toList)
           dbBands <- ZIO.foreach(bandIds)(id => CopilotTest.Database.Band.byId(id))
           bands <- ZIO.foreach(dbBands)(CopilotTest.Code.Band.fromDatabase)
-
-          _ <- ZIO.foreach(bands) { band =>
-            Logger.println.info(band.asJson.spaces4)
-          }
         } yield ()
       }
 

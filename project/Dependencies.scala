@@ -20,19 +20,13 @@ object Dependencies {
     val jimfs = rawDep("jimfs", "1.2")
   }
 
-  object `io.circe` extends Org("io.circe") {
-    private val version = "0.15.0-M1"
-
-    val `circe-core` = crossDep("circe-core", version)
-    val `circe-generic` = crossDep("circe-generic", version)
-    val `circe-parser` = crossDep("circe-parser", version)
-  }
-
   object `dev.zio` extends Org("dev.zio") {
     private val version = "2.0.0-RC1"
 
     val zio = crossDep("zio", version)
     val `zio-streams` = crossDep("zio-streams", version)
+    val `zio-json` = crossDep("zio-json", "0.3.0-RC5")
+
     val `zio-test` = crossDep("zio-test", version, _ % Test)
     val `zio-test-sbt` = crossDep("zio-test-sbt", version, _ % Test)
   }

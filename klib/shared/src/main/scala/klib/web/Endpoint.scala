@@ -3,8 +3,8 @@ package klib.web
 import cats.data.*
 import cats.syntax.either.*
 import cats.syntax.parallel.*
-import io.circe.*
 import zio.{Unzippable, Zippable}
+import zio.json.*
 
 import klib.fp.typeclass.*
 import klib.utils.*
@@ -213,7 +213,7 @@ object Endpoint {
         ),
       )
 
-    def jsonRequestBody[T: Encoder: Decoder]: Builder[
+    def jsonRequestBody[T: JsonCodec]: Builder[
       Headers,
       QueryParams,
       Types.RequestBody.Encoded[T],
@@ -221,8 +221,8 @@ object Endpoint {
     ] =
       copyRequestBody(
         Types.RequestBody.Encoded[T](
-          EncodeToString.fromCirceEncoder[T],
-          DecodeFromString.fromCirceDecoder[T],
+          EncodeToString.fromJsonEncoder[T],
+          DecodeFromString.fromJsonDecoder[T],
         ),
       )
 
@@ -250,7 +250,7 @@ object Endpoint {
         ),
       )
 
-    def jsonResponseBody[T: Encoder: Decoder]: Builder[
+    def jsonResponseBody[T: JsonEncoder: JsonDecoder]: Builder[
       Headers,
       QueryParams,
       RequestBody,
@@ -258,8 +258,8 @@ object Endpoint {
     ] =
       copyResponseBody(
         Types.ResponseBody.Encoded[T](
-          EncodeToString.fromCirceEncoder[T],
-          DecodeFromString.fromCirceDecoder[T],
+          EncodeToString.fromJsonEncoder[T],
+          DecodeFromString.fromJsonDecoder[T],
         ),
       )
 
@@ -304,7 +304,7 @@ object Endpoint {
         (pm, h) => pm.addParamO[H](key, h),
       )
 
-    def jsonHeader[H: Encoder: Decoder](key: String)(implicit
+    def jsonHeader[H: JsonEncoder: JsonDecoder](key: String)(implicit
         unzippable: Unzippable[Headers, H],
         zippable: Zippable[Headers, H],
         zipsAreSame: unzippable.In =:= zippable.Out,
@@ -316,7 +316,7 @@ object Endpoint {
         (pm, h) => pm.addJsonParam[H](key, h),
       )
 
-    def jsonHeaderO[H: Encoder: Decoder](key: String)(implicit
+    def jsonHeaderO[H: JsonEncoder: JsonDecoder](key: String)(implicit
         unzippable: Unzippable[Headers, Option[H]],
         zippable: Zippable[Headers, Option[H]],
         zipsAreSame: unzippable.In =:= zippable.Out,
@@ -366,7 +366,7 @@ object Endpoint {
         (pm, h) => pm.addParamO[P](key, h),
       )
 
-    def jsonParam[P: Encoder: Decoder](key: String)(implicit
+    def jsonParam[P: JsonEncoder: JsonDecoder](key: String)(implicit
         unzippable: Unzippable[QueryParams, P],
         zippable: Zippable[QueryParams, P],
         zipsAreSame: unzippable.In =:= zippable.Out,
@@ -378,7 +378,7 @@ object Endpoint {
         (pm, h) => pm.addJsonParam[P](key, h),
       )
 
-    def jsonParamO[P: Encoder: Decoder](key: String)(implicit
+    def jsonParamO[P: JsonEncoder: JsonDecoder](key: String)(implicit
         unzippable: Unzippable[QueryParams, Option[P]],
         zippable: Zippable[QueryParams, Option[P]],
         zipsAreSame: unzippable.In =:= zippable.Out,

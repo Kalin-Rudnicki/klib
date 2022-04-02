@@ -85,12 +85,10 @@ lazy val klib =
       scalacOptions += "-source:future",
       // Dependencies
       Dependencies.`dev.zio`.zio,
+      Dependencies.`dev.zio`.`zio-json`,
       Dependencies.`dev.zio`.`zio-streams`,
       Dependencies.`dev.zio`.`zio-test`,
       Dependencies.`dev.zio`.`zio-test-sbt`,
-      Dependencies.`io.circe`.`circe-core`,
-      Dependencies.`io.circe`.`circe-generic`,
-      Dependencies.`io.circe`.`circe-parser`,
       Dependencies.`org.typelevel`.`cats-effect`,
       Dependencies.`com.github.julien-truffaut`.`monocle-core`,
       Dependencies.`com.github.julien-truffaut`.`monocle-macro`,

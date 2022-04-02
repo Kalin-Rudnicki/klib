@@ -2,8 +2,8 @@ package klib.web
 
 import cats.data.*
 import cats.syntax.either.*
+import cats.syntax.option.*
 import cats.syntax.parallel.*
-import io.circe.Encoder
 import monocle.*
 import monocle.Focus.KeywordContext
 import monocle.macros.GenLens
@@ -11,6 +11,7 @@ import scala.annotation.targetName
 import scala.annotation.unchecked.uncheckedVariance
 import scala.quoted.*
 import zio.*
+import zio.json.*
 
 import klib.utils.*
 import klib.web.VDomBuilders.CSSAttrBuilders.display
@@ -165,18 +166,18 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
     self.debugState.debugValue
 
   inline final def debugStateJson[NewStateGet >: StateSet <: StateGet](implicit
-      stateEncoder: Encoder[NewStateGet],
+      stateEncoder: JsonEncoder[NewStateGet],
   ): PWidget[Action, NewStateGet, StateSet, Value] =
-    genericDebugState[NewStateGet](stateEncoder(_).spaces4)
+    genericDebugState[NewStateGet](_.toJsonPretty)
 
   inline final def debugValueJson[NewValue >: Value](implicit
-      valueEncoder: Encoder[NewValue],
+      valueEncoder: JsonEncoder[NewValue],
   ): PWidget[Action, StateGet, StateSet, NewValue] =
-    genericDebugValue[NewValue](valueEncoder(_).spaces4)
+    genericDebugValue[NewValue](_.toJsonPretty)
 
   inline final def debugStateAndValueJson[NewStateGet >: StateSet <: StateGet, NewValue >: Value](implicit
-      stateEncoder: Encoder[NewStateGet],
-      valueEncoder: Encoder[NewValue],
+      stateEncoder: JsonEncoder[NewStateGet],
+      valueEncoder: JsonEncoder[NewValue],
   ): PWidget[Action, NewStateGet, StateSet, NewValue] =
     self.debugStateJson[NewStateGet].debugValueJson[NewValue]
 

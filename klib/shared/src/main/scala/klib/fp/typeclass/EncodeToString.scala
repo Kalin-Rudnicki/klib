@@ -1,9 +1,7 @@
 package klib.fp.typeclass
 
 import java.util.UUID
-
-import io.circe.*
-import io.circe.syntax.*
+import zio.json.*
 
 // =====| Core |=====
 
@@ -20,11 +18,11 @@ object EncodeToString {
   def apply[T: EncodeToString]: EncodeToString[T] =
     implicitly[EncodeToString[T]]
 
-  def fromCirceEncoder[T: Encoder](toString: Json => String): EncodeToString[T] =
-    t => toString(t.asJson)
+  def fromJsonEncoder[T: JsonEncoder](spaces: Option[Int]): EncodeToString[T] =
+    JsonEncoder[T].encodeJson(_, spaces).toString
 
-  def fromCirceEncoder[T: Encoder]: EncodeToString[T] =
-    fromCirceEncoder[T]((json: Json) => json.noSpaces)
+  def fromJsonEncoder[T: JsonEncoder]: EncodeToString[T] =
+    JsonEncoder[T].encodeJson(_, None).toString
 
   def usingToString[T]: EncodeToString[T] = _.toString
 
