@@ -13,6 +13,7 @@ import zio.*
 
 import klib.utils.*
 import klib.web.VDomBuilders.CSSAttrBuilders.display
+import klib.web.widgets.LabeledFieldDecorator
 
 trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
 
@@ -178,7 +179,7 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
   inline final def setValue[Value2](f: => Value2): PWidget[Action, StateGet, StateSet, Value2] =
     copySelfWithNewValueF(_ => f.asRight)
 
-  // =====| Aliases |=====
+  // --- Aliases ---
 
   inline final def asEither[Value2](f: => Valid[Value2]): PWidget[Action, StateGet, StateSet, Value2] =
     setValueE(f)
@@ -186,10 +187,19 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
   inline final def as[Value2](f: => Value2): PWidget[Action, StateGet, StateSet, Value2] =
     setValueE(f.asRight)
 
-  inline final def asError(f: => NonEmptyList[String]): PWidget[Action, StateGet, StateSet, Nothing] =
-    setValueE(f.asLeft)
+  inline final def asError(e: => NonEmptyList[String]): PWidget[Action, StateGet, StateSet, Nothing] =
+    setValueE(e.asLeft)
 
-  // --- Map State ---
+  inline final def asError(e0: => String, eN: => String*): PWidget[Action, StateGet, StateSet, Nothing] =
+    asError(NonEmptyList(e0, eN.toList))
+
+  inline final def mapErrorString(f: String => String): PWidget[Action, StateGet, StateSet, Value] =
+    mapValueVE(_.leftMap(_.map(f)))
+
+  inline final def prependErrorString(s: => String): PWidget[Action, StateGet, StateSet, Value] =
+    mapErrorString(e => s"$s$e")
+
+  // =====| Map State |=====
 
   final def imapState[OuterState, InnerState >: StateSet <: StateGet](
       lens: Lens[OuterState, InnerState],
@@ -205,12 +215,39 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
   final def zoomOut: PWidget.LensBuilder[Action, StateGet @uncheckedVariance, StateSet @uncheckedVariance, Value] =
     PWidget.LensBuilder(self)
 
-  // --- Map Action ---
+  // =====| Map Action |=====
 
   /*
   final def [Action2](f: (StateGet, Action) => Action2): PWidget[Action2, StateGet, StateSet, Value] =
     ???
    */
+
+  // =====| Form Helpers |=====
+
+  final def required[V2](implicit ev: Value <:< Option[V2]): PWidget[Action, StateGet, StateSet, V2] =
+    mapValueVF { v =>
+      ev(v) match {
+        case Some(v2) => v2.asRight
+        case None     => NonEmptyList.one("Missing required").asLeft
+      }
+    }
+
+  // NOTE : Call this after doing any value validations.
+  //      : This way, the error message will include the label.
+  final def labeled(name: String, decorator: LabeledFieldDecorator): PWidget[Action, StateGet, StateSet, Value] =
+    decorator.decorate(self)(name)
+
+  inline final def labeledInFront(
+      name: String,
+      decorator: LabeledFieldDecorator => LabeledFieldDecorator = identity,
+  ): PWidget[Action, StateGet, StateSet, Value] =
+    labeled(name, decorator(LabeledFieldDecorator.labelInFront))
+
+  inline final def labeledAbove(
+      name: String,
+      decorator: LabeledFieldDecorator => LabeledFieldDecorator = identity,
+  ): PWidget[Action, StateGet, StateSet, Value] =
+    labeled(name, decorator(LabeledFieldDecorator.labelAbove))
 
 }
 object PWidget {
