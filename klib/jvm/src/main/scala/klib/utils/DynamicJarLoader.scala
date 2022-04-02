@@ -13,27 +13,25 @@ object DynamicJarLoader {
 
   final class Jar(file: File) {
 
-    private[DynamicJarLoader] def managed: TaskManagedM[ClassLoader] =
-      ZManaged
-        .fromAutoCloseable {
-          for {
-            url <- ZIOM.attempt(file.toPath.toUri.toURL)
-            classLoader <- ZIOM.attempt(URLClassLoader(Array(url), getClass.getClassLoader))
-          } yield classLoader
-        }
+    private[DynamicJarLoader] def managed: RIOM[Scope, ClassLoader] =
+      ZIO.acquireRelease {
+        for {
+          url <- ZIOM.attempt(file.toPath.toUri.toURL)
+          classLoader <- ZIOM.attempt(URLClassLoader(Array(url), getClass.getClassLoader))
+        } yield classLoader
+      } { classLoader =>
+        ZIOM.attempt(classLoader.close).orDieKlib
+      }
 
     def use[R, A](useF: ClassLoader => RIOM[R, A]): RIOM[R, A] =
-      managed.use(useF)
-
-    def reserve: UIO[Reservation[Any, KError[Nothing], ClassLoader]] =
-      managed.reserve
+      ZIO.scoped { managed.flatMap(useF) }
 
   }
 
   final class JarClass[T](jar: Jar, classPath: String, klass: Class[T]) {
 
-    private[DynamicJarLoader] def managed: TaskManagedM[T] =
-      jar.managed.mapZIO { classLoader =>
+    def managed: RIOM[Scope, T] =
+      jar.managed.flatMap { classLoader =>
         for {
           c <- ZIOM.attempt(classLoader.loadClass(classPath))
           constructors <- ZIOM.attempt(c.getDeclaredConstructors)
@@ -47,10 +45,7 @@ object DynamicJarLoader {
       }
 
     def use[R, A](useF: T => RIOM[R, A]): RIOM[R, A] =
-      managed.use(useF)
-
-    def reserve: UIO[Reservation[Any, KError[Nothing], T]] =
-      managed.reserve
+      ZIO.scoped { managed.flatMap(useF) }
 
   }
 
@@ -89,8 +84,8 @@ object DynamicJarLoader {
 
       for {
         jarBytes <- file.readBytes
-        jarInputStream = ZManaged.fromAutoCloseable(ZIOM.attempt(JarInputStream(ByteArrayInputStream(jarBytes), true)))
-        jarEntries <- jarInputStream.use(getJarEntries(_, Nil))
+        jarInputStream = ZIO.acquireRelease { ZIOM.attempt(JarInputStream(ByteArrayInputStream(jarBytes), true)) } { bais => ZIOM.attempt(bais.close).orDieKlib }
+        jarEntries <- ZIO.scoped { jarInputStream.flatMap(getJarEntries(_, Nil)) }
         classPaths = getClassPaths(jarEntries)
         jar = Jar(file)
         jarClasses <- jar.use { classLoader => ZIO.foreach(classPaths)(getJarClass(jar, classLoader, _)) }

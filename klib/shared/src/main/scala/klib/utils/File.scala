@@ -2,7 +2,6 @@ package klib.utils
 
 export OpaqueFile.File
 import cats.syntax.option.*
-import io.circe.*
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File as JavaFile
@@ -18,6 +17,8 @@ import java.nio.file.attribute.FileTime
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 import zio.*
+import zio.json.*
+import zio.json.ast.Json
 
 object OpaqueFile {
 
@@ -113,19 +114,15 @@ object OpaqueFile {
       withOutputStream(s => ZIOM.attempt(s.write(bytes)))
     def writeString(string: String): TaskM[Unit] =
       withOutputStream(s => ZIOM.attempt(s.write(string.getBytes)))
-    def writeJson(json: Json, toString: Json => String = _.toString): TaskM[Unit] =
-      writeString(toString(json))
-    def writeEncodedJson[T: Encoder](t: T, toString: Json => String = _.toString): TaskM[Unit] =
-      writeJson(Encoder[T].apply(t), toString)
+    def writeJson[T: JsonEncoder](t: T, spaces: Option[Int] = None): TaskM[Unit] =
+      writeString(JsonEncoder[T].encodeJson(t, spaces).toString)
 
     def readBytes: TaskM[Array[Byte]] =
       withInputStream(s => ZIOM.attempt(s.readAllBytes()))
     def readString: TaskM[String] =
       withInputStream(s => ZIOM.attempt(new String(s.readAllBytes())))
-    def readJson: TaskM[Json] =
-      readString.flatMap(s => ZIO.fromEither(parser.parse(s)).toKlibError)
-    def readDecodedJson[T: Decoder]: TaskM[T] =
-      readJson.flatMap(j => ZIO.fromEither(Decoder[T].decodeJson(j)).toKlibError)
+    def readDecodedJson[T: JsonDecoder]: TaskM[T] =
+      readString.flatMap(s => ZIO.fromEither(JsonDecoder[T].decodeJson(s)).mapError(KError.message.same(_)))
 
     def ensureExists: TaskM[Unit] =
       existsWrapped.flatMap {

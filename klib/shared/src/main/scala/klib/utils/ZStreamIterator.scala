@@ -19,11 +19,15 @@ type    URStreamIterator[-R, +A] = ZStreamIterator[R,   Nothing, A]
 
 final class ZStreamIterator[-R, +E, +A] private (state: Ref[ZStreamIterator.State[R, E, A]]) {
 
-  private def open(reservation: Reservation[R, Nothing, Iterator[Either[E, A]]]): URIO[R, Unit] =
-    reservation.acquire.flatMap(iter => state.set(ZStreamIterator.State.Opened(iter, reservation.release(Exit.unit))))
+  private def open(reservation: URIO[R & Scope, Iterator[Either[E, A]]]): URIO[R, Unit] =
+    for {
+      scope <- Scope.make
+      iter <- scope.extend[R].apply(reservation)
+      _ <- state.set(ZStreamIterator.State.Opened(iter, scope))
+    } yield ()
 
-  private def close(release: URIO[R, Any]): URIO[R, Any] =
-    release *> state.set(ZStreamIterator.State.Closed)
+  private def close(scope: Scope.Closeable): URIO[R, Any] =
+    scope.close(Exit.unit) *> state.set(ZStreamIterator.State.Closed)
 
   private def fold[R1 <: R, E1 >: E, B](num: Int)(init: => B, onClosed: => ZIO[R1, E1, B])(
       onValue: (B, A) => ZIO[R1, E1, B],
@@ -80,15 +84,14 @@ object ZStreamIterator {
   }
 
   private enum State[-R, +E, +A] {
-    case NotOpened(reservation: Reservation[R, Nothing, Iterator[Either[E, A]]])
-    case Opened(iter: Iterator[Either[E, A]], release: URIO[R, Any])
+    case NotOpened(reservation: URIO[R & Scope, Iterator[Either[E, A]]])
+    case Opened(iter: Iterator[Either[E, A]], scope: Scope.Closeable)
     case Closed
   }
 
   def fromZStream[R, E, A](zStream: ZStream[R, E, A]): UIO[ZStreamIterator[R, E, A]] =
     for {
-      reservation <- zStream.toIterator.reserve
-      state <- Ref.make(State.NotOpened(reservation))
+      state <- Ref.make(State.NotOpened(zStream.toIterator))
     } yield ZStreamIterator(state)
 
 }

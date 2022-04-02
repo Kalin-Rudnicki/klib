@@ -4,7 +4,7 @@ import cats.data.*
 import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import io.circe.*
+import zio.json.*
 
 import klib.fp.typeclass.*
 import klib.utils.*
@@ -17,7 +17,7 @@ final class ParamMap(mapType: String, map: Map[String, String]) {
     new ParamMap(mapType, f(map))
 
   def addParam[T: EncodeToString](key: String, value: T): ParamMap =
-    copy(_.updated(key, implicitly[EncodeToString[T]].encode(value)))
+    copy(_.updated(key, EncodeToString[T].encode(value)))
 
   def addParamO[T: EncodeToString](key: String, value: Option[T]): ParamMap =
     value match {
@@ -25,10 +25,10 @@ final class ParamMap(mapType: String, map: Map[String, String]) {
       case None        => this
     }
 
-  def addJsonParam[T: Encoder](key: String, value: T): ParamMap =
-    copy(_.updated(key, Encoder[T].apply(value).noSpaces))
+  def addJsonParam[T: JsonEncoder](key: String, value: T): ParamMap =
+    addParam[T](key, value)(using EncodeToString.fromJsonEncoder[T])
 
-  def addJsonParamO[T: Encoder](key: String, value: Option[T]): ParamMap =
+  def addJsonParamO[T: JsonEncoder](key: String, value: Option[T]): ParamMap =
     value match {
       case Some(value) => addJsonParam[T](key, value)
       case None        => this
@@ -56,11 +56,11 @@ final class ParamMap(mapType: String, map: Map[String, String]) {
   def getParamO[T: DecodeFromString](key: String): EitherError[Option[T]] =
     getOption(key, implicitly[DecodeFromString[T]].decodeError)
 
-  def getJsonParam[T: Decoder](key: String): EitherError[T] =
-    getRequired(key, DecodeFromString.fromCirceDecoder[T].decodeError)
+  def getJsonParam[T: JsonDecoder](key: String): EitherError[T] =
+    getParam[T](key)(using DecodeFromString.fromJsonDecoder[T])
 
-  def getJsonParamO[T: Decoder](key: String): EitherError[Option[T]] =
-    getOption(key, DecodeFromString.fromCirceDecoder[T].decodeError)
+  def getJsonParamO[T: JsonDecoder](key: String): EitherError[Option[T]] =
+    getParamO[T](key)(using DecodeFromString.fromJsonDecoder[T])
 
 }
 object ParamMap {

@@ -3,10 +3,9 @@ package klib.fp.typeclass
 import cats.data.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import io.circe.*
-import io.circe.parser.*
 import java.util.UUID
 import scala.util.Try
+import zio.json.*
 
 import klib.utils.*
 
@@ -38,8 +37,8 @@ object DecodeFromString {
   def apply[T: DecodeFromString]: DecodeFromString[T] =
     implicitly[DecodeFromString[T]]
 
-  def fromCirceDecoder[T: Decoder]: DecodeFromString[T] =
-    decode[T](_).leftMap(e => NonEmptyList.one(e.getMessage))
+  def fromJsonDecoder[T: JsonDecoder]: DecodeFromString[T] =
+    JsonDecoder[T].decodeJson(_).leftMap(NonEmptyList.one(_))
 
   implicit val stringDecodeString: DecodeFromString[String] =
     _.asRight

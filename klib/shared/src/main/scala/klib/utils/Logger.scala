@@ -346,7 +346,7 @@ object Logger {
         }
       } yield new Source("StdOut", logTolerance, queuedBreak) {
         override type Src = ops.type
-        override val acquire: UIO[Src] = UIO(ops)
+        override val acquire: UIO[Src] = ZIO.succeed[Src](ops)
         override def release(src: Src): UIO[Unit] = UIO.unit
       }
 
