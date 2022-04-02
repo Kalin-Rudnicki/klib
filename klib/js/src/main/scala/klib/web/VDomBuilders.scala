@@ -93,7 +93,12 @@ object VDomBuilders {
   // ex: div.style(_) = _
   object CSSAttrBuilders {
     abstract class CSSAttrBuilder(scopedName: ScopedName) {
-      def :=(value: String): CSSAttr = CSSAttr(scopedName, value)
+      final def :=(value: String): CSSAttr = CSSAttr(scopedName, value)
+
+      final def inherit: CSSAttr = this := "inherit"
+      final def initial: CSSAttr = this := "initial"
+      final def unset: CSSAttr = this := "unset"
+      final def revert: CSSAttr = this := "revert"
     }
     abstract class ColorCSSAttrBuilder(scopedName: ScopedName) extends CSSAttrBuilder(scopedName) {
       def red: CSSAttr = this := "red"
@@ -118,9 +123,6 @@ object VDomBuilders {
       def navy: CSSAttr = this := "navy"
       def fuchsia: CSSAttr = this := "fuchsia"
       def aqua: CSSAttr = this := "aqua"
-      def inherit: CSSAttr = this := "inherit"
-      def initial: CSSAttr = this := "initial"
-      def unset: CSSAttr = this := "unset"
       def rgb(r: Int, g: Int, b: Int): CSSAttr = this := s"rgb($r, $g, $b)"
       // TODO: more?
     }
@@ -132,6 +134,10 @@ object VDomBuilders {
     object cursor extends CSSAttrBuilder("cursor")
     object userSelect extends CSSAttrBuilder("user-select")
     object padding extends CSSAttrBuilder("padding")
+    object paddingTop extends CSSAttrBuilder("padding-top")
+    object paddingRight extends CSSAttrBuilder("padding-right")
+    object paddingBottom extends CSSAttrBuilder("padding-bottom")
+    object paddingLeft extends CSSAttrBuilder("padding-left")
     object margin extends CSSAttrBuilder("margin")
     object display extends CSSAttrBuilder("display") {
       def inline: CSSAttr = this := "inline"
@@ -149,11 +155,9 @@ object VDomBuilders {
       def tableColumnGroup: CSSAttr = this := "table-column-group"
       def tableCaption: CSSAttr = this := "table-caption"
       def none: CSSAttr = this := "none"
-      def inherit: CSSAttr = this := "inherit"
-      def initial: CSSAttr = this := "initial"
-      def unset: CSSAttr = this := "unset"
     }
     object textAlign extends CSSAttrBuilder("text-align")
+    object verticalAlign extends CSSAttrBuilder("vertical-align")
     object fontSize extends CSSAttrBuilder("font-size")
     object fontWeight extends CSSAttrBuilder("font-weight")
     object fontFamily extends CSSAttrBuilder("font-family")
@@ -166,6 +170,14 @@ object VDomBuilders {
     object borderBottom extends CSSAttrBuilder("border-bottom")
     object borderLeft extends CSSAttrBuilder("border-left")
     object border extends CSSAttrBuilder("border")
+    object whiteSpace extends CSSAttrBuilder("white-space") {
+      def normal: CSSAttr = this := "normal"
+      def noWrap: CSSAttr = this := "nowrap"
+      def pre: CSSAttr = this := "pre"
+      def preWrap: CSSAttr = this := "pre-wrap"
+      def preLine: CSSAttr = this := "pre-line"
+      def breakSpaces: CSSAttr = this := "break-spaces"
+    }
     object boxShadow extends CSSAttrBuilder("box-shadow")
     object textShadow extends CSSAttrBuilder("text-shadow")
     object transform extends CSSAttrBuilder("transform")
@@ -190,7 +202,7 @@ object VDomBuilders {
   // ex: div.setAttr(_, _)
   object StdAttrBuilders {
     abstract class StdAttrBuilder(scopedName: ScopedName) {
-      def :=(value: String): StdAttr = StdAttr(scopedName, value)
+      final def :=(value: String): StdAttr = StdAttr(scopedName, value)
     }
 
     object `type` extends StdAttrBuilder("type") {
@@ -227,7 +239,7 @@ object VDomBuilders {
   // ex: div._ = _
   object KeyAttrBuilders {
     abstract class KeyAttrBuilder[T](name: String, convert: T => js.Any) {
-      def :=(value: T): KeyAttr = KeyAttr(name, convert(value))
+      final def :=(value: T): KeyAttr = KeyAttr(name, convert(value))
     }
 
     object onClick extends KeyAttrBuilder[MouseEvent => Unit]("onclick", identity(_))
