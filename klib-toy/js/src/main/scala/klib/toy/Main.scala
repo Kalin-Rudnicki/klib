@@ -93,7 +93,7 @@ object Main extends PageApp {
             .mapValueV(v => s"1: $v")
             .labeledAbove("ex-input-string-double-reference-1") >>
             TextWidgets
-              .input[String]()
+              .textArea[String]()
               .mapValueV(_.map(v => s"2: $v"))
               .labeledAbove("ex-input-string-double-reference-2")
         }
@@ -105,6 +105,7 @@ object Main extends PageApp {
             .radioGroup(
               Food.values,
               EnumWidgets.RadioGroupDecorator(
+                groupClassModifiers = List("custom"),
                 buttonModifier = BeforeAfterModifier.after(padding := "5px", border := "2px solid black", cursor.pointer, userSelect.none),
                 buttonModifierSelected = BeforeAfterModifier.after(backgroundColor.aqua),
               ),

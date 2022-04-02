@@ -20,13 +20,18 @@ import klib.web.widgets.CommonRaises.*
 
 object TextWidgets {
 
+  final case class TextFieldDecorator(
+      textFieldClassModifiers: List[String] = Nil,
+      textFeidldModifiers: BeforeAfterModifier = BeforeAfterModifier(),
+  )
+
   sealed abstract class TextFieldBuilder1(tagName: String, requireCtrlForSubmit: Boolean) {
 
-    def apply[T: DecodeFromString](decorator: BeforeAfterModifier = BeforeAfterModifier()): AVWidget[Submit, String, Option[T]] =
+    def apply[T: DecodeFromString](decorator: TextFieldDecorator = TextFieldDecorator()): AVWidget[Submit, String, Option[T]] =
       AVWidget[Submit, String, Option[T]](
         (rh, s) =>
           NodeElement(tagName)(
-            decorator.before,
+            decorator.textFeidldModifiers.before,
           )(
             onKeyUp := { e =>
               val value = e.target.asInstanceOf[Dynamic].value.asInstanceOf[String]
@@ -37,8 +42,9 @@ object TextWidgets {
               rh.raiseMany(raises)
             },
             value := s,
+            ClassName.b("widget-text", tagName.some, decorator.textFieldClassModifiers),
           )(
-            decorator.after,
+            decorator.textFeidldModifiers.after,
           ),
         s =>
           Option

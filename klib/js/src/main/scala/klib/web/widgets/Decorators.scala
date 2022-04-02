@@ -154,6 +154,7 @@ final class FocusedPWidgetDecorator private[widgets] (
 // I think it is easier to reason about when looking at the symbol `|>|`,
 // which is why all of the other operations are defined in terms of that.
 final case class LabeledFieldDecorator(
+    labelClassModifiers: List[String] = Nil,
     labelModifier: BeforeAfterNFModifier = BeforeAfterNFModifier(),
     wrappedModifier: BeforeAfterNFModifier = BeforeAfterNFModifier(),
     decorateLabel: CWidgetDecorator = CWidgetDecorator.identity,
@@ -165,6 +166,7 @@ final case class LabeledFieldDecorator(
 
   def |>|(other: LabeledFieldDecorator): LabeledFieldDecorator =
     LabeledFieldDecorator(
+      self.labelClassModifiers |+| other.labelClassModifiers,
       self.labelModifier |+| other.labelModifier,
       self.wrappedModifier |+| other.wrappedModifier,
       CWidgetDecorator.monoid.combine(self.decorateLabel, other.decorateLabel),
@@ -202,6 +204,9 @@ final case class LabeledFieldDecorator(
 
   // --- helper focuses ---
 
+  def withLabelClassModifiers(mods: String*): LabeledFieldDecorator =
+    copy(labelClassModifiers = labelClassModifiers |+| mods.toList)
+
   def focusLabelModifierBefore: FocusedNameFunctionModifier =
     focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.labelModifier.before))
 
@@ -236,7 +241,7 @@ final case class LabeledFieldDecorator(
     val wrappedModifierBefore: Modifier = self.wrappedModifier.before(name, prettyName)
     val wrappedModifierAfter: Modifier = self.wrappedModifier.after(name, prettyName)
 
-    val baseLabel: CWidget = CWidget(label(labelModifierBefore)(s"$prettyName: ")(labelModifierAfter))
+    val baseLabel: CWidget = CWidget(label(labelModifierBefore)(s"$prettyName: ", ClassName.b("widget-label", labelClassModifiers))(labelModifierAfter))
     val modifiedLabel: CWidget = self.decorateLabel(baseLabel)
 
     val baseField: PWidget[Action, StateGet, StateSet, Value] = fieldWidget.prependErrorString(s"Error in field '$prettyName': ")
