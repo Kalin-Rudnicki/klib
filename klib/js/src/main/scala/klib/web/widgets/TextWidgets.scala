@@ -23,7 +23,9 @@ object TextWidgets {
   final case class TextFieldDecorator(
       textFieldClassModifiers: List[String] = Nil,
       textFeidldModifiers: BeforeAfterModifier = BeforeAfterModifier(),
-  )
+  ) extends FocusableDecorator[TextFieldDecorator] { self =>
+    override def getSelf: TextFieldDecorator = self
+  }
 
   sealed abstract class TextFieldBuilder1(tagName: String, requireCtrlForSubmit: Boolean) {
 

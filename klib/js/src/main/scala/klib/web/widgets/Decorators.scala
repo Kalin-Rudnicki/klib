@@ -82,72 +82,125 @@ object BeforeAfterNFModifier {
 
 }
 
-// =====| ... |=====
+// =====| Focused |=====
 
-final class FocusedNameFunctionModifier private[widgets] (
-    self: LabeledFieldDecorator,
-    lens: Lens[LabeledFieldDecorator, NameFunction[Modifier]],
+trait FocusableDecorator[Self] {
+
+  def getSelf: Self
+
+  inline final def focus(inline f: Self => List[String]): FocusedClassModifiers[Self] =
+    FocusedClassModifiers(getSelf, GenLens[Self](f).asInstanceOf[Lens[Self, List[String]]])
+
+  inline final def focus(inline f: Self => Modifier): FocusedModifier[Self] =
+    FocusedModifier(getSelf, GenLens[Self](f).asInstanceOf[Lens[Self, Modifier]])
+
+  inline final def focus(inline f: Self => NameFunction[Modifier]): FocusedNFModifier[Self] =
+    FocusedNFModifier(getSelf, GenLens[Self](f).asInstanceOf[Lens[Self, NameFunction[Modifier]]])
+
+  inline final def focus(inline f: Self => CWidgetDecorator): FocusedCWidgetDecorator[Self] =
+    FocusedCWidgetDecorator(getSelf, GenLens[Self](f).asInstanceOf[Lens[Self, CWidgetDecorator]])
+
+  inline final def focus(inline f: Self => PWidgetDecorator): FocusedPWidgetDecorator[Self] =
+    FocusedPWidgetDecorator(getSelf, GenLens[Self](f).asInstanceOf[Lens[Self, PWidgetDecorator]])
+
+}
+
+final class FocusedClassModifiers[Self](
+    self: Self,
+    lens: Lens[Self, List[String]],
 ) {
 
-  def |>|(other: NameFunction[Modifier]): LabeledFieldDecorator =
+  def before(other: String*): Self =
+    lens.modify(other.toList |+| _)(self)
+
+  def after(other: String*): Self =
+    lens.modify(_ |+| other.toList)(self)
+
+}
+
+final class FocusedModifier[Self](
+    self: Self,
+    lens: Lens[Self, Modifier],
+) {
+
+  def |>|(other: Modifier): Self =
+    lens.modify(_ |+| other)(self)
+
+  inline def before(other: Modifier*): Self =
+    this |>| Modifier.flatten(other.toList)
+
+  inline def |<|(other: Modifier): Self =
+    lens.modify(other |+| _)(self)
+
+  inline def after(other: Modifier*): Self =
+    this |<| Modifier.flatten(other.toList)
+
+}
+
+final class FocusedNFModifier[Self](
+    self: Self,
+    lens: Lens[Self, NameFunction[Modifier]],
+) {
+
+  def |>|(other: NameFunction[Modifier]): Self =
     lens.modify(_ |>| other)(self)
 
-  inline def before(other: NameFunction[Modifier]): LabeledFieldDecorator =
+  inline def before(other: NameFunction[Modifier]): Self =
     this |>| other
 
-  inline def before(other: Modifier*): LabeledFieldDecorator =
+  inline def before(other: Modifier*): Self =
     this |>| NameFunction.const[Modifier](other)
 
-  inline def |<|(other: NameFunction[Modifier]): LabeledFieldDecorator =
+  inline def |<|(other: NameFunction[Modifier]): Self =
     lens.modify(_ |<| other)(self)
 
-  inline def after(other: NameFunction[Modifier]): LabeledFieldDecorator =
+  inline def after(other: NameFunction[Modifier]): Self =
     this |<| other
 
-  inline def after(other: Modifier*): LabeledFieldDecorator =
+  inline def after(other: Modifier*): Self =
     this |<| NameFunction.const[Modifier](other)
 
 }
 
-final class FocusedCWidgetDecorator private[widgets] (
-    self: LabeledFieldDecorator,
-    lens: Lens[LabeledFieldDecorator, CWidgetDecorator],
+final class FocusedCWidgetDecorator[Self](
+    self: Self,
+    lens: Lens[Self, CWidgetDecorator],
 ) {
 
-  def |>|(other: CWidgetDecorator): LabeledFieldDecorator =
+  def |>|(other: CWidgetDecorator): Self =
     lens.modify { wF => w => other(wF(w)) }(self)
 
-  inline def before(other: CWidgetDecorator): LabeledFieldDecorator =
+  inline def before(other: CWidgetDecorator): Self =
     this |>| other
 
-  inline def |<|(other: CWidgetDecorator): LabeledFieldDecorator =
+  inline def |<|(other: CWidgetDecorator): Self =
     lens.modify { wF => w => wF(other(w)) }(self)
 
-  inline def after(other: CWidgetDecorator): LabeledFieldDecorator =
+  inline def after(other: CWidgetDecorator): Self =
     this |<| other
 
 }
 
-final class FocusedPWidgetDecorator private[widgets] (
-    self: LabeledFieldDecorator,
-    lens: Lens[LabeledFieldDecorator, PWidgetDecorator],
+final class FocusedPWidgetDecorator[Self](
+    self: Self,
+    lens: Lens[Self, PWidgetDecorator],
 ) {
 
-  def |>|(other: PWidgetDecorator): LabeledFieldDecorator =
+  def |>|(other: PWidgetDecorator): Self =
     lens.modify { PWidgetDecorator.monoid.combine(_, other) }(self)
 
-  inline def before(other: PWidgetDecorator): LabeledFieldDecorator =
+  inline def before(other: PWidgetDecorator): Self =
     this |>| other
 
-  inline def |<|(other: PWidgetDecorator): LabeledFieldDecorator =
+  inline def |<|(other: PWidgetDecorator): Self =
     lens.modify { PWidgetDecorator.monoid.combine(other, _) }(self)
 
-  inline def after(other: PWidgetDecorator): LabeledFieldDecorator =
+  inline def after(other: PWidgetDecorator): Self =
     this |<| other
 
 }
 
-// =====| ... |=====
+// =====| Label Decorator |=====
 
 // A helpful way to think of the naming scheme is this:
 // `before` means that this decorator decorates before the `other` decorator.
@@ -160,7 +213,9 @@ final case class LabeledFieldDecorator(
     decorateLabel: CWidgetDecorator = CWidgetDecorator.identity,
     decorateField: PWidgetDecorator = PWidgetDecorator.identity,
     decorateWrapped: PWidgetDecorator = PWidgetDecorator.identity,
-) { self =>
+) extends FocusableDecorator[LabeledFieldDecorator] { self =>
+
+  override def getSelf: LabeledFieldDecorator = self
 
   // =====| merge entire decorator |=====
 
@@ -182,51 +237,6 @@ final case class LabeledFieldDecorator(
 
   inline def after(other: LabeledFieldDecorator): LabeledFieldDecorator =
     self |<| other
-
-  // =====| nested modifier fields |=====
-
-  // --- generic focuses ---
-
-  def focusNamedFunctionModifier(
-      lens: Lens[LabeledFieldDecorator, NameFunction[Modifier]],
-  ): FocusedNameFunctionModifier =
-    FocusedNameFunctionModifier(self, lens)
-
-  def focusCWidgetDecorator(
-      lens: Lens[LabeledFieldDecorator, CWidgetDecorator],
-  ): FocusedCWidgetDecorator =
-    FocusedCWidgetDecorator(self, lens)
-
-  def focusPWidgetDecorator(
-      lens: Lens[LabeledFieldDecorator, PWidgetDecorator],
-  ): FocusedPWidgetDecorator =
-    FocusedPWidgetDecorator(self, lens)
-
-  // --- helper focuses ---
-
-  def withLabelClassModifiers(mods: String*): LabeledFieldDecorator =
-    copy(labelClassModifiers = labelClassModifiers |+| mods.toList)
-
-  def focusLabelModifierBefore: FocusedNameFunctionModifier =
-    focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.labelModifier.before))
-
-  def focusLabelModifierAfter: FocusedNameFunctionModifier =
-    focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.labelModifier.after))
-
-  def focusWrappedModifierBefore: FocusedNameFunctionModifier =
-    focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.wrappedModifier.before))
-
-  def focusWrappedModifierAfter: FocusedNameFunctionModifier =
-    focusNamedFunctionModifier(GenLens[LabeledFieldDecorator](_.wrappedModifier.after))
-
-  def focusDecorateLabel: FocusedCWidgetDecorator =
-    focusCWidgetDecorator(GenLens[LabeledFieldDecorator](_.decorateLabel))
-
-  def focusDecorateField: FocusedPWidgetDecorator =
-    focusPWidgetDecorator(GenLens[LabeledFieldDecorator](_.decorateField))
-
-  def focusDecorateWrapped: FocusedPWidgetDecorator =
-    focusPWidgetDecorator(GenLens[LabeledFieldDecorator](_.decorateWrapped))
 
   // =====| nested modifier fields |=====
 
