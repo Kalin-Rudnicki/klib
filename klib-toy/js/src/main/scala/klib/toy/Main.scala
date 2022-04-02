@@ -54,6 +54,8 @@ object Main extends PageApp {
               backgroundColor.aqua,
               padding := "3px 10px",
               borderRadius := "10px",
+              cursor.pointer,
+              userSelect.none,
               ClassName.be("my-button", "stuff", Option.when(s > 5)("more-than-5")),
               onClick := { _ => rh.modifyState(modify) },
             )
@@ -91,7 +93,7 @@ object Main extends PageApp {
             .input[String]()
             .required
             .mapValueV(v => s"1: $v")
-            .labeledAbove("ex-input-string-double-reference-1") >>
+            .labeledAbove("ex-input-string-double-reference-1", _.focus(_.labelModifier.after).after(color.red)) >>
             TextWidgets
               .textArea[String]()
               .mapValueV(_.map(v => s"2: $v"))
@@ -104,13 +106,18 @@ object Main extends PageApp {
           EnumWidgets
             .radioGroup(
               Food.values,
-              EnumWidgets.RadioGroupDecorator(
-                groupClassModifiers = List("custom"),
-                buttonModifier = BeforeAfterModifier.after(padding := "5px", border := "2px solid black", cursor.pointer, userSelect.none),
-                buttonModifierSelected = BeforeAfterModifier.after(backgroundColor.aqua),
-              ),
+              EnumWidgets
+                .RadioGroupDecorator()
+                .focus(_.groupClassModifiers)
+                .after("custom")
+                .focus(_.buttonModifier.after)
+                .after(padding := "5px", border := "2px solid black", cursor.pointer, userSelect.none)
+                .focus(_.buttonModifier.after)
+                .after(backgroundColor.aqua)
+                .focus(_.buttonModifierSelected.after)
+                .after(backgroundColor.blue, color.white, fontWeight := "bold"),
             )
-            .labeledAbove("ex-food", _.focusLabelModifierAfter.after(marginBottom := "5px"))
+            .labeledAbove("ex-food", _.focus(_.labelModifier.after).after(marginBottom := "5px"))
             .zoomOut[Env](_.exFood)
             .inSection
 

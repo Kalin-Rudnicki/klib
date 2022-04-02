@@ -19,7 +19,9 @@ object EnumWidgets {
       buttonModifierFirst: BeforeAfterModifier = BeforeAfterModifier(),
       buttonModifierLast: BeforeAfterModifier = BeforeAfterModifier(),
       buttonModifierSelected: BeforeAfterModifier = BeforeAfterModifier(),
-  )
+  ) extends FocusableDecorator[RadioGroupDecorator] { self =>
+    override def getSelf: RadioGroupDecorator = self
+  }
 
   def radioGroup[E](
       values: Seq[E],
