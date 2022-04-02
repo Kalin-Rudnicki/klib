@@ -2,13 +2,8 @@ package klib.web.widgets
 
 import cats.Monoid
 import cats.data.NonEmptyList
-import cats.syntax.either.*
-import cats.syntax.monoid.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import monocle.Lens
-import monocle.macros.GenLens
-import org.scalajs.dom.console
 import scala.scalajs.js.Dynamic
 
 import klib.fp.typeclass.DecodeFromString

@@ -121,14 +121,19 @@ object Main extends PageApp {
             .zoomOut[Env](_.exFood)
             .inSection
 
+        val submitButton: CAWidget[Submit] =
+          FormWidgets.submitButton().inSection
+
         {
           header >>
             exCounter >>
             exInputString >>
             exInputInt >>
             exInputStringDoubleReference >>
-            exFood
+            exFood >>
+            submitButton
         }.debugStateAndValueJson
+          .mapActionAV { (a, v) => Logger.println.info(v).as(Nil) }
       }
       .logA
 
