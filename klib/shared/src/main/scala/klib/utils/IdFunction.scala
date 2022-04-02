@@ -26,4 +26,16 @@ object IdFunction {
     def apply[K[_, _, _]](f: [A, B, C] => K[A, B, C] => K[A, B, C]): K3[K] = f
   }
 
+  type K4[K[_, _, _, _]] = [A, B, C, D] => K[A, B, C, D] => K[A, B, C, D]
+  object K4 {
+    def identity[K[_, _, _, _]]: K4[K] = [A, B, C, D] => (k: K[A, B, C, D]) => k
+    def apply[K[_, _, _, _]](f: [A, B, C, D] => K[A, B, C, D] => K[A, B, C, D]): K4[K] = f
+  }
+
+  type K5[K[_, _, _, _, _]] = [A, B, C, D, E] => K[A, B, C, D, E] => K[A, B, C, D, E]
+  object K5 {
+    def identity[K[_, _, _, _, _]]: K5[K] = [A, B, C, D, E] => (k: K[A, B, C, D, E]) => k
+    def apply[K[_, _, _, _, _]](f: [A, B, C, D, E] => K[A, B, C, D, E] => K[A, B, C, D, E]): K5[K] = f
+  }
+
 }

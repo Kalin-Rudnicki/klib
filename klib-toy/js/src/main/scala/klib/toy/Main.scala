@@ -18,7 +18,7 @@ object Main extends PageApp {
   val testPage: Page =
     Page
       .builder("test")
-      .constEnv { Env("test", 0) }
+      .constEnv { Env("", 0) }
       .titleF(env => s"${env.str} : ${env.counter}")
       .body {
         def incButton(text: String, modify: Int => Int): Widget[Int] =
@@ -37,11 +37,11 @@ object Main extends PageApp {
           CWidget(h1("HEADER")) >>
             Widget[Env](s => div(s"${s.str} : ${s.counter}"))
 
-        val counter: VWidget[Int, Int] =
-          CWidget("Counter: ") >>
-            incButton("-", i => (i - 1).max(0)) >>
+        val counter: VWidget[Int, Int] = {
+          incButton("-", i => (i - 1).max(0)) >>
             Widget[Int] { s => span(display := "inline-block", textAlign := "center", width := "25px")(s.toString) }.setValueS(identity) >>
             incButton("+", _ + 1)
+        }.labeledAbove("counter")
 
         {
           header >>
@@ -49,14 +49,19 @@ object Main extends PageApp {
               .mapValueV(_ * 2)
               .debugStateAndValue
               .zoomOut[Env](_.counter) >>
-            TextWidgets.input
-              .required[String]("text", TextWidgets.Decorator.labelInFront)
+            TextWidgets
+              .input[String]()
+              .labeledAbove("field-1")
               .zoomOut[Env](_.str) >>
-            TextWidgets.input
-              .required[Int]("counter", TextWidgets.Decorator.labelInFront.modifyFieldModifier.after(`type` := "number"))
+            TextWidgets
+              .input[Int](TextWidgets.TextFieldDecorator.after(`type`.number))
+              .required
+              .labeledAbove("field-2")
               .zoomOut[Env](_.str) >>
-            TextWidgets.textArea
-              .optional[String]("text")
+            TextWidgets
+              .textArea[String]()
+              .required
+              .labeledAbove("field-3")
               .zoomOut[Env](_.str)
         }.debugStateAndValue
       }

@@ -34,6 +34,9 @@ object VDom {
     def apply(children: Modifier*): Modifier =
       Wrapped(children.toList.flatMap(_.toBasics))
 
+    def flatten(children: List[Modifier]): Modifier =
+      Wrapped(children.flatMap(_.toBasics))
+
     val empty: Modifier = Wrapped(Nil)
 
     given Monoid[Modifier] = new Monoid[Modifier] {

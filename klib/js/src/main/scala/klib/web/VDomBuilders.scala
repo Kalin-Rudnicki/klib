@@ -133,7 +133,26 @@ object VDomBuilders {
     object userSelect extends CSSAttrBuilder("user-select")
     object padding extends CSSAttrBuilder("padding")
     object margin extends CSSAttrBuilder("margin")
-    object display extends CSSAttrBuilder("display")
+    object display extends CSSAttrBuilder("display") {
+      def inline: CSSAttr = this := "inline"
+      def block: CSSAttr = this := "block"
+      def inlineBlock: CSSAttr = this := "inline-block"
+      def flex: CSSAttr = this := "flex"
+      def inlineFlex: CSSAttr = this := "inline-flex"
+      def table: CSSAttr = this := "table"
+      def tableCell: CSSAttr = this := "table-cell"
+      def tableRow: CSSAttr = this := "table-row"
+      def tableRowGroup: CSSAttr = this := "table-row-group"
+      def tableHeaderGroup: CSSAttr = this := "table-header-group"
+      def tableFooterGroup: CSSAttr = this := "table-footer-group"
+      def tableColumn: CSSAttr = this := "table-column"
+      def tableColumnGroup: CSSAttr = this := "table-column-group"
+      def tableCaption: CSSAttr = this := "table-caption"
+      def none: CSSAttr = this := "none"
+      def inherit: CSSAttr = this := "inherit"
+      def initial: CSSAttr = this := "initial"
+      def unset: CSSAttr = this := "unset"
+    }
     object textAlign extends CSSAttrBuilder("text-align")
     object fontSize extends CSSAttrBuilder("font-size")
     object fontWeight extends CSSAttrBuilder("font-weight")
@@ -174,7 +193,34 @@ object VDomBuilders {
       def :=(value: String): StdAttr = StdAttr(scopedName, value)
     }
 
-    object `type` extends StdAttrBuilder("type")
+    object `type` extends StdAttrBuilder("type") {
+      def text: StdAttr = this := "text"
+      def number: StdAttr = this := "number"
+      def password: StdAttr = this := "password"
+      def checkbox: StdAttr = this := "checkbox"
+      def radio: StdAttr = this := "radio"
+      def submit: StdAttr = this := "submit"
+      def reset: StdAttr = this := "reset"
+      def button: StdAttr = this := "button"
+      def hidden: StdAttr = this := "hidden"
+      def image: StdAttr = this := "image"
+      def file: StdAttr = this := "file"
+      def color: StdAttr = this := "color"
+      def date: StdAttr = this := "date"
+      def datetime: StdAttr = this := "datetime"
+      def datetimeLocal: StdAttr = this := "datetime-local"
+      def email: StdAttr = this := "email"
+      def month: StdAttr = this := "month"
+      def range: StdAttr = this := "range"
+      def search: StdAttr = this := "search"
+      def tel: StdAttr = this := "tel"
+      def time: StdAttr = this := "time"
+      def url: StdAttr = this := "url"
+      def week: StdAttr = this := "week"
+      def inherit: StdAttr = this := "inherit"
+      def initial: StdAttr = this := "initial"
+      def unset: StdAttr = this := "unset"
+    }
     // TODO:
   }
 
