@@ -3,6 +3,7 @@ package klib.web
 import cats.data.*
 import cats.syntax.either.*
 import cats.syntax.parallel.*
+import io.circe.Encoder
 import monocle.*
 import monocle.Focus.KeywordContext
 import monocle.macros.GenLens
@@ -114,20 +115,70 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
         )
     }
 
-  inline final def debugState: PWidget[Action, StateGet, StateSet, Value] =
+  final def genericDebugState[NewStateGet >: StateSet <: StateGet](showState: NewStateGet => String): PWidget[Action, NewStateGet, StateSet, Value] =
     self >>
-      PWidget[Action, StateGet, StateSet, Unit](
-        (_, s) => VDomBuilders.div(s"State: $s"),
+      PWidget[Action, NewStateGet, StateSet, Unit](
+        (_, s) =>
+          VDomBuilders.div(
+            VDomBuilders.span(
+              "State: ",
+              VDomBuilders.display.inlineBlock,
+              VDomBuilders.height := "100%",
+              VDomBuilders.verticalAlign := "top",
+              VDomBuilders.paddingRight := "15px",
+            ),
+            VDomBuilders.span(showState(s), VDomBuilders.display.inlineBlock, VDomBuilders.whiteSpace.pre),
+          ),
         _ => ().asRight,
       )
 
-  inline final def debugValue: PWidget[Action, StateGet, StateSet, Value] =
+  final def genericDebugValue[NewValue >: Value](showValue: NewValue => String): PWidget[Action, StateGet, StateSet, NewValue] =
     placeAfterWithEitherValue { e =>
-      CWidget(VDomBuilders.div(s"Value: $e"))
+      CWidget(
+        VDomBuilders.div(
+          VDomBuilders.span(
+            "Value: ",
+            VDomBuilders.display.inlineBlock,
+            VDomBuilders.height := "100%",
+            VDomBuilders.verticalAlign := "top",
+            VDomBuilders.paddingRight := "15px",
+          ),
+          VDomBuilders.span(
+            e match {
+              case Right(v) => showValue(v)
+              case Left(e)  => s"Errors:${e.toList.map(e => s"\n  - $e").mkString}"
+            },
+            VDomBuilders.display.inlineBlock,
+            VDomBuilders.whiteSpace.pre,
+          ),
+        ),
+      )
     }
+
+  inline final def debugState: PWidget[Action, StateGet, StateSet, Value] =
+    genericDebugState[StateGet](_.toString)
+
+  inline final def debugValue: PWidget[Action, StateGet, StateSet, Value] =
+    genericDebugValue[Value](_.toString)
 
   inline final def debugStateAndValue: PWidget[Action, StateGet, StateSet, Value] =
     self.debugState.debugValue
+
+  inline final def debugStateJson[NewStateGet >: StateSet <: StateGet](implicit
+      stateEncoder: Encoder[NewStateGet],
+  ): PWidget[Action, NewStateGet, StateSet, Value] =
+    genericDebugState[NewStateGet](stateEncoder(_).spaces4)
+
+  inline final def debugValueJson[NewValue >: Value](implicit
+      valueEncoder: Encoder[NewValue],
+  ): PWidget[Action, StateGet, StateSet, NewValue] =
+    genericDebugValue[NewValue](valueEncoder(_).spaces4)
+
+  inline final def debugStateAndValueJson[NewStateGet >: StateSet <: StateGet, NewValue >: Value](implicit
+      stateEncoder: Encoder[NewStateGet],
+      valueEncoder: Encoder[NewValue],
+  ): PWidget[Action, NewStateGet, StateSet, NewValue] =
+    self.debugStateJson[NewStateGet].debugValueJson[NewValue]
 
   // --- wrap ---
 
