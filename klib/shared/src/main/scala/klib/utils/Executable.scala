@@ -12,7 +12,7 @@ import klib.utils.commandLine.parse.*
 
 trait ExecutableApp extends ZIOAppDefault {
 
-  override def run: ZIO[Environment with ZEnv with ZIOAppArgs, Any, Any] =
+  override final def run: ZIO[Environment with ZEnv with ZIOAppArgs, Any, Any] =
     for {
       zioAppArgs <- ZIO.service[ZIOAppArgs]
       exitCode <- executable.execute(zioAppArgs.getArgs.toList)
@@ -95,7 +95,7 @@ object Executable {
       Builder2(parser, layerF)
   }
 
-  final case class Builder2[P, R: Tag] private[Executable] (
+  final case class Builder2[P, R: EnvironmentTag] private[Executable] (
       private val parser: BuiltParser[P],
       private val layerF: P => RLayerM[BaseEnv, R],
   ) {
