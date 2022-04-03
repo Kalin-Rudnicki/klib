@@ -11,7 +11,7 @@ import klib.utils.*
 
 object SpecUtils {
 
-  type TestEnv = Logger with FileSystem with RunMode
+  type TestEnv = Logger & FileSystem & RunMode
 
   val testLayers: TaskLayerM[TestEnv] =
     FileSystem.live ++
@@ -19,7 +19,7 @@ object SpecUtils {
       ZLayer.succeed(RunMode.Dev)
 
   abstract class KSpec[Env](implicit
-      val tag: Tag[Env],
+      val tag: EnvironmentTag[Env],
   ) extends RunnableSpec[TestEnvironment with Env, Any] {
 
     protected final type TestSpec = ZSpec[Environment, Any]

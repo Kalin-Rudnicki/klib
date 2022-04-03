@@ -22,7 +22,7 @@ object SharedMain extends ZIOApp {
         ),
       )
 
-  override implicit def tag: Tag[Environment] = Tag[Environment]
+  override implicit def tag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
   override def run: RIO[Environment, Any] =
     for {

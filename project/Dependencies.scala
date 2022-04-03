@@ -21,7 +21,7 @@ object Dependencies {
   }
 
   object `dev.zio` extends Org("dev.zio") {
-    private val version = "2.0.0-RC1"
+    private val version = "2.0.0-RC3"
 
     val zio = crossDep("zio", version)
     val `zio-streams` = crossDep("zio-streams", version)
