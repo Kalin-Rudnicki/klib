@@ -31,6 +31,10 @@ object Dependencies {
     val `zio-test-sbt` = crossDep("zio-test-sbt", version, _ % Test)
   }
 
+  object `io.getquill` extends Org("io.getquill") {
+    val `quill-jdbc-zio` = dep("quill-jdbc-zio", "3.17.0.Beta3.0-RC2")
+  }
+
   object `org.typelevel` extends Org("org.typelevel") {
     val `cats-effect` = crossDep("cats-effect", "3.3.3")
   }

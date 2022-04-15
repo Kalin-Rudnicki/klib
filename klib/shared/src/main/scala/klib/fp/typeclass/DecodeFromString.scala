@@ -107,7 +107,7 @@ object DecodeFromString {
       case other2Year(day, month, year) => attemptDate(LocalDate.of(guessYear(year.toInt), month.toInt, day.toInt))
       case other4Year(day, month, year) => attemptDate(LocalDate.of(year.toInt, month.toInt, day.toInt))
       case yearFirst(year, month, day)  => attemptDate(LocalDate.of(year.toInt, month.toInt, day.toInt))
-      case _                            => "Invalid date format".leftNel
+      case _                            => s"Malformatted date ${str.unesc}".leftNel
     }
   }
 
@@ -133,7 +133,7 @@ object DecodeFromString {
       case hourMinuteSecond(hour, minute, second)   => attemptTime(LocalTime.of(hour.toInt, minute.toInt, second.toInt))
       case hourMinuteSecondAM(hour, minute, second) => attemptTime(LocalTime.of(hour.toInt, minute.toInt, second.toInt))
       case hourMinuteSecondPM(hour, minute, second) => attemptTime(LocalTime.of(hour.toInt + 12, minute.toInt, second.toInt))
-      case _                                        => "Invalid time format".leftNel
+      case _                                        => s"Malformatted time ${str.unesc}".leftNel
     }
   }
 
@@ -147,11 +147,17 @@ object DecodeFromString {
           case Left(e1) =>
             (localTimeDecodeString.decode(str1), configurableLocalDateDecodeString(_currentYear, futureTolerance).decode(str2)).parTupled match {
               case Right((time, date)) => LocalDateTime.of(date, time).asRight
-              case Left(e2)            => (e1 ::: e2).asLeft
+              case Left(e2) =>
+                NonEmptyList
+                  .of(
+                    s"Could not parse 'DATE TIME' : ${e1.toList.mkString(", ")}",
+                    s"Could not parse 'TIME DATE' : ${e2.toList.mkString(", ")}",
+                  )
+                  .asLeft
             }
         }
       case Array(str1) => localDateDecodeString.decode(str1).map(_.atStartOfDay)
-      case _           => "Invalid dateTime format".leftNel
+      case _           => s"Malformatted date-time ${str.unesc}".leftNel
     }
   }
 

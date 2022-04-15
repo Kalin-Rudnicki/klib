@@ -102,9 +102,10 @@ lazy val klib =
       Dependencies.`com.lihaoyi`.scalatags,
     )
     .jvmSettings(
+      Test / run / fork := true,
       // Dependencies
       Dependencies.`com.google.jimfs`.jimfs,
-      Test / run / fork := true,
+      // Dependencies.`io.getquill`.`quill-jdbc-zio`,
     )
 
 lazy val `klib-toy` =
