@@ -10,6 +10,21 @@ import zio.*
 
 import klib.utils.commandLine.parse.*
 
+/*
+   =====| Executable App Template |=====
+   import klib.utils.*
+   import klib.utils.commandLine.parse.*
+
+   object Main extends ExecutableApp {
+     override val executable: Executable = Executable.fromSubcommands()
+   }
+
+   =====| Executable Template |=====
+   Executable
+     .fromParser { ??? }
+     .withLayer { _ => ??? }
+     .withExecute { _ => ??? }
+ */
 trait ExecutableApp extends ZIOAppDefault {
 
   override final def run: ZIO[Environment with ZEnv with ZIOAppArgs, Any, Any] =

@@ -3,6 +3,7 @@ package klib.fp.typeclass
 import cats.data.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
+import java.time.LocalDate
 import java.util.UUID
 import scala.util.Try
 import zio.json.*
@@ -63,6 +64,9 @@ object DecodeFromString {
 
   implicit val uuidDecodeString: DecodeFromString[UUID] =
     str => Try(UUID.fromString(str)).toEither.leftMap(e => NonEmptyList.one(e.getMessage))
+
+  implicit val localDateDecodeString: DecodeFromString[LocalDate] =
+    str => Try(LocalDate.parse(str)).toEither.leftMap(e => NonEmptyList.one(e.getMessage))
 
 }
 
