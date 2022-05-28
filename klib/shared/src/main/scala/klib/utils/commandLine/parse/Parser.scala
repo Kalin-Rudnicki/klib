@@ -398,9 +398,9 @@ object Parser {
         val findFunction: FindFunction[String] =
           FindFunction.first {
             FindFunction.fromParam(_primaryLongParam) ::
-              _primaryShortParam.map(FindFunction.fromParam(_)).toList :::
-              _longParamAliases.map(FindFunction.fromParam(_)) :::
-              _shortParamAliases.map(FindFunction.fromParam(_))
+              _primaryShortParam.map(FindFunction.fromParam).toList :::
+              _longParamAliases.map(FindFunction.fromParam) :::
+              _shortParamAliases.map(FindFunction.fromParam)
           }
 
         findFunction.attemptToFind(args) match {

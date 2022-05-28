@@ -4,11 +4,11 @@ import zio.*
 
 extension (fs: FileSystem.type) {
 
-  def jsUnimplemented: TaskLayerM[FileSystem] =
+  def jsUnimplemented: KTaskLayer[FileSystem] =
     ZLayer.succeed {
       new FileSystem {
-        override def createFileObject(path: String): TaskM[File] = ZIO.fail(KError.message.???)
-        override def roots: TaskM[Array[File]] = ZIO.fail(KError.message.???)
+        override def createFileObject(path: String): KTask[File] = ZIO.failNEL(KError.???("FileSystem.createFileObject"))
+        override def roots: KTask[Array[File]] = ZIO.failNEL(KError.???("FileSystem.roots"))
       }
     }
 

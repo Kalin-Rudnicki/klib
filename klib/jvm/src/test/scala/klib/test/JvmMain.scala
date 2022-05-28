@@ -35,10 +35,10 @@ object JvmMain extends ExecutableApp {
       ) extends HasId
       object Musician {
 
-        def byId(id: UUID): TaskM[Musician] =
+        def byId(id: UUID): KTask[Musician] =
           Tables.musicians.get(id) match {
             case Some(m) => ZIO.succeed(m)
-            case None    => ZIO.fail(KError.message.unexpected(s"Musician with id $id not found"))
+            case None    => ZIO.failNEL(KError.Unexpected(s"Musician with id $id not found"))
           }
 
       }
@@ -50,10 +50,10 @@ object JvmMain extends ExecutableApp {
       ) extends HasId
       object Band {
 
-        def byId(id: UUID): TaskM[Band] =
+        def byId(id: UUID): KTask[Band] =
           Tables.bands.get(id) match {
             case Some(b) => ZIO.succeed(b)
-            case None    => ZIO.fail(KError.message.unexpected(s"Band with id $id not found"))
+            case None    => ZIO.failNEL(KError.Unexpected(s"Band with id $id not found"))
           }
 
       }
@@ -65,13 +65,13 @@ object JvmMain extends ExecutableApp {
       ) extends HasId
       object MusicianInBand {
 
-        def byId(id: UUID): TaskM[MusicianInBand] =
+        def byId(id: UUID): KTask[MusicianInBand] =
           Tables.musicianInBands.get(id) match {
             case Some(mib) => ZIO.succeed(mib)
-            case None      => ZIO.fail(KError.message.unexpected(s"MusicianInBand with id $id not found"))
+            case None      => ZIO.failNEL(KError.Unexpected(s"MusicianInBand with id $id not found"))
           }
 
-        def byBandId(bandId: UUID): TaskM[List[MusicianInBand]] =
+        def byBandId(bandId: UUID): KTask[List[MusicianInBand]] =
           ZIO.succeed {
             Tables.musicianInBands.valuesIterator
               .filter(_.bandId == bandId)
@@ -88,13 +88,13 @@ object JvmMain extends ExecutableApp {
       ) extends HasId
       object Album {
 
-        def byId(id: UUID): TaskM[Album] =
+        def byId(id: UUID): KTask[Album] =
           Tables.albums.get(id) match {
             case Some(a) => ZIO.succeed(a)
-            case None    => ZIO.fail(KError.message.unexpected(s"Album with id $id not found"))
+            case None    => ZIO.failNEL(KError.Unexpected(s"Album with id $id not found"))
           }
 
-        def byBandId(bandId: UUID): TaskM[List[Album]] =
+        def byBandId(bandId: UUID): KTask[List[Album]] =
           ZIO.succeed {
             Tables.albums.valuesIterator
               .filter(a => a.bandId == bandId)
@@ -115,20 +115,20 @@ object JvmMain extends ExecutableApp {
       ) extends HasId
       object Song {
 
-        def byId(id: UUID): TaskM[Song] =
+        def byId(id: UUID): KTask[Song] =
           Tables.songs.get(id) match {
             case Some(s) => ZIO.succeed(s)
-            case None    => ZIO.fail(KError.message.unexpected(s"Song with id $id not found"))
+            case None    => ZIO.failNEL(KError.Unexpected(s"Song with id $id not found"))
           }
 
-        def byAlbumId(albumId: UUID): TaskM[List[Song]] =
+        def byAlbumId(albumId: UUID): KTask[List[Song]] =
           ZIO.succeed {
             Tables.songs.valuesIterator
               .filter(s => s.songBelongsTo == SongBelongsTo.Album(albumId))
               .toList
           }
 
-        def byBandId(bandId: UUID): TaskM[List[Song]] =
+        def byBandId(bandId: UUID): KTask[List[Song]] =
           ZIO.succeed {
             Tables.songs.valuesIterator
               .filter(s => s.songBelongsTo == SongBelongsTo.Band(bandId))
@@ -408,7 +408,7 @@ object JvmMain extends ExecutableApp {
       )
       object Band {
 
-        def fromDatabase(b: Database.Band): TaskM[Band] =
+        def fromDatabase(b: Database.Band): KTask[Band] =
           for {
             dbMusiciansInBand <- Database.MusicianInBand.byBandId(b.id)
             dbMusicians <- ZIO.foreach(dbMusiciansInBand)(mib => Database.Musician.byId(mib.musicianId))
@@ -435,7 +435,7 @@ object JvmMain extends ExecutableApp {
       )
       object Album {
 
-        def fromDatabase(a: Database.Album): TaskM[Album] =
+        def fromDatabase(a: Database.Album): KTask[Album] =
           for {
             songs <- Database.Song.byAlbumId(a.id).map(_.map(Song.fromDatabase))
           } yield Album(
@@ -468,7 +468,7 @@ object JvmMain extends ExecutableApp {
       .withLayer(_ => ZLayer.succeed(()))
       .withExecute { _ =>
         for {
-          bandIds <- ZIOM.attempt(CopilotTest.Tables.bands.keySet.toList)
+          bandIds <- ZIO.kAttempt("...")(CopilotTest.Tables.bands.keySet.toList)
           dbBands <- ZIO.foreach(bandIds)(id => CopilotTest.Database.Band.byId(id))
           bands <- ZIO.foreach(dbBands)(CopilotTest.Code.Band.fromDatabase)
         } yield ()

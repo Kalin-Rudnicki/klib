@@ -7,14 +7,12 @@ import zio.*
 import zio.stream.*
 
 // format: off
-type ZStreamIteratorM[-R, +E, +A] = ZStreamIterator[R, KError[E], A]
+type KTaskStreamIterator[    +A] = ZStreamIterator[Any, KError, A]
+type    KRStreamIterator[-R, +A] = ZStreamIterator[R,   KError, A]
 
-type TaskStreamIteratorM[        +A] = ZStreamIteratorM[Any, Nothing, A]
-type     StreamIteratorM[    +E, +A] = ZStreamIteratorM[Any, E,       A]
-type    RStreamIteratorM[-R,     +A] = ZStreamIteratorM[R,   Nothing, A]
-
-type     UStreamIterator[    +A] = ZStreamIterator[Any, Nothing, A]
-type    URStreamIterator[-R, +A] = ZStreamIterator[R,   Nothing, A]
+type     UStreamIterator[        +A] = ZStreamIterator[Any, Nothing, A]
+type      StreamIterator[    +E, +A] = ZStreamIterator[Any, E,       A]
+type    URStreamIterator[-R,     +A] = ZStreamIterator[R,   Nothing, A]
 // format: on
 
 final class ZStreamIterator[-R, +E, +A] private (state: Ref[ZStreamIterator.State[R, E, A]]) {
@@ -90,8 +88,6 @@ object ZStreamIterator {
   }
 
   def fromZStream[R, E, A](zStream: ZStream[R, E, A]): UIO[ZStreamIterator[R, E, A]] =
-    for {
-      state <- Ref.make(State.NotOpened(zStream.toIterator))
-    } yield ZStreamIterator(state)
+    Ref.make(State.NotOpened(zStream.toIterator)).map(ZStreamIterator(_))
 
 }

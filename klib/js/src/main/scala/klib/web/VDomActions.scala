@@ -109,11 +109,11 @@ object VDomActions {
 
   final class Renderer private (ref: Ref.Synchronized[Option[List[Element]]]) {
 
-    def render(title: String, newVDoms: List[Element]): TaskM[Unit] =
+    def render(title: String, newVDoms: List[Element]): KTask[Unit] =
       ref.updateZIO { oldVDoms =>
-        val runSetTitle = ZIOM.attempt(window.document.title = title)
+        val runSetTitle = ZIO.kAttempt("Unable to set title of document")(window.document.title = title)
         val runRender =
-          ZIOM.attempt {
+          ZIO.kAttempt("Unable to (re)render VDOM") {
             oldVDoms match {
               case Some(oldVDoms) => diffElements(document.body, newVDoms, oldVDoms)
               case None           => setBody(newVDoms)

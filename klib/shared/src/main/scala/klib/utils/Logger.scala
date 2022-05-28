@@ -308,6 +308,7 @@ object Logger {
 
   // =====| Source |=====
 
+  // TODO (KR) : Convert this to using ZIO-2 Scope
   abstract class Source(
       val name: String,
       val logTolerance: LogLevel,
@@ -365,13 +366,14 @@ object Logger {
       }
 
       for {
-        _ <- file.createIfDNE.orDieKlib
+        _ <- file.createIfDNE.orDieKError
         queuedBreak <- Ref.make(initialQueuedBreak)
+        scope <- Scope.make
       } yield new Source(file.toString, logTolerance, queuedBreak) {
         override type Src = BufferedWriterOps
-        override protected val acquire: UIO[Src] =
-          file.bufferedWriter(StandardOpenOption.APPEND).map(BufferedWriterOps(_)).orDieKlib
-        override protected def release(src: Src): UIO[Unit] = ZIO.attempt(src.bw.close()).orDie
+
+        override protected val acquire: UIO[Src] = scope.extend(file.bufferedWriter(StandardOpenOption.APPEND).map(BufferedWriterOps(_))).orDieKError
+        override protected def release(src: Src): UIO[Unit] = ZIO.kAttempt("Error closing logger source file")(src.bw.close()).ensuring(scope.close(Exit.unit)).orDieKError
       }
     }
 

@@ -269,7 +269,7 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
   // =====| Map Action |=====
 
   final def mapActionASVE[NewAction, NewStateGet <: StateGet, NewStateSet >: StateSet <: NewStateGet](
-      f: (Action, NewStateGet, Valid[Value]) => STaskM[List[Raise[NewAction, NewStateSet]]],
+      f: (Action, NewStateGet, Valid[Value]) => SKTask[List[Raise[NewAction, NewStateSet]]],
   ): PWidget[NewAction, NewStateGet, NewStateSet, Value] =
     PWidget.many[NewAction, NewStateGet, NewStateSet, Value](
       (rh, s) =>
@@ -281,32 +281,32 @@ trait PWidget[+Action, -StateGet, +StateSet <: StateGet, +Value] { self =>
     )
 
   inline final def mapActionASV[NewAction, NewStateGet <: StateGet, NewStateSet >: StateSet <: NewStateGet](
-      f: (Action, NewStateGet, Value) => STaskM[List[Raise[NewAction, NewStateSet]]],
+      f: (Action, NewStateGet, Value) => SKTask[List[Raise[NewAction, NewStateSet]]],
   ): PWidget[NewAction, NewStateGet, NewStateSet, Value] =
     mapActionASVE[NewAction, NewStateGet, NewStateSet] { (a, s, v) =>
       v match {
         case Right(v) => f(a, s, v)
-        case Left(e)  => ZIO.fail(KError(e.map(SingleError.message.same(_)))) // TODO: Should probably do something more like "DisplayMessage"
+        case Left(e)  => ZIO.fail(e.map(KError.UserError(_))) // TODO: Should probably do something more like "DisplayMessage"
       }
     }
 
   inline final def mapActionAS[NewAction, NewStateGet <: StateGet, NewStateSet >: StateSet <: NewStateGet](
-      f: (Action, NewStateGet) => STaskM[List[Raise[NewAction, NewStateSet]]],
+      f: (Action, NewStateGet) => SKTask[List[Raise[NewAction, NewStateSet]]],
   ): PWidget[NewAction, NewStateGet, NewStateSet, Value] =
     mapActionASVE[NewAction, NewStateGet, NewStateSet] { (a, s, _) => f(a, s) }
 
   inline final def mapActionAVE[NewAction, NewStateSet >: StateSet <: StateGet](
-      f: (Action, Valid[Value]) => STaskM[List[Raise[NewAction, NewStateSet]]],
+      f: (Action, Valid[Value]) => SKTask[List[Raise[NewAction, NewStateSet]]],
   ): PWidget[NewAction, StateGet, NewStateSet, Value] =
     mapActionASVE[NewAction, StateGet, NewStateSet] { (a, _, v) => f(a, v) }
 
   inline final def mapActionAV[NewAction, NewStateSet >: StateSet <: StateGet](
-      f: (Action, Value) => STaskM[List[Raise[NewAction, NewStateSet]]],
+      f: (Action, Value) => SKTask[List[Raise[NewAction, NewStateSet]]],
   ): PWidget[NewAction, StateGet, NewStateSet, Value] =
     mapActionASV[NewAction, StateGet, NewStateSet] { (a, _, v) => f(a, v) }
 
   inline final def mapActionA[NewAction, NewStateSet >: StateSet <: StateGet](
-      f: Action => STaskM[List[Raise[NewAction, NewStateSet]]],
+      f: Action => SKTask[List[Raise[NewAction, NewStateSet]]],
   ): PWidget[NewAction, StateGet, NewStateSet, Value] =
     mapActionASVE[NewAction, StateGet, NewStateSet] { (a, _, _) => f(a) }
 

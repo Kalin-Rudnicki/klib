@@ -9,6 +9,9 @@ extension (str: String) {
   def toNES: Option[String] =
     Option.when(str.nonEmpty)(str)
 
+  def pluralize(amount: Long, pluralSuffix: String = "s", singularSuffix: String = ""): String =
+    s"$str${if (amount == 1) singularSuffix else pluralSuffix}"
+
   // =====| Alignment |=====
 
   private def alignFunction(length: Int, char: Char)(padF: Int => (Option[Int], Option[Int])): String = {

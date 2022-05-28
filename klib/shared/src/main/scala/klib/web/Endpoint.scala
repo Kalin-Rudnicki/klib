@@ -101,13 +101,13 @@ object Endpoint {
         requiredKeys: Set[String],
         optionalKeys: Set[String],
         encode: (ParamMap, T) => ParamMap,
-        decode: ParamMap => EitherError[T],
+        decode: ParamMap => EitherErrorNEL[T],
     ) {
 
       def zip[T2](
           required: Boolean,
           key: String,
-          get: ParamMap => EitherError[T2],
+          get: ParamMap => EitherErrorNEL[T2],
           set: (ParamMap, T2) => ParamMap,
       )(implicit
           unzippable: Unzippable[T, T2],
@@ -271,7 +271,7 @@ object Endpoint {
     private def zipHeader[H](
         required: Boolean,
         key: String,
-        get: ParamMap => EitherError[H],
+        get: ParamMap => EitherErrorNEL[H],
         set: (ParamMap, H) => ParamMap,
     )(implicit
         unzippable: Unzippable[Headers, H],
@@ -333,7 +333,7 @@ object Endpoint {
     private def zipParam[P](
         required: Boolean,
         key: String,
-        get: ParamMap => EitherError[P],
+        get: ParamMap => EitherErrorNEL[P],
         set: (ParamMap, P) => ParamMap,
     )(implicit
         unzippable: Unzippable[QueryParams, P],

@@ -21,8 +21,8 @@ final class ArrayBuffer[T: ClassTag] private (ref: Ref[ArrayBuffer.State[T]]) {
 
   private def readTaskM[T2](
       readF: ArrayBuffer.State[T] => EitherError[T2],
-  ): TaskM[T2] =
-    ref.get.flatMap(state => ZIO.fromEither(readF(state)))
+  ): KTask[T2] =
+    ref.get.flatMap(state => ZIO.fromEither(readF(state)).toErrorNEL)
 
   private def writeUIO[T2](
       writeF: ArrayBuffer.State[T] => (T2, ArrayBuffer.State[T]),
@@ -31,7 +31,7 @@ final class ArrayBuffer[T: ClassTag] private (ref: Ref[ArrayBuffer.State[T]]) {
 
   private def writeTaskM[T2](
       writeF: ArrayBuffer.State[T] => EitherError[(T2, ArrayBuffer.State[T])],
-  ): TaskM[T2] =
+  ): KTask[T2] =
     ref
       .modify { state =>
         writeF(state) match {
@@ -39,7 +39,7 @@ final class ArrayBuffer[T: ClassTag] private (ref: Ref[ArrayBuffer.State[T]]) {
           case Right((t2, state2)) => (t2.asRight, state2)
         }
       }
-      .flatMap(ZIO.fromEither)
+      .flatMap(ZIO.fromEither(_).toErrorNEL)
 
   // =====| misc |=====
 
@@ -53,19 +53,19 @@ final class ArrayBuffer[T: ClassTag] private (ref: Ref[ArrayBuffer.State[T]]) {
 
   // =====| get |=====
 
-  def apply(idx: Int): TaskM[T] =
+  def apply(idx: Int): KTask[T] =
     readTaskM(_.apply(idx))
 
   def get(idx: Int): UIO[Option[T]] =
     readUIO(_.get(idx))
 
-  def head: TaskM[T] =
+  def head: KTask[T] =
     readTaskM(_.head)
 
   def headOption: UIO[Option[T]] =
     readUIO(_.headOption)
 
-  def last: TaskM[T] =
+  def last: KTask[T] =
     readTaskM(_.last)
 
   def lastOption: UIO[Option[T]] =
@@ -73,13 +73,13 @@ final class ArrayBuffer[T: ClassTag] private (ref: Ref[ArrayBuffer.State[T]]) {
 
   // =====| pop |=====
 
-  def popHead: TaskM[T] =
+  def popHead: KTask[T] =
     writeTaskM(_.popHead)
 
   def popHeadOption: UIO[Option[T]] =
     writeUIO(_.popHeadOption)
 
-  def popLast: TaskM[T] =
+  def popLast: KTask[T] =
     writeTaskM(_.popLast)
 
   def popLastOption: UIO[Option[T]] =
@@ -90,13 +90,13 @@ final class ArrayBuffer[T: ClassTag] private (ref: Ref[ArrayBuffer.State[T]]) {
   def prepend(elem: T): UIO[Unit] =
     writeUIO(_.prepend(elem))
 
-  def prependFixed(elem: T): TaskM[Option[T]] =
+  def prependFixed(elem: T): KTask[Option[T]] =
     writeTaskM(_.prependFixed(elem))
 
   def append(elem: T): UIO[Unit] =
     writeUIO(_.append(elem))
 
-  def appendFixed(elem: T): TaskM[Option[T]] =
+  def appendFixed(elem: T): KTask[Option[T]] =
     writeTaskM(_.appendFixed(elem))
 
   // =====| _____InPlace |=====
@@ -161,13 +161,13 @@ object ArrayBuffer {
       (elemsAtEnd, elemsAtStart)
     }
 
-    private def readUIOToTaskM[T2](uio: ReadUIO[Option[T2]], error: => KError[Nothing]): ReadTaskM[T2] =
+    private def readUIOToTaskM[T2](uio: ReadUIO[Option[T2]], error: => KError): ReadTaskM[T2] =
       uio match {
         case Some(res) => res.asRight
         case None      => error.asLeft
       }
 
-    private def writeUIOToTaskM[T2](uio: WriteUIO[Option[T2]], error: => KError[Nothing]): WriteTaskM[T2] =
+    private def writeUIOToTaskM[T2](uio: WriteUIO[Option[T2]], error: => KError): WriteTaskM[T2] =
       uio match {
         case (res, state) =>
           res match {
@@ -179,7 +179,7 @@ object ArrayBuffer {
     // =====| get |=====
 
     def apply(idx: Int): ReadTaskM[T] =
-      readUIOToTaskM(get(idx), KError.message.same(s"Index out of bounds: $idx"))
+      readUIOToTaskM(get(idx), KError.Unexpected(s"Index out of bounds: $idx"))
 
     def get(idx: Int): ReadUIO[Option[T]] =
       actualIndex(idx).map(array(_))
@@ -199,7 +199,7 @@ object ArrayBuffer {
     // =====| pop |=====
 
     def popHead: WriteTaskM[T] =
-      writeUIOToTaskM(popHeadOption, KError.message.same("No head to pop in ArrayBuffer"))
+      writeUIOToTaskM(popHeadOption, KError.Unexpected("No head to pop in ArrayBuffer"))
 
     def popHeadOption: WriteUIO[Option[T]] =
       actualIndex(0) match {
@@ -212,7 +212,7 @@ object ArrayBuffer {
       }
 
     def popLast: WriteTaskM[T] =
-      writeUIOToTaskM(popLastOption, KError.message.same("No last to pop in ArrayBuffer"))
+      writeUIOToTaskM(popLastOption, KError.Unexpected("No last to pop in ArrayBuffer"))
 
     def popLastOption: WriteUIO[Option[T]] =
       actualIndex(size - 1) match {
@@ -239,7 +239,7 @@ object ArrayBuffer {
     }
 
     def prependFixed(elem: T): WriteTaskM[Option[T]] =
-      if (array.length == 0) KError.message.same("Can not run 'prependFixed' on an 0-length array").asLeft
+      if (array.length == 0) KError.Unexpected("Can not run 'prependFixed' on an 0-length array").asLeft
       else if (size < array.length) {
         val (_, newState) = prepend(elem)
         (None, newState).asRight
@@ -256,7 +256,7 @@ object ArrayBuffer {
     }
 
     def appendFixed(elem: T): WriteTaskM[Option[T]] =
-      if (array.length == 0) KError.message.same("Can not run 'appendFixed' on an 0-length array").asLeft
+      if (array.length == 0) KError.Unexpected("Can not run 'appendFixed' on an 0-length array").asLeft
       else if (size < array.length) {
         val (_, newState) = append(elem)
         (None, newState).asRight

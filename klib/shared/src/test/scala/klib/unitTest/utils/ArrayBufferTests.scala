@@ -41,9 +41,9 @@ object ArrayBufferTests extends DefaultKSpec {
   }
 
   val operationsSpec: TestSpec = {
-    final case class Op[T, T2](op: ArrayBuffer[T] => TaskM[T2], opExp: T2, arrayExp: Array[T]) {
+    final case class Op[T, T2](op: ArrayBuffer[T] => KTask[T2], opExp: T2, arrayExp: Array[T]) {
 
-      def toResult(idx: Int, arrayBuffer: ArrayBuffer[T]): TaskM[TestResult] =
+      def toResult(idx: Int, arrayBuffer: ArrayBuffer[T]): KTask[TestResult] =
         for {
           res <- op(arrayBuffer)
           array <- arrayBuffer.toArray
@@ -55,7 +55,7 @@ object ArrayBufferTests extends DefaultKSpec {
 
     def makeTest[T](name: String)(make: UIO[ArrayBuffer[T]])(ops: Op[T, _]*): TestSpec =
       test(name) {
-        def rec(idx: Int, arrayBuffer: ArrayBuffer[T], ops: List[Op[T, _]]): RIOM[Logger, TestResult] =
+        def rec(idx: Int, arrayBuffer: ArrayBuffer[T], ops: List[Op[T, _]]): KRIO[Logger, TestResult] =
           ops match {
             case op :: tail =>
               for {

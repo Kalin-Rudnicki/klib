@@ -13,31 +13,28 @@ import zio.json.*
 import zio.stream.*
 
 // format: off
-// =====| ZIOM |=====
-type ZIOM[-R, +E, +A] = ZIO[R, KError[E], A]
+// =====| ZIO |=====
+// TODO (KR) : Add KZIO?
+//           : - Which makes more sense?
+//           :   - type KZIO[-R, +E, +A] = ZIO[R, NonEmptyList[Either[E, KError]], A]
+//           :   - type KZIO[-R, +E, +A] = ZIO[R, Either[E, NonEmptyList[KError]], A]
+//           :   - (I think the first one)
+//           : - Add for ZLayer?
+//           : - Add for ZStream?
 
-type  TaskM[        +A] = ZIOM[Any, Nothing, A]
-type    IOM[    +E, +A] = ZIOM[Any, E,       A]
-type   RIOM[-R,     +A] = ZIOM[R,   Nothing, A]
+type KTask[    +A] =  ZIO[Any, NonEmptyList[KError], A]
+type  KRIO[-R, +A] =  ZIO[R,   NonEmptyList[KError], A]
 
-type  SZIOM[-R, +E, +A] = ZIOM[Executable.BaseEnv & R, E,       A]
-type STaskM[        +A] = ZIOM[Executable.BaseEnv,     Nothing, A]
-type   SIOM[    +E, +A] = ZIOM[Executable.BaseEnv,     E,       A]
-type  SRIOM[-R,     +A] = ZIOM[Executable.BaseEnv & R, Nothing, A]
+type SKTask[    +A] = KRIO[Executable.BaseEnv,     A]
+type  SKRIO[-R, +A] = KRIO[Executable.BaseEnv & R, A]
 
-// =====| ZLayerM |=====
-type ZLayerM[-R, +E, +A] = ZLayer[R, KError[E], A]
+// =====| ZLayer |=====
+type KTaskLayer[    +A] = ZLayer[Any, NonEmptyList[KError], A]
+type    KRLayer[-R, +A] = ZLayer[R,   NonEmptyList[KError], A]
 
-type TaskLayerM[        +A] = ZLayerM[Any, Nothing, A]
-type   IOLayerM[    +E, +A] = ZLayerM[Any, E,       A]
-type    RLayerM[-R,     +A] = ZLayerM[R,   Nothing, A]
-
-// =====| ZStreamM |=====
-type ZStreamM[-R, +E, +A] = ZStream[R, KError[E], A]
-
-type TaskStreamM[        +A] = ZStreamM[Any, Nothing, A]
-type   IOStreamM[    +E, +A] = ZStreamM[Any, E,       A]
-type    RStreamM[-R,     +A] = ZStreamM[R,   Nothing, A]
+// =====| ZStream |=====
+type KTaskStream[    +A] = ZStream[Any, NonEmptyList[KError], A]
+type    KRStream[-R, +A] = ZStream[R,   NonEmptyList[KError], A]
 // format: on
 
 extension (zio: ZIO.type) {
@@ -92,118 +89,171 @@ extension (zio: ZIO.type) {
   def traverseNEL[R, E, A, B](list: List[A])(f: A => ZIO[R, NonEmptyList[E], B]): ZIO[R, NonEmptyList[E], List[B]] =
     traverse(list)(f).mapError(_.flatMap(identity))
 
-  def failIf[E](pred: Boolean, e: => E): IO[E, Unit] =
+  def failIf[E](pred: => Boolean, e: => E): IO[E, Unit] =
     ZIO.cond(pred, (), e)
+  def failIfNEL[E](pred: => Boolean, e0: => E, eN: => E*): IO[NonEmptyList[E], Unit] =
+    ZIO.cond(pred, (), NonEmptyList(e0, eN.toList))
 
-  def failUnless[E](pred: Boolean, e: => E): IO[E, Unit] =
+  def failUnless[E](pred: => Boolean, e: => E): IO[E, Unit] =
     ZIO.cond(!pred, (), e)
+  def failUnlessNEL[E](pred: => Boolean, e0: => E, eN: => E*): IO[NonEmptyList[E], Unit] =
+    ZIO.cond(!pred, (), NonEmptyList(e0, eN.toList))
 
-}
+  def kAttempt[A](mapError: Throwable => KError)(thunk: => A): KTask[A] =
+    ZIO.attempt(thunk).mapErrorToNEL(mapError)
 
-object ZIOM {
+  def kAttempt[A](message: => String, errorType: => KError.ErrorType)(thunk: => A)(implicit trace: ZTraceElement): KTask[A] =
+    ZIO.kAttempt { throwable =>
+      errorType match {
+        case KError.ErrorType.Unexpected                   => KError.Unexpected(message, throwable)(trace)
+        case KError.ErrorType.SystemFailure                => KError.SystemFailure(message, throwable)(trace)
+        case KError.ErrorType.User                         => KError.UserError(message, throwable)(trace)
+        case KError.ErrorType.ExternalService(serviceName) => KError.ExternalService(serviceName)(message, throwable)(trace)
+      }
+    }(thunk)
 
-  def mapAttempt[E, A](map: (KError.type, KError[Nothing]) => KError[E])(thunk: => A): IOM[E, A] =
-    ZIO.attempt(thunk).mapError { throwable => map(KError, KError.throwable(throwable)) }
+  def kAttempt[A](message: => String)(thunk: => A)(implicit trace: ZTraceElement): KTask[A] =
+    kAttempt(message, KError.ErrorType.Unexpected)(thunk)(trace)
 
-  def attempt[A](thunk: => A): TaskM[A] =
-    ZIO.attempt(thunk).mapError(KError.throwable(_))
+  def failNEL[E](e0: E, eN: E*): IO[NonEmptyList[E], Nothing] =
+    ZIO.fail(NonEmptyList(e0, eN.toList))
 
-  def traverse[R, E, A, B](nel: NonEmptyList[A])(f: A => ZIOM[R, E, B]): ZIOM[R, E, NonEmptyList[B]] =
-    ZIO.traverse(nel)(f).mapError(KError.flatten)
+  def fromOptionKError[A](option: => Option[A])(e: => KError): KTask[A] =
+    ZIO.fromOption(option).orElseFail(NonEmptyList.one(e))
 
-  def traverse[R, E, A, B](list: List[A])(f: A => ZIOM[R, E, B]): ZIOM[R, E, List[B]] =
-    ZIO.traverse(list)(f).mapError(KError.flatten)
+  def fromEitherKError[E, A](either: => Either[E, A])(mapE: E => KError): KTask[A] =
+    ZIO.fromEither(either).mapErrorToNEL(mapE)
+
+  def acquireReleaseClosable[R, E, A <: AutoCloseable](acquire: => ZIO[R, E, A]): ZIO[R & Scope, E, A] =
+    ZIO.acquireRelease(acquire)(c => ZIO.kAttempt(s"Unable to auto-close : $c")(c.close()).orDieKError)
 
 }
 
 // =====| KError Mapping |=====
 
-extension [R, A](zio: ZIO[R, Throwable, A]) {
-  def toKlibError: RIOM[R, A] =
-    zio.mapError(KError.throwable)
+extension [R, E, A](zio: ZIO[R, E, A]) {
+
+  def mapErrorToNEL[E2](f: E => E2): ZIO[R, NonEmptyList[E2], A] =
+    zio.mapError(e => NonEmptyList.one(f(e)))
+
+  def toErrorNEL: ZIO[R, NonEmptyList[E], A] =
+    zio.mapError(NonEmptyList.one)
+
 }
-extension [R, A](zLayer: ZLayer[R, Throwable, A]) {
-  def toKlibError: RLayerM[R, A] =
-    zLayer.mapError(KError.throwable)
+extension [R, E, A](zLayer: ZLayer[R, E, A]) {
+
+  def mapErrorToNEL[E2](f: E => E2): ZLayer[R, NonEmptyList[E2], A] =
+    zLayer.mapError(e => NonEmptyList.one(f(e)))
+
+  def toErrorNEL: ZLayer[R, NonEmptyList[E], A] =
+    zLayer.mapError(NonEmptyList.one)
+
 }
-extension [R, A](zStream: ZStream[R, Throwable, A]) {
-  def toKlibError: RStreamM[R, A] =
-    zStream.mapError(KError.throwable)
+extension [R, E, A](zStream: ZStream[R, E, A]) {
+
+  def mapErrorToNEL[E2](f: E => E2): ZStream[R, NonEmptyList[E2], A] =
+    zStream.mapError(e => NonEmptyList.one(f(e)))
+
+  def toErrorNEL: ZStream[R, NonEmptyList[E], A] =
+    zStream.mapError(NonEmptyList.one)
+
 }
 
-extension [R, E, A](zioM: ZIOM[R, E, A]) {
-  def orDieKlib: URIO[R, A] =
-    zioM.mapError(ErrorThrowable.fromError(_)).orDie
+extension [R, E, A](zio: ZIO[R, NonEmptyList[E], A]) {
+
+  def mapErrorNEL[E2](f: E => E2): ZIO[R, NonEmptyList[E2], A] =
+    zio.mapError(_.map(f))
+
 }
-extension [R, E, A](zLayerM: ZLayerM[R, E, A]) {
-  def orDieKlib: URLayer[R, A] =
-    zLayerM.mapError(ErrorThrowable.fromError(_)).orDie
+extension [R, E, A](zLayer: ZLayer[R, NonEmptyList[E], A]) {
+
+  def mapErrorNEL[E2](f: E => E2): ZLayer[R, NonEmptyList[E2], A] =
+    zLayer.mapError(_.map(f))
+
+}
+extension [R, E, A](zStream: ZStream[R, NonEmptyList[E], A]) {
+
+  def mapErrorNEL[E2](f: E => E2): ZStream[R, NonEmptyList[E2], A] =
+    zStream.mapError(_.map(f))
+
 }
 
-extension [R, E, A](zioM: ZIOM[R, E, A]) {
+extension [R, A](kRIO: KRIO[R, A]) {
 
-  def dumpErrorsAndContinue(errorLevel: Logger.LogLevel, convertE: E => String): URIO[R & RunMode & Logger, Option[A]] =
-    zioM.foldZIO(
-      _.toLoggerEvent(errorLevel, convertE).flatMap(Logger.execute(_)).as(None),
+  def orDieKError: URIO[R, A] =
+    kRIO.mapError(KError.WrappedKErrors(_)).orDie
+
+  def catchCauseKError: KRIO[R, A] =
+    kRIO.foldCauseZIO(
+      {
+        case fail: Cause.Fail[NonEmptyList[KError]] => ZIO.failCause(fail)
+        case Cause.Die(throwable, trace) =>
+          ZIO.fail(
+            KError.unwrapOr(
+              throwable,
+              KError.Unexpected("Experienced unexpected ZIO die", _, trace.stackTrace),
+            ),
+          )
+        case cause =>
+          ZIO.failNEL(KError.Unexpected(s"Experienced unexpected ZIO cause:\n$cause"))
+      },
+      ZIO.succeed,
+    )
+
+  def someOrFailKError[A2](e0: => KError, eN: => KError*)(implicit ev: A <:< Option[A2]): KRIO[R, A2] =
+    kRIO.someOrFail(NonEmptyList(e0, eN.toList))
+
+}
+extension [R, A](kRLayer: KRLayer[R, A]) {
+  def orDieKError: URLayer[R, A] =
+    kRLayer.mapError(KError.WrappedKErrors(_)).orDie
+}
+// TODO (KR) : Implement for RStreamM as well?
+
+extension [R, A](kRIO: KRIO[R, A]) {
+
+  def dumpErrorsAndContinue: URIO[R & RunMode & Logger, Option[A]] =
+    kRIO.dumpErrorsAndContinue(Logger.LogLevel.Error)
+
+  def dumpErrorsAndContinue(errorLevel: Logger.LogLevel): URIO[R & RunMode & Logger, Option[A]] =
+    kRIO.foldZIO(
+      errors =>
+        ZIO
+          .service[RunMode]
+          .flatMap { runMode => Logger.execute.all(errors.toList.map(_.formatEvent(runMode, errorLevel))) }
+          .as(None),
       ZIO.some,
     )
 
-  def dumpErrorsAndContinue(errorLevel: Logger.LogLevel): URIO[R & RunMode & Logger, Option[A]] =
-    dumpErrorsAndContinue(errorLevel, _.toString)
+  // TODO (KR) : Error recovery/retry
 
-  def dumpJsonErrorsAndContinue(errorLevel: Logger.LogLevel)(implicit encoder: JsonEncoder[E]): URIO[R & RunMode & Logger, Option[A]] =
-    dumpErrorsAndContinue(errorLevel, JsonEncoder[E].encodeJson(_, 4.some).toString)
-
-  def recoverFromErrors[B](f: E => RIOM[R, B]): RIOM[R, Either[List[B], A]] = {
-    def convertSingleError(error: SingleError[E]): URIO[R, Either[NonEmptyList[SingleError[Nothing]], List[B]]] =
-      error match {
-        case SingleError.Err(err, _, _) => ???
-        case SingleError.Message(devMessage, prodMessage, stackTrace, cause) =>
-          cause match {
-            case None =>
-              ZIO.left(NonEmptyList.one(SingleError.Message(devMessage, prodMessage, stackTrace, None)))
-            case Some(cause) =>
-              ZIOM
-                .traverse(cause.toNEL)(convertSingleError)
-                .fold(
-                  e => e.toNEL.asLeft,
-                  _.parTraverse(identity).map(_.toList.flatten) match {
-                    case Right(_) =>
-                      NonEmptyList.one(SingleError.Message(devMessage, prodMessage, stackTrace, None)).asLeft
-                    case Left(errors) =>
-                      (SingleError.Message(devMessage, prodMessage, stackTrace, None) :: errors).asLeft
-                  },
-                )
-          }
-        case e: SingleError.Throwable => ZIO.left(NonEmptyList.one(e))
-      }
-
-    zioM.foldM(
-      error =>
-        ZIOM.traverse(error.toNEL)(convertSingleError).flatMap {
-          _.parTraverse(identity) match {
-            case Right(values) =>
-              ZIO.succeed(values.toList.flatten.asLeft)
-            case Left(errors) =>
-              ZIO.fail(KError(errors))
-          }
-        },
-      ZIO.right,
-    )
-  }
-
-  def <**>[B](other: ZIOM[R, E, B])(implicit zippable: Zippable[A, B]): ZIOM[R, E, zippable.Out] =
-    (zioM.either <*> other.either).flatMap { pair =>
+  def <**>[B](other: KRIO[R, B])(implicit zippable: Zippable[A, B]): KRIO[R, zippable.Out] =
+    (kRIO.either <*> other.either).flatMap { pair =>
       ZIO.fromEither { pair.parMapN(zippable.zip) }
     }
 
-  def <**[B](other: ZIOM[R, E, B]): ZIOM[R, E, A] =
-    (zioM.either <*> other.either).flatMap { pair =>
+  def <**[B](other: KRIO[R, B]): KRIO[R, A] =
+    (kRIO.either <*> other.either).flatMap { pair =>
       ZIO.fromEither { pair.parMapN((a, _) => a) }
     }
 
-  def **>[B](other: ZIOM[R, E, B]): ZIOM[R, E, B] =
-    (zioM.either <*> other.either).flatMap { pair =>
+  def **>[B](other: KRIO[R, B]): KRIO[R, B] =
+    (kRIO.either <*> other.either).flatMap { pair =>
+      ZIO.fromEither { pair.parMapN((_, b) => b) }
+    }
+
+  def <&&>[B](other: KRIO[R, B])(implicit zippable: Zippable[A, B]): KRIO[R, zippable.Out] =
+    (kRIO.either <&> other.either).flatMap { pair =>
+      ZIO.fromEither { pair.parMapN(zippable.zip) }
+    }
+
+  def <&&[B](other: KRIO[R, B]): KRIO[R, A] =
+    (kRIO.either <&> other.either).flatMap { pair =>
+      ZIO.fromEither { pair.parMapN((a, _) => a) }
+    }
+
+  def &&>[B](other: KRIO[R, B]): KRIO[R, B] =
+    (kRIO.either <&> other.either).flatMap { pair =>
       ZIO.fromEither { pair.parMapN((_, b) => b) }
     }
 

@@ -12,12 +12,12 @@ sealed trait Page {
   type Env
   type A
   val url: String
-  val getEnv: TaskM[Env]
+  val getEnv: KTask[Env]
   val titleF: Page.TitleF[Env]
   val widget: AVWidget[A, Env, Any]
-  val handleA: A => STaskM[List[Raise.StandardOrUpdate[Env]]]
+  val handleA: A => SKTask[List[Raise.StandardOrUpdate[Env]]]
 
-  private final def renderAnd(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv])(and: String => TaskM[Unit]): TaskM[Unit] =
+  private final def renderAnd(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv])(and: String => KTask[Unit]): KTask[Unit] =
     for {
       env <- getEnv
       envRef <- Ref.Synchronized.make(env)
@@ -27,17 +27,17 @@ sealed trait Page {
       _ <- renderer.render(titleF(env), newVDom)
     } yield ()
 
-  private[web] final def push(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv]): TaskM[Unit] =
+  private[web] final def push(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv]): KTask[Unit] =
     renderAnd(renderer, runtime) { title =>
-      ZIOM.attempt(window.history.pushState(null, title, url))
+      ZIO.kAttempt("Unable to push state to window history")(window.history.pushState(null, title, url))
     }
 
-  private[web] final def replace(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv]): TaskM[Unit] =
+  private[web] final def replace(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv]): KTask[Unit] =
     renderAnd(renderer, runtime) { title =>
-      ZIOM.attempt(window.history.replaceState(null, title, url))
+      ZIO.kAttempt("Unable to replace state in window history")(window.history.replaceState(null, title, url))
     }
 
-  private[web] final def replaceNoTrace(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv]): TaskM[Unit] =
+  private[web] final def replaceNoTrace(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv]): KTask[Unit] =
     renderAnd(renderer, runtime) { _ => ZIO.unit }
 
 }
@@ -57,7 +57,7 @@ object Page {
         url: String,
     ) {
 
-      def getEnv[Env](getEnv: TaskM[Env]): Builder2[Env] =
+      def getEnv[Env](getEnv: KTask[Env]): Builder2[Env] =
         Builder2(url, getEnv)
 
       def constEnv[Env](env: Env): Builder2[Env] =
@@ -67,7 +67,7 @@ object Page {
 
     final class Builder2[Env] private[builder] (
         url: String,
-        getEnv: TaskM[Env],
+        getEnv: KTask[Env],
     ) {
 
       def constTitle(title: String): Builder3[Env] =
@@ -80,7 +80,7 @@ object Page {
 
     final class Builder3[Env] private[builder] (
         url: String,
-        getEnv: TaskM[Env],
+        getEnv: KTask[Env],
         titleF: Either[String, Env => String],
     ) {
 
@@ -91,12 +91,12 @@ object Page {
 
     final class Builder4[Env, A] private[builder] (
         url: String,
-        getEnv: TaskM[Env],
+        getEnv: KTask[Env],
         titleF: Either[String, Env => String],
         widget: AVWidget[A, Env, Any],
     ) { self =>
 
-      def handleA(_handleA: A => STaskM[List[Raise.StandardOrUpdate[Env]]]): Page =
+      def handleA(_handleA: A => SKTask[List[Raise.StandardOrUpdate[Env]]]): Page =
         new Page {
           type Env = self.Env
           type A = self.A

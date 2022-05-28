@@ -17,9 +17,9 @@ trait DecodeFromString[+T] {
 
   def decode(string: String): EitherNel[String, T]
 
-  final def decodeError(string: String): EitherError[T] =
-    decode(string).leftMap { errs =>
-      KError(errs.map(SingleError.message.same(_)))
+  final def decodeError(string: String): EitherErrorNEL[T] =
+    decode(string).leftMap {
+      _.map(msg => KError.UserError(s"Unable to decode JSON : $msg"))
     }
 
   final def map[T2](f: T => T2): DecodeFromString[T2] =
@@ -40,7 +40,7 @@ object DecodeFromString {
     implicitly[DecodeFromString[T]]
 
   def fromJsonDecoder[T: JsonDecoder]: DecodeFromString[T] =
-    JsonDecoder[T].decodeJson(_).leftMap(NonEmptyList.one(_))
+    JsonDecoder[T].decodeJson(_).leftMap(NonEmptyList.one)
 
   implicit val stringDecodeString: DecodeFromString[String] =
     _.asRight

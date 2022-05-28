@@ -28,60 +28,61 @@ object OpaqueFile {
     def toPath: Path = self
     def toJavaFile: JavaFile = self.toFile
 
-    def createFile(fileAttributes: FileAttribute[_]*): TaskM[Unit] =
-      ZIOM.attempt(Files.createFile(self, fileAttributes*))
-    def createDirectory(fileAttributes: FileAttribute[_]*): TaskM[Unit] =
-      ZIOM.attempt(Files.createDirectory(self, fileAttributes*))
-    def createDirectories(fileAttributes: FileAttribute[_]*): TaskM[Unit] =
-      ZIOM.attempt(Files.createDirectories(self, fileAttributes*))
+    def createFile(fileAttributes: FileAttribute[_]*): KTask[Unit] =
+      ZIO.kAttempt(s"Unable to create file : $self", KError.ErrorType.SystemFailure)(Files.createFile(self, fileAttributes*))
+    def createDirectory(fileAttributes: FileAttribute[_]*): KTask[Unit] =
+      ZIO.kAttempt(s"Unable to create directory : $self", KError.ErrorType.SystemFailure)(Files.createDirectory(self, fileAttributes*))
+    def createDirectories(fileAttributes: FileAttribute[_]*): KTask[Unit] =
+      ZIO.kAttempt(s"Unable to create directories : $self", KError.ErrorType.SystemFailure)(Files.createDirectories(self, fileAttributes*))
 
-    def createSymbolicLink(target: File, fileAttributes: FileAttribute[_]*): TaskM[Unit] =
-      ZIOM.attempt(Files.createSymbolicLink(self, target, fileAttributes*))
-    def createLink(existing: File): TaskM[Unit] =
-      ZIOM.attempt(Files.createLink(self, existing))
+    def createSymbolicLink(target: File, fileAttributes: FileAttribute[_]*): KTask[Unit] =
+      ZIO.kAttempt(s"Unable to create symbolic link : $self", KError.ErrorType.SystemFailure)(Files.createSymbolicLink(self, target, fileAttributes*))
+    def createLink(existing: File): KTask[Unit] =
+      ZIO.kAttempt(s"Unable to create link : $self", KError.ErrorType.SystemFailure)(Files.createLink(self, existing))
 
-    def delete: TaskM[Boolean] =
-      ZIOM.attempt(Files.deleteIfExists(self))
+    def delete: KTask[Boolean] =
+      ZIO.kAttempt(s"Unable to delete file : $self", KError.ErrorType.SystemFailure)(Files.deleteIfExists(self))
 
-    def copyTo(target: File, copyOptions: CopyOption*): TaskM[Unit] =
-      ZIOM.attempt(Files.copy(self, target, copyOptions*))
-    def moveTo(target: File, copyOptions: CopyOption*): TaskM[Unit] =
-      ZIOM.attempt(Files.move(self, target, copyOptions*))
+    def copyTo(target: File, copyOptions: CopyOption*): KTask[Unit] =
+      ZIO.kAttempt(s"Unable to copy file : $self", KError.ErrorType.SystemFailure)(Files.copy(self, target, copyOptions*))
+    def moveTo(target: File, copyOptions: CopyOption*): KTask[Unit] =
+      ZIO.kAttempt(s"Unable to move file : $self", KError.ErrorType.SystemFailure)(Files.move(self, target, copyOptions*))
 
-    def existsWrapped: TaskM[Boolean] =
-      ZIOM.attempt(Files.exists(self))
+    def existsWrapped: KTask[Boolean] =
+      ZIO.kAttempt(s"Unable to check if file exists : $self", KError.ErrorType.SystemFailure)(Files.exists(self))
 
-    def exists: TaskM[Boolean] =
-      ZIOM.attempt(Files.exists(self))
-    def isFile: TaskM[Boolean] =
-      ZIOM.attempt(Files.isRegularFile(self))
-    def isDirectory: TaskM[Boolean] =
-      ZIOM.attempt(Files.isDirectory(self))
-    def isSymbolicLink: TaskM[Boolean] =
-      ZIOM.attempt(Files.isSymbolicLink(self))
+    def exists: KTask[Boolean] =
+      ZIO.kAttempt(s"Unable to check if file exists : $self", KError.ErrorType.SystemFailure)(Files.exists(self))
+    def isFile: KTask[Boolean] =
+      ZIO.kAttempt(s"Unable to check if file is a file : $self", KError.ErrorType.SystemFailure)(Files.isRegularFile(self))
+    def isDirectory: KTask[Boolean] =
+      ZIO.kAttempt(s"Unable to check if file is a directory : $self", KError.ErrorType.SystemFailure)(Files.isDirectory(self))
+    def isSymbolicLink: KTask[Boolean] =
+      ZIO.kAttempt(s"Unable to check if file is a symbolic link : $self", KError.ErrorType.SystemFailure)(Files.isSymbolicLink(self))
 
-    def outputStream(openOptions: OpenOption*): TaskM[OutputStream] =
-      ZIOM.attempt(Files.newOutputStream(self, openOptions*))
-    def inputStream(openOptions: OpenOption*): TaskM[InputStream] =
-      ZIOM.attempt(Files.newInputStream(self, openOptions*))
-    def bufferedWriter(openOptions: OpenOption*): TaskM[BufferedWriter] =
-      ZIOM.attempt(Files.newBufferedWriter(self, openOptions*))
-    def bufferedReader: TaskM[BufferedReader] =
-      ZIOM.attempt(Files.newBufferedReader(self))
+    // TODO (KR) : I think these should probably be scoped
+    def outputStream(openOptions: OpenOption*): KRIO[Scope, OutputStream] =
+      ZIO.acquireReleaseClosable(ZIO.kAttempt(s"Unable to create OutputStream for file : $self", KError.ErrorType.SystemFailure)(Files.newOutputStream(self, openOptions*)))
+    def inputStream(openOptions: OpenOption*): KRIO[Scope, InputStream] =
+      ZIO.acquireReleaseClosable(ZIO.kAttempt(s"Unable to create InputStream for file : $self", KError.ErrorType.SystemFailure)(Files.newInputStream(self, openOptions*)))
+    def bufferedWriter(openOptions: OpenOption*): KRIO[Scope, BufferedWriter] =
+      ZIO.acquireReleaseClosable(ZIO.kAttempt(s"Unable to create BufferedWriter for file : $self", KError.ErrorType.SystemFailure)(Files.newBufferedWriter(self, openOptions*)))
+    def bufferedReader: KRIO[Scope, BufferedReader] =
+      ZIO.acquireReleaseClosable(ZIO.kAttempt(s"Unable to create BufferedReader for file : $self", KError.ErrorType.SystemFailure)(Files.newBufferedReader(self)))
 
-    def getLastModifiedTime: TaskM[Long] =
-      ZIOM.attempt(Files.getLastModifiedTime(self)).map(_.toMillis)
-    def setLastModifiedTime(millis: Long): TaskM[Unit] =
-      ZIOM.attempt(Files.setLastModifiedTime(self, FileTime.fromMillis(millis)))
+    def getLastModifiedTime: KTask[Long] =
+      ZIO.kAttempt(s"Unable to get last modified time for file : $self", KError.ErrorType.SystemFailure)(Files.getLastModifiedTime(self)).map(_.toMillis)
+    def setLastModifiedTime(millis: Long): KTask[Unit] =
+      ZIO.kAttempt(s"Unable to set last modified time for file : $self", KError.ErrorType.SystemFailure)(Files.setLastModifiedTime(self, FileTime.fromMillis(millis)))
 
-    def size: TaskM[Long] =
-      ZIOM.attempt(Files.size(self))
+    def size: KTask[Long] =
+      ZIO.kAttempt(s"Unable to get size of file : $self", KError.ErrorType.SystemFailure)(Files.size(self))
 
-    def child(path: String): TaskM[File] =
-      ZIOM.attempt(self.resolve(path))
+    def child(path: String): KTask[File] =
+      ZIO.kAttempt(s"Unable to create child instance of file : $self ($path)", KError.ErrorType.SystemFailure)(self.resolve(path))
 
-    def children: TaskM[Array[File]] =
-      ZIOM.attempt(Files.list(self)).map(_.iterator().asScala.toArray.map(File.fromNIOPath))
+    def children: KTask[Array[File]] =
+      ZIO.kAttempt(s"Unable to get children for file : $self", KError.ErrorType.SystemFailure)(Files.list(self)).map(_.iterator().asScala.toArray.map(File.fromNIOPath))
 
     def fileName: File.Name = {
       val name = self.getFileName.toString
@@ -93,44 +94,27 @@ object OpaqueFile {
 
     // =====|  |=====
 
-    private def bracket[R, C <: AutoCloseable, A](
-        acquire: => RIOM[R, C],
-        use: C => RIOM[R, A],
-    ): RIOM[R, A] =
-      ZIO
-        .acquireReleaseWith[R, KError[Nothing], C](acquire)
-        .apply(s => ZIOM.attempt(s.close()).orDieKlib)
-        .apply(use)
-    def withOutputStream[R, A](use: OutputStream => RIOM[R, A]): RIOM[R, A] =
-      bracket(outputStream(), use)
-    def withInputStream[R, A](use: InputStream => RIOM[R, A]): RIOM[R, A] =
-      bracket(inputStream(), use)
-    def withBufferedWriter[R, A](use: BufferedWriter => RIOM[R, A]): RIOM[R, A] =
-      bracket(bufferedWriter(), use)
-    def withBufferedReader[R, A](use: BufferedReader => RIOM[R, A]): RIOM[R, A] =
-      bracket(bufferedReader, use)
-
-    def writeBytes(bytes: Array[Byte]): TaskM[Unit] =
-      withOutputStream(s => ZIOM.attempt(s.write(bytes)))
-    def writeString(string: String): TaskM[Unit] =
-      withOutputStream(s => ZIOM.attempt(s.write(string.getBytes)))
-    def writeJson[T: JsonEncoder](t: T, spaces: Option[Int] = None): TaskM[Unit] =
+    def writeBytes(bytes: Array[Byte]): KTask[Unit] =
+      ZIO.scoped(outputStream().flatMap(s => ZIO.kAttempt(s"Unable to write bytes to file : $self", KError.ErrorType.SystemFailure)(s.write(bytes))))
+    def writeString(string: String): KTask[Unit] =
+      ZIO.scoped(outputStream().flatMap(s => ZIO.kAttempt(s"Unable to write string to file : $self", KError.ErrorType.SystemFailure)(s.write(string.getBytes))))
+    def writeJson[T: JsonEncoder](t: T, spaces: Option[Int] = None): KTask[Unit] =
       writeString(JsonEncoder[T].encodeJson(t, spaces).toString)
 
-    def readBytes: TaskM[Array[Byte]] =
-      withInputStream(s => ZIOM.attempt(s.readAllBytes()))
-    def readString: TaskM[String] =
-      withInputStream(s => ZIOM.attempt(new String(s.readAllBytes())))
-    def readDecodedJson[T: JsonDecoder]: TaskM[T] =
-      readString.flatMap(s => ZIO.fromEither(JsonDecoder[T].decodeJson(s)).mapError(KError.message.same(_)))
+    def readBytes: KTask[Array[Byte]] =
+      ZIO.scoped(inputStream().flatMap(s => ZIO.kAttempt(s"Unable to read bytes from file : $self", KError.ErrorType.SystemFailure)(s.readAllBytes())))
+    def readString: KTask[String] =
+      ZIO.scoped(inputStream().flatMap(s => ZIO.kAttempt(s"Unable to read bytes from file : $self", KError.ErrorType.SystemFailure)(String(s.readAllBytes()))))
+    def readDecodedJson[T: JsonDecoder]: KTask[T] =
+      readString.flatMap { s => ZIO.fromEitherKError(JsonDecoder[T].decodeJson(s))(m => KError.UserError(s"Unable to decode json from file : $self\n$m")) }
 
-    def ensureExists: TaskM[Unit] =
+    def ensureExists: KTask[Unit] =
       existsWrapped.flatMap {
         case true  => ZIO.unit
-        case false => ZIO.fail(KError.message.unexpected("File does not exist"))
+        case false => ZIO.failNEL(KError.UserError(s"File that should exist does not : $self"))
       }
 
-    def createIfDNE: TaskM[Unit] =
+    def createIfDNE: KTask[Unit] =
       existsWrapped.flatMap {
         case true  => ZIO.unit
         case false => createFile()
@@ -139,13 +123,13 @@ object OpaqueFile {
   }
   object File {
 
-    def fromPath(path: String): RIOM[FileSystem, File] =
+    def fromPath(path: String): KRIO[FileSystem, File] =
       ZIO.service[FileSystem].flatMap(_.createFileObject(path))
 
     def fromNIOPath(path: Path): File = path
 
-    def homeDirectory: RIOM[FileSystem, File] =
-      ZIOM.attempt(java.lang.System.getProperty("user.home")).flatMap(fromPath)
+    def homeDirectory: KRIO[FileSystem, File] =
+      ZIO.kAttempt("Unable to get user.home from system properties")(java.lang.System.getProperty("user.home")).flatMap(fromPath)
 
     final case class Name(
         name: String,

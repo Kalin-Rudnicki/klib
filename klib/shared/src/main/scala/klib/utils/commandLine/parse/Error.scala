@@ -10,16 +10,16 @@ final case class Error(
     reason: Error.Reason,
 ) {
 
-  def toKError: KError[Nothing] =
+  def toKError: KError =
     reason match {
       case Error.Reason.MissingRequired(primaryParamName) =>
-        KError.message.same(s"Missing required param: $primaryParamName")
+        KError.UserError(s"Missing required param: $primaryParamName")
       case Error.Reason.MalformattedValue(value, cause) =>
-        KError.message.same(s"Malformatted value ${value.unesc}", cause)
+        KError.UserError(s"Malformatted value ${value.unesc}", KError.WrappedKErrors(cause))
       case Error.Reason.UnexpectedArg(arg) =>
-        KError.message.same(s"Unexpected arg ${arg.value} at index ${arg.index}")
+        KError.UserError(s"Unexpected arg ${arg.value} at index ${arg.index}")
       case Error.Reason.ViolatedExclusiveOr(names) =>
-        KError.message.same(s"You can only provide one of: ${names.mkString(", ")}")
+        KError.UserError(s"You can only provide one of: ${names.mkString(", ")}")
     }
 
 }
@@ -28,7 +28,7 @@ object Error {
   sealed trait Reason
   object Reason {
     final case class MissingRequired(primaryParamName: String) extends Reason
-    final case class MalformattedValue(value: String, cause: KError[Nothing]) extends Reason
+    final case class MalformattedValue(value: String, cause: NonEmptyList[KError]) extends Reason
     final case class UnexpectedArg(arg: Indexed[Arg]) extends Reason
     final case class ViolatedExclusiveOr(names: Set[String]) extends Reason
   }

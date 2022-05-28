@@ -36,13 +36,13 @@ final case class RouteMatcher[T](private val attemptMatch: (List[String], ParamM
       case _              => None
     }
 
-  def attemptToLoadPage(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv])(implicit ev: T <:< Page): STaskM[Unit] =
+  def attemptToLoadPage(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv])(implicit ev: T <:< Page): SKTask[Unit] =
     for {
-      pathname <- ZIOM.attempt(window.location.pathname)
-      search <- ZIOM.attempt(window.location.search)
+      pathname <- ZIO.kAttempt("Unable to get pathname from window")(window.location.pathname)
+      search <- ZIO.kAttempt("Unable to get search from window")(window.location.search)
 
       pathnames = pathname.split("/").toList.filter(_.nonEmpty)
-      params <- ZIOM.attempt { new URLSearchParams(search).toList.map { t => (t._1, t._2) }.toMap }
+      params <- ZIO.kAttempt("Unable to create URLSearchParams") { new URLSearchParams(search).toList.map { t => (t._1, t._2) }.toMap }
       paramMap = ParamMap("param", params)
 
       _ <-

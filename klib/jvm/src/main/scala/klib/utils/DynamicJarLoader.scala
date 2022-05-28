@@ -13,47 +13,47 @@ object DynamicJarLoader {
 
   final class Jar(file: File) {
 
-    private[DynamicJarLoader] def managed: RIOM[Scope, ClassLoader] =
-      ZIO.acquireRelease {
+    private[DynamicJarLoader] def managed: KRIO[Scope, ClassLoader] =
+      ZIO.acquireReleaseClosable {
         for {
-          url <- ZIOM.attempt(file.toPath.toUri.toURL)
-          classLoader <- ZIOM.attempt(URLClassLoader(Array(url), getClass.getClassLoader))
+          url <- ZIO.kAttempt("Unable to convert file to URL")(file.toPath.toUri.toURL)
+          classLoader <- ZIO.kAttempt("Unable to create URLClassLoader")(URLClassLoader(Array(url), getClass.getClassLoader))
         } yield classLoader
-      } { classLoader =>
-        ZIOM.attempt(classLoader.close).orDieKlib
       }
 
-    def use[R, A](useF: ClassLoader => RIOM[R, A]): RIOM[R, A] =
+    def use[R, A](useF: ClassLoader => KRIO[R, A]): KRIO[R, A] =
       ZIO.scoped { managed.flatMap(useF) }
 
   }
 
   final class JarClass[T](jar: Jar, classPath: String, klass: Class[T]) {
 
-    def managed: RIOM[Scope, T] =
+    def managed: KRIO[Scope, T] =
       jar.managed.flatMap { classLoader =>
         for {
-          c <- ZIOM.attempt(classLoader.loadClass(classPath))
-          constructors <- ZIOM.attempt(c.getDeclaredConstructors)
+          c <- ZIO.kAttempt(s"Unable to load class : $classPath")(classLoader.loadClass(classPath))
+          constructors <- ZIO.kAttempt(s"Unable to get declared constructors : $classPath")(c.getDeclaredConstructors)
           zeroArgConstructor = constructors.find(_.getParameterCount == 0)
-          constructor <- ZIO.fromOption(zeroArgConstructor).orElseFail(KError.message.same("No zero arg constructor found"))
-          _ <- ZIOM.attempt(constructor.setAccessible(true))
-          inst <- ZIOM.attempt(constructor.newInstance())
-          isInstance <- ZIOM.attempt(klass.isInstance(inst))
-          casted <- ZIO.cond(isInstance, inst.asInstanceOf[T], KError.message.same(s"'$classPath' is not an instance of $klass"))
+          constructor <- ZIO.fromOptionKError(zeroArgConstructor)(KError.UserError(s"No zero arg constructor found : $classPath"))
+          _ <- ZIO.kAttempt(s"Unable to set constructor as accessible : $classPath")(constructor.setAccessible(true))
+          inst <- ZIO.kAttempt(s"Unable to instantiate new instance : $classPath")(constructor.newInstance())
+          isInstance <- ZIO.kAttempt(s"Unable to check if instance : $classPath")(klass.isInstance(inst))
+          casted <-
+            if (isInstance) ZIO.succeed(inst.asInstanceOf[T])
+            else ZIO.failNEL(KError.Unexpected(s"'$classPath' is not an instance of $klass"))
         } yield casted
       }
 
-    def use[R, A](useF: T => RIOM[R, A]): RIOM[R, A] =
+    def use[R, A](useF: T => KRIO[R, A]): KRIO[R, A] =
       ZIO.scoped { managed.flatMap(useF) }
 
   }
 
   final class Builder1[T] private[DynamicJarLoader] (klass: Class[T]) {
 
-    def inFile(file: File): TaskM[List[JarClass[T]]] = {
-      def getJarEntries(jarInputStream: JarInputStream, stack: List[JarEntry]): TaskM[List[JarEntry]] =
-        ZIOM.attempt(Option(jarInputStream.getNextJarEntry)).flatMap {
+    def inFile(file: File): KTask[List[JarClass[T]]] = {
+      def getJarEntries(jarInputStream: JarInputStream, stack: List[JarEntry]): KTask[List[JarEntry]] =
+        ZIO.kAttempt(s"Unable to get next jar entry : $file")(Option(jarInputStream.getNextJarEntry)).flatMap {
           case Some(next) => getJarEntries(jarInputStream, next :: stack)
           case None       => ZIO.succeed(stack.reverse)
         }
@@ -66,25 +66,26 @@ object DynamicJarLoader {
             cp.substring(0, cp.length - 6).replaceAllLiterally("/", ".")
           }
 
-      def getJarClass(jar: Jar, classLoader: ClassLoader, classPath: String): TaskM[Option[JarClass[T]]] =
+      def getJarClass(jar: Jar, classLoader: ClassLoader, classPath: String): KTask[Option[JarClass[T]]] =
         (for {
-          c <- ZIOM.attempt(classLoader.loadClass(classPath)).asSomeError
-          _ <- ZIO.whenZIO(ZIOM.attempt(klass.isAssignableFrom(c) && klass.toString != c.toString))(ZIO.unit).some
-          constructors <- ZIOM.attempt(c.getDeclaredConstructors).asSomeError
-          zeroArgConstructor <-
+          c <- ZIO.kAttempt(s"Unable to load class : $classPath")(classLoader.loadClass(classPath)).asSomeError
+          _ <-
             ZIO
-              .fromOption(constructors.find(_.getParameterCount == 0))
-              .orElseFail(KError.message.same(s"No zero arg constructor for '$classPath'").some)
-          setAccessible <- ZIOM.attempt(zeroArgConstructor.trySetAccessible()).asSomeError
-          _ <- ZIO.cond(setAccessible, (), KError.message.same("Zero arg constructor is not accessible").some)
-          inst <- ZIOM.attempt(zeroArgConstructor.newInstance()).asSomeError
-          isIsntance <- ZIOM.attempt(klass.isInstance(inst)).asSomeError
-          _ <- ZIO.cond(isIsntance, (), KError.message.unexpected("Class is not actually assignable...?").some)
+              .kAttempt(s"Unable to check if class is assignable from : $classPath")(klass.isAssignableFrom(c) && klass.toString != c.toString)
+              .map(Option.when(_)(()))
+              .some
+          constructors <- ZIO.kAttempt(s"Unable to get declared constructors : $classPath")(c.getDeclaredConstructors).asSomeError
+          zeroArgConstructor <- ZIO.fromOptionKError(constructors.find(_.getParameterCount == 0))(KError.UserError(s"No zero arg constructor found : $classPath")).asSomeError
+          // TODO (KR) : Should this use 'setAccessible' or 'trySetAccessible'?
+          _ <- ZIO.kAttempt(s"Unable to set constructor as accessible : $classPath")(zeroArgConstructor.setAccessible(true)).asSomeError
+          inst <- ZIO.kAttempt(s"Unable to instantiate new instance : $classPath")(zeroArgConstructor.newInstance()).asSomeError
+          isInstance <- ZIO.kAttempt(s"Unable to check if instance : $classPath")(klass.isInstance(inst)).asSomeError
+          _ <- ZIO.failUnlessNEL(isInstance, KError.Unexpected(s"Class is not actually assignable... : $classPath")).asSomeError
         } yield JarClass(jar, classPath, klass)).optional
 
       for {
         jarBytes <- file.readBytes
-        jarInputStream = ZIO.acquireRelease { ZIOM.attempt(JarInputStream(ByteArrayInputStream(jarBytes), true)) } { bais => ZIOM.attempt(bais.close).orDieKlib }
+        jarInputStream = ZIO.acquireReleaseClosable { ZIO.kAttempt(s"Unable to create JarInputStream : $file")(JarInputStream(ByteArrayInputStream(jarBytes), true)) }
         jarEntries <- ZIO.scoped { jarInputStream.flatMap(getJarEntries(_, Nil)) }
         classPaths = getClassPaths(jarEntries)
         jar = Jar(file)
@@ -92,7 +93,7 @@ object DynamicJarLoader {
       } yield jarClasses.flatten
     }
 
-    def inDir(file: File): TaskM[List[JarClass[T]]] =
+    def inDir(file: File): KTask[List[JarClass[T]]] =
       for {
         children <- file.children.map(_.toList)
         jarChildren = children.toList.filter { f => f.fileName.ext == "jar".some }

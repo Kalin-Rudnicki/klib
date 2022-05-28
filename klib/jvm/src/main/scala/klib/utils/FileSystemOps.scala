@@ -6,10 +6,10 @@ import zio.*
 
 extension (fs: FileSystem.type) {
 
-  def currentPlatformJIMFS: TaskLayerM[FileSystem] =
+  def currentPlatformJIMFS: KTaskLayer[FileSystem] =
     FileSystem.layer(Jimfs.newFileSystem(Configuration.forCurrentPlatform()))
 
-  def unixJIMFS: TaskLayerM[FileSystem] =
+  def unixJIMFS: KTaskLayer[FileSystem] =
     FileSystem.layer(Jimfs.newFileSystem(Configuration.unix()))
 
 }
