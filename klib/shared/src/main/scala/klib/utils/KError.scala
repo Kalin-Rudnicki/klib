@@ -3,7 +3,7 @@ package klib.utils
 import cats.data.NonEmptyList
 import cats.syntax.option.*
 import scala.annotation.targetName
-import zio.{Chunk, ZTraceElement}
+import zio.{Chunk, Trace}
 
 type EitherError[A] = Either[KError, A]
 type EitherErrorNEL[A] = Either[NonEmptyList[KError], A]
@@ -13,13 +13,13 @@ sealed abstract class KError(
     userMessage: String,
     internalMessage: String,
     cause: Option[Throwable],
-    trace: Chunk[ZTraceElement],
+    trace: Chunk[Trace],
 ) extends Throwable {
 
   final val _userMessage: String = userMessage
   final val _internalMessage: String = internalMessage
   final val _cause: Option[Throwable] = cause
-  final val _trace: Chunk[ZTraceElement] = trace
+  final val _trace: Chunk[Trace] = trace
 
   final lazy val fullInternalMessage: String =
     List[Option[(String, String)]](
@@ -88,7 +88,7 @@ object KError {
       userMessage: String,
       internalMessage: String,
       cause: Option[Throwable],
-      trace: Chunk[ZTraceElement],
+      trace: Chunk[Trace],
   ) extends KError(userMessage, internalMessage, cause, trace)
   object UserError extends ErrorBuilder4[UserError](new UserError(_, _, _, _))
 
@@ -100,7 +100,7 @@ object KError {
   final class Unexpected private (
       internalMessage: String,
       cause: Option[Throwable],
-      trace: Chunk[ZTraceElement],
+      trace: Chunk[Trace],
   ) extends KError(genericUserMessage, s"This should never happen...\n$internalMessage", cause, trace)
   object Unexpected extends ErrorBuilder3[Unexpected](new Unexpected(_, _, _))
 
@@ -111,7 +111,7 @@ object KError {
   final class SystemFailure private (
       internalMessage: String,
       cause: Option[Throwable],
-      trace: Chunk[ZTraceElement],
+      trace: Chunk[Trace],
   ) extends KError(genericUserMessage, internalMessage, cause, trace)
   object SystemFailure extends ErrorBuilder3[SystemFailure](new SystemFailure(_, _, _))
 
@@ -119,7 +119,7 @@ object KError {
       serviceName: String,
       internalMessage: String,
       cause: Option[Throwable],
-      trace: Chunk[ZTraceElement],
+      trace: Chunk[Trace],
   ) extends KError(s"There was a problem with an external service ($serviceName)", internalMessage, cause, trace)
   object ExternalService {
 
@@ -135,7 +135,7 @@ object KError {
   @targetName("Unimplemented")
   final class ??? private (
       functionalityVerb: String,
-      trace: Chunk[ZTraceElement],
+      trace: Chunk[Trace],
   ) extends KError(
         s"The ability to '$functionalityVerb' is not yet supported",
         s"Encountered an unimplemented block of code: '$functionalityVerb'",
@@ -143,8 +143,8 @@ object KError {
         trace,
       )
   object ??? {
-    def apply(functionalityVerb: String)(implicit trace: ZTraceElement): ??? = new ???(functionalityVerb, Chunk.single(trace))
-    def apply(functionalityVerb: String, trace: Chunk[ZTraceElement]): ??? = new ???(functionalityVerb, trace)
+    def apply(functionalityVerb: String)(implicit trace: Trace): ??? = new ???(functionalityVerb, Chunk.single(trace))
+    def apply(functionalityVerb: String, trace: Chunk[Trace]): ??? = new ???(functionalityVerb, trace)
   }
 
   // =====| Utils |=====
@@ -216,34 +216,34 @@ object KError {
   private def formatExceptionTrace(trace: Array[StackTraceElement]): String = trace.mkString("\n")
 
   // TODO (KR) : Make prettier?
-  private def formatZIOTrace(trace: Chunk[ZTraceElement]): String = trace.mkString("\n\n")
+  private def formatZIOTrace(trace: Chunk[Trace]): String = trace.mkString("\n\n")
 
   // =====| Builders |=====
 
-  abstract class ErrorBuilder3[E](build: (String, Option[Throwable], Chunk[ZTraceElement]) => E) {
-    def apply(internalMessage: String)(implicit trace: ZTraceElement): E = build(internalMessage, None, Chunk.single(trace))
-    def apply(internalMessage: String, cause: Throwable)(implicit trace: ZTraceElement): E = build(internalMessage, cause.some, Chunk.single(trace))
-    def apply(internalMessage: String, cause: Option[Throwable])(implicit trace: ZTraceElement): E = build(internalMessage, cause, Chunk.single(trace))
+  abstract class ErrorBuilder3[E](build: (String, Option[Throwable], Chunk[Trace]) => E) {
+    def apply(internalMessage: String)(implicit trace: Trace): E = build(internalMessage, None, Chunk.single(trace))
+    def apply(internalMessage: String, cause: Throwable)(implicit trace: Trace): E = build(internalMessage, cause.some, Chunk.single(trace))
+    def apply(internalMessage: String, cause: Option[Throwable])(implicit trace: Trace): E = build(internalMessage, cause, Chunk.single(trace))
 
-    def apply(internalMessage: String, trace: Chunk[ZTraceElement]): E = build(internalMessage, None, trace)
-    def apply(internalMessage: String, cause: Throwable, trace: Chunk[ZTraceElement]): E = build(internalMessage, cause.some, trace)
-    def apply(internalMessage: String, cause: Option[Throwable], trace: Chunk[ZTraceElement]): E = build(internalMessage, cause, trace)
+    def apply(internalMessage: String, trace: Chunk[Trace]): E = build(internalMessage, None, trace)
+    def apply(internalMessage: String, cause: Throwable, trace: Chunk[Trace]): E = build(internalMessage, cause.some, trace)
+    def apply(internalMessage: String, cause: Option[Throwable], trace: Chunk[Trace]): E = build(internalMessage, cause, trace)
   }
 
-  abstract class ErrorBuilder4[E](build: (String, String, Option[Throwable], Chunk[ZTraceElement]) => E) {
-    def apply(userMessage: String)(implicit trace: ZTraceElement): E = build(userMessage, userMessage, None, Chunk.single(trace))
-    def apply(userMessage: String, cause: Throwable)(implicit trace: ZTraceElement): E = build(userMessage, userMessage, cause.some, Chunk.single(trace))
-    def apply(userMessage: String, cause: Option[Throwable])(implicit trace: ZTraceElement): E = build(userMessage, userMessage, cause, Chunk.single(trace))
-    def apply(userMessage: String, internalMessage: String)(implicit trace: ZTraceElement): E = build(userMessage, internalMessage, None, Chunk.single(trace))
-    def apply(userMessage: String, internalMessage: String, cause: Throwable)(implicit trace: ZTraceElement): E = build(userMessage, internalMessage, cause.some, Chunk.single(trace))
-    def apply(userMessage: String, internalMessage: String, cause: Option[Throwable])(implicit trace: ZTraceElement): E = build(userMessage, internalMessage, cause, Chunk.single(trace))
+  abstract class ErrorBuilder4[E](build: (String, String, Option[Throwable], Chunk[Trace]) => E) {
+    def apply(userMessage: String)(implicit trace: Trace): E = build(userMessage, userMessage, None, Chunk.single(trace))
+    def apply(userMessage: String, cause: Throwable)(implicit trace: Trace): E = build(userMessage, userMessage, cause.some, Chunk.single(trace))
+    def apply(userMessage: String, cause: Option[Throwable])(implicit trace: Trace): E = build(userMessage, userMessage, cause, Chunk.single(trace))
+    def apply(userMessage: String, internalMessage: String)(implicit trace: Trace): E = build(userMessage, internalMessage, None, Chunk.single(trace))
+    def apply(userMessage: String, internalMessage: String, cause: Throwable)(implicit trace: Trace): E = build(userMessage, internalMessage, cause.some, Chunk.single(trace))
+    def apply(userMessage: String, internalMessage: String, cause: Option[Throwable])(implicit trace: Trace): E = build(userMessage, internalMessage, cause, Chunk.single(trace))
 
-    def apply(userMessage: String, trace: Chunk[ZTraceElement]): E = build(userMessage, userMessage, None, trace)
-    def apply(userMessage: String, cause: Throwable, trace: Chunk[ZTraceElement]): E = build(userMessage, userMessage, cause.some, trace)
-    def apply(userMessage: String, cause: Option[Throwable], trace: Chunk[ZTraceElement]): E = build(userMessage, userMessage, cause, trace)
-    def apply(userMessage: String, internalMessage: String, trace: Chunk[ZTraceElement]): E = build(userMessage, internalMessage, None, trace)
-    def apply(userMessage: String, internalMessage: String, cause: Throwable, trace: Chunk[ZTraceElement]): E = build(userMessage, internalMessage, cause.some, trace)
-    def apply(userMessage: String, internalMessage: String, cause: Option[Throwable], trace: Chunk[ZTraceElement]): E = build(userMessage, internalMessage, cause, trace)
+    def apply(userMessage: String, trace: Chunk[Trace]): E = build(userMessage, userMessage, None, trace)
+    def apply(userMessage: String, cause: Throwable, trace: Chunk[Trace]): E = build(userMessage, userMessage, cause.some, trace)
+    def apply(userMessage: String, cause: Option[Throwable], trace: Chunk[Trace]): E = build(userMessage, userMessage, cause, trace)
+    def apply(userMessage: String, internalMessage: String, trace: Chunk[Trace]): E = build(userMessage, internalMessage, None, trace)
+    def apply(userMessage: String, internalMessage: String, cause: Throwable, trace: Chunk[Trace]): E = build(userMessage, internalMessage, cause.some, trace)
+    def apply(userMessage: String, internalMessage: String, cause: Option[Throwable], trace: Chunk[Trace]): E = build(userMessage, internalMessage, cause, trace)
   }
 
 }

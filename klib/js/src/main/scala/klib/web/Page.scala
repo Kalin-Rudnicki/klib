@@ -17,7 +17,7 @@ sealed trait Page {
   val widget: AVWidget[A, Env, Any]
   val handleA: A => SKTask[List[Raise.StandardOrUpdate[Env]]]
 
-  private final def renderAnd(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv])(and: String => KTask[Unit]): KTask[Unit] =
+  private final def renderAnd(renderer: VDomActions.Renderer, runtime: Runtime[Executable.Env])(and: String => KTask[Unit]): KTask[Unit] =
     for {
       env <- getEnv
       envRef <- Ref.Synchronized.make(env)
@@ -27,17 +27,17 @@ sealed trait Page {
       _ <- renderer.render(titleF(env), newVDom)
     } yield ()
 
-  private[web] final def push(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv]): KTask[Unit] =
+  private[web] final def push(renderer: VDomActions.Renderer, runtime: Runtime[Executable.Env]): KTask[Unit] =
     renderAnd(renderer, runtime) { title =>
       ZIO.kAttempt("Unable to push state to window history")(window.history.pushState(null, title, url))
     }
 
-  private[web] final def replace(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv]): KTask[Unit] =
+  private[web] final def replace(renderer: VDomActions.Renderer, runtime: Runtime[Executable.Env]): KTask[Unit] =
     renderAnd(renderer, runtime) { title =>
       ZIO.kAttempt("Unable to replace state in window history")(window.history.replaceState(null, title, url))
     }
 
-  private[web] final def replaceNoTrace(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv]): KTask[Unit] =
+  private[web] final def replaceNoTrace(renderer: VDomActions.Renderer, runtime: Runtime[Executable.Env]): KTask[Unit] =
     renderAnd(renderer, runtime) { _ => ZIO.unit }
 
 }

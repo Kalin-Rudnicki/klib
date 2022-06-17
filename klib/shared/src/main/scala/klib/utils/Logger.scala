@@ -70,7 +70,7 @@ final class Logger private (
                       }
                     } *> source.queuedBreak.set(None)
                   case None =>
-                    UIO.unit
+                    ZIO.unit
                 }
                 _ <- _type match {
                   case Logger.Event.Output.Type.Print   => ops.print(Logger.formatMessage(colorMode, logLevel, indent, message))
@@ -87,10 +87,10 @@ final class Logger private (
             indents.update(_.drop(1))
           case Logger.Event.RequireFlags(requiredFlags, event) =>
             if (requiredFlags.forall(flags.contains)) handle(logLevel, ops, event())
-            else UIO.unit
+            else ZIO.unit
           case Logger.Event.RequireLogLevel(logLevel, event) =>
             if (logLevel.logPriority >= source.logTolerance.tolerancePriority) handle(logLevel.some, ops, event())
-            else UIO.unit
+            else ZIO.unit
         }
 
       source.withOps(handle(None, _, event).unit)
@@ -130,14 +130,16 @@ object Logger {
       colorMode: ColorMode,
       initialIndents: List[String],
   ): ZLayer[Any, Nothing, Logger] =
-    Logger(
-      defaultIndent = defaultIndent,
-      flags = flags,
-      flagMap = flagMap,
-      sources = sources,
-      colorMode = colorMode,
-      initialIndents = initialIndents,
-    ).toLayer
+    ZLayer.fromZIO {
+      Logger(
+        defaultIndent = defaultIndent,
+        flags = flags,
+        flagMap = flagMap,
+        sources = sources,
+        colorMode = colorMode,
+        initialIndents = initialIndents,
+      )
+    }
 
   def live(
       logTolerance: Logger.LogLevel,
@@ -272,9 +274,10 @@ object Logger {
     }
 
     def apply[R, E, A](by: Int)(zio: ZIO[R, E, A]): ZIO[Logger with R, E, A] =
-      indent(by).bracket(_ => popIndent())(_ => zio)
+      ZIO.acquireReleaseWith(indent(by))(_ => popIndent())(_ => zio)
+
     def apply[R, E, A](idt: String)(zio: ZIO[R, E, A]): ZIO[Logger with R, E, A] =
-      indent(idt).bracket(_ => popIndent())(_ => zio)
+      ZIO.acquireReleaseWith(indent(idt))(_ => popIndent())(_ => zio)
 
   }
 
@@ -321,7 +324,7 @@ object Logger {
     protected def release(src: Src): UIO[Unit]
 
     def withOps(f: Source.Ops => UIO[Unit]): UIO[Unit] =
-      acquire.bracket(release)(f)
+      ZIO.acquireReleaseWith(acquire)(release)(f)
 
   }
   object Source {
@@ -341,14 +344,14 @@ object Logger {
       for {
         queuedBreak <- Ref.make(initialQueuedBreak)
         ops = new Ops {
-          def print(message: Any): UIO[Unit] = ZIO { scala.Console.print(message) }.orDie
-          def println(message: Any): UIO[Unit] = ZIO { scala.Console.println(message) }.orDie
-          def log(message: Any): UIO[Unit] = ZIO { scala.Console.print(message) }.orDie
+          def print(message: Any): UIO[Unit] = ZIO.attempt { scala.Console.print(message) }.orDie
+          def println(message: Any): UIO[Unit] = ZIO.attempt { scala.Console.println(message) }.orDie
+          def log(message: Any): UIO[Unit] = ZIO.attempt { scala.Console.print(message) }.orDie
         }
       } yield new Source("StdOut", logTolerance, queuedBreak) {
         override type Src = ops.type
         override val acquire: UIO[Src] = ZIO.succeed[Src](ops)
-        override def release(src: Src): UIO[Unit] = UIO.unit
+        override def release(src: Src): UIO[Unit] = ZIO.unit
       }
 
     def file(

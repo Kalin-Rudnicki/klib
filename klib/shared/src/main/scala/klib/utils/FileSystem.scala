@@ -24,7 +24,7 @@ object FileSystem {
     }
 
   def layer(fileSystem: => java.nio.file.FileSystem): KTaskLayer[FileSystem] =
-    ZIO.kAttempt("Unable to create filesystem")(fileSystem).map(FileSystem.fromJavaFileSystem).toLayer
+    ZLayer.fromZIO(ZIO.kAttempt("Unable to create filesystem")(fileSystem).map(FileSystem.fromJavaFileSystem))
 
   def live: KTaskLayer[FileSystem] =
     layer(java.nio.file.FileSystems.getDefault)

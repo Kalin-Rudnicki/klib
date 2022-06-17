@@ -21,18 +21,22 @@ object Dependencies {
   }
 
   object `dev.zio` extends Org("dev.zio") {
-    private val version = "2.0.0-RC3"
+    private val version = "2.0.0-RC6"
 
     val zio = crossDep("zio", version)
     val `zio-streams` = crossDep("zio-streams", version)
-    val `zio-json` = crossDep("zio-json", "0.3.0-RC5")
+    val `zio-json` = crossDep("zio-json", "0.3.0-RC8")
 
     val `zio-test` = crossDep("zio-test", version, _ % Test)
     val `zio-test-sbt` = crossDep("zio-test-sbt", version, _ % Test)
   }
 
   object `io.getquill` extends Org("io.getquill") {
-    val `quill-jdbc-zio` = dep("quill-jdbc-zio", "3.17.0.Beta3.0-RC2")
+    val `quill-jdbc-zio` = dep("quill-jdbc-zio", "4.0.0-RC1")
+  }
+
+  object `io.d11` extends Org("io.d11") {
+    val zhttp = dep("zhttp", "2.0.0-RC9")
   }
 
   object `org.typelevel` extends Org("org.typelevel") {

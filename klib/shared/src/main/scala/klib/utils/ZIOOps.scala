@@ -25,8 +25,8 @@ import zio.stream.*
 type KTask[    +A] =  ZIO[Any, NonEmptyList[KError], A]
 type  KRIO[-R, +A] =  ZIO[R,   NonEmptyList[KError], A]
 
-type SKTask[    +A] = KRIO[Executable.BaseEnv,     A]
-type  SKRIO[-R, +A] = KRIO[Executable.BaseEnv & R, A]
+type SKTask[    +A] = KRIO[Executable.Env,     A]
+type  SKRIO[-R, +A] = KRIO[Executable.Env & R, A]
 
 // =====| ZLayer |=====
 type KTaskLayer[    +A] = ZLayer[Any, NonEmptyList[KError], A]
@@ -102,7 +102,7 @@ extension (zio: ZIO.type) {
   def kAttempt[A](mapError: Throwable => KError)(thunk: => A): KTask[A] =
     ZIO.attempt(thunk).mapErrorToNEL(mapError)
 
-  def kAttempt[A](message: => String, errorType: => KError.ErrorType)(thunk: => A)(implicit trace: ZTraceElement): KTask[A] =
+  def kAttempt[A](message: => String, errorType: => KError.ErrorType)(thunk: => A)(implicit trace: Trace): KTask[A] =
     ZIO.kAttempt { throwable =>
       errorType match {
         case KError.ErrorType.Unexpected                   => KError.Unexpected(message, throwable)(trace)
@@ -112,7 +112,7 @@ extension (zio: ZIO.type) {
       }
     }(thunk)
 
-  def kAttempt[A](message: => String)(thunk: => A)(implicit trace: ZTraceElement): KTask[A] =
+  def kAttempt[A](message: => String)(thunk: => A)(implicit trace: Trace): KTask[A] =
     kAttempt(message, KError.ErrorType.Unexpected)(thunk)(trace)
 
   def failNEL[E](e0: E, eN: E*): IO[NonEmptyList[E], Nothing] =

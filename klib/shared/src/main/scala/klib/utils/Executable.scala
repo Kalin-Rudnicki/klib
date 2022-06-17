@@ -27,7 +27,7 @@ import klib.utils.commandLine.parse.*
  */
 trait ExecutableApp extends ZIOAppDefault {
 
-  override final def run: ZIO[Environment with ZEnv with ZIOAppArgs, Any, Any] =
+  override final def run: ZIO[Environment with ZIOAppArgs, Any, Any] =
     for {
       zioAppArgs <- ZIO.service[ZIOAppArgs]
       exitCode <- executable.execute(zioAppArgs.getArgs.toList)
@@ -38,13 +38,12 @@ trait ExecutableApp extends ZIOAppDefault {
 
 }
 
-opaque type Executable = (List[String], List[String]) => KRIO[Executable.BaseEnv, Unit]
-extension (executable: Executable) {
+final class Executable(executable: (List[String], List[String]) => KRIO[Executable.Env, Unit]) {
 
-  def execute(subCommands: List[String], programArgs: List[String]): KRIO[Executable.BaseEnv, Unit] =
+  def execute(subCommands: List[String], programArgs: List[String]): KRIO[Executable.Env, Unit] =
     executable(subCommands, programArgs)
 
-  def execute(args: List[String]): URIO[ZEnv, ExitCode] = {
+  def execute(args: List[String]): UIO[ExitCode] = {
     def defaultLayer: ULayer[Executable.Env] =
       FileSystem.live.orDieKError ++
         Logger.live(Logger.LogLevel.Info) ++
@@ -66,11 +65,11 @@ extension (executable: Executable) {
         subCommands: List[String],
         programArgs: List[String],
         other: Option[EitherErrorNEL[BuiltParser.Result.Help]],
-    ): URIO[ZEnv & Executable.Env, ExitCode] = {
-      def dumpErrors(errors: NonEmptyList[KError]): URIO[ZEnv & Executable.Env, ExitCode] =
+    ): URIO[Executable.Env, ExitCode] = {
+      def dumpErrors(errors: NonEmptyList[KError]): URIO[Executable.Env, ExitCode] =
         ZIO.fail(errors).dumpErrorsAndContinue(Logger.LogLevel.Fatal).as(ExitCode.failure)
 
-      def showHelp(help: BuiltParser.Result.Help): URIO[ZEnv & Executable.Env, ExitCode] =
+      def showHelp(help: BuiltParser.Result.Help): URIO[Executable.Env, ExitCode] =
         Logger.println.info(help.helpString).as(ExitCode.success)
 
       other match {
@@ -80,7 +79,7 @@ extension (executable: Executable) {
             case Right(help)  => showHelp(help)
           }
         case None =>
-          executable.execute(subCommands, programArgs).either.flatMap {
+          execute(subCommands, programArgs).either.flatMap {
             case Left(errors) => dumpErrors(errors)
             case Right(_)     => ZIO.succeed(ExitCode.success)
           }
@@ -98,56 +97,57 @@ object Executable {
   // =====| Type Aliases |=====
 
   type Env = FileSystem with Logger with RunMode
-  type BaseEnv = Env & ZEnv
-  type FullEnv[ExtraEnv] = BaseEnv & ExtraEnv
+  type FullEnv[ExtraEnv] = Env & ExtraEnv
 
   // =====| Builders |=====
 
   final case class Builder1[P] private[Executable] (
       private val parser: BuiltParser[P],
   ) {
-    def withLayer[R: Tag](layerF: P => KRLayer[BaseEnv, R]): Builder2[P, R] =
+    def withLayer[R: Tag](layerF: P => KRLayer[Env, R]): Builder2[P, R] =
       Builder2(parser, layerF)
   }
 
   final case class Builder2[P, R: EnvironmentTag] private[Executable] (
       private val parser: BuiltParser[P],
-      private val layerF: P => KRLayer[BaseEnv, R],
+      private val layerF: P => KRLayer[Env, R],
   ) {
 
-    def withExecute(execute: P => KRIO[FullEnv[R], Unit]): Executable = { (subCommands, args) =>
-      subCommands match {
-        case Nil =>
-          parser.parse(args) match {
-            case BuiltParser.Result.Success(result) =>
-              execute(result).provideSomeLayer(layerF(result))
-            case BuiltParser.Result.Failure(errors) =>
-              ZIO.fail(errors.map(_.toKError))
-            case BuiltParser.Result.Help(_, helpString) =>
-              Logger.println.info(helpString)
-          }
-        case subCommand :: _ =>
-          ZIO.failNEL(KError.UserError(s"Unknown sub-command: $subCommand"))
+    def withExecute(execute: P => KRIO[FullEnv[R], Unit]): Executable =
+      Executable { (subCommands, args) =>
+        subCommands match {
+          case Nil =>
+            parser.parse(args) match {
+              case BuiltParser.Result.Success(result) =>
+                execute(result).provideSomeLayer(layerF(result))
+              case BuiltParser.Result.Failure(errors) =>
+                ZIO.fail(errors.map(_.toKError))
+              case BuiltParser.Result.Help(_, helpString) =>
+                Logger.println.info(helpString)
+            }
+          case subCommand :: _ =>
+            ZIO.failNEL(KError.UserError(s"Unknown sub-command: $subCommand"))
+        }
       }
-    }
 
   }
 
   def fromParser[P](parser: BuiltParser[P]): Builder1[P] =
     Builder1(parser)
 
-  def fromSubCommands(subOptions: (String, Executable)*): Executable = { (subCommands, args) =>
-    subCommands match {
-      case subCommand :: rest =>
-        subOptions.find(_._1 == subCommand) match {
-          case Some((_, executable)) => executable(rest, args)
-          case None =>
-            ZIO.failNEL(KError.UserError(s"Invalid sub-command ($subCommand), options: ${subOptions.map(_._1).mkString(", ")}"))
-        }
-      case Nil =>
-        ZIO.failNEL(KError.UserError(s"Missing sub-command, options: ${subOptions.map(_._1).mkString(", ")}"))
+  def fromSubCommands(subOptions: (String, Executable)*): Executable =
+    Executable { (subCommands, args) =>
+      subCommands match {
+        case subCommand :: rest =>
+          subOptions.find(_._1 == subCommand) match {
+            case Some((_, executable)) => executable.execute(rest, args)
+            case None =>
+              ZIO.failNEL(KError.UserError(s"Invalid sub-command ($subCommand), options: ${subOptions.map(_._1).mkString(", ")}"))
+          }
+        case Nil =>
+          ZIO.failNEL(KError.UserError(s"Missing sub-command, options: ${subOptions.map(_._1).mkString(", ")}"))
+      }
     }
-  }
 
   // =====| Helpers |=====
 

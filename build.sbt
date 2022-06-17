@@ -105,7 +105,8 @@ lazy val klib =
       Test / run / fork := true,
       // Dependencies
       Dependencies.`com.google.jimfs`.jimfs,
-      // Dependencies.`io.getquill`.`quill-jdbc-zio`,
+      Dependencies.`io.getquill`.`quill-jdbc-zio`,
+      Dependencies.`io.d11`.zhttp,
     )
 
 lazy val `klib-toy` =

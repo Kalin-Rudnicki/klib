@@ -81,7 +81,13 @@ object DynamicJarLoader {
           inst <- ZIO.kAttempt(s"Unable to instantiate new instance : $classPath")(zeroArgConstructor.newInstance()).asSomeError
           isInstance <- ZIO.kAttempt(s"Unable to check if instance : $classPath")(klass.isInstance(inst)).asSomeError
           _ <- ZIO.failUnlessNEL(isInstance, KError.Unexpected(s"Class is not actually assignable... : $classPath")).asSomeError
-        } yield JarClass(jar, classPath, klass)).optional
+        } yield JarClass(jar, classPath, klass)).foldZIO(
+          {
+            case Some(err) => ZIO.fail(err)
+            case None      => ZIO.none
+          },
+          ZIO.some(_),
+        )
 
       for {
         jarBytes <- file.readBytes
