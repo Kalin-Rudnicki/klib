@@ -92,6 +92,7 @@ lazy val klib =
       Dependencies.`org.typelevel`.`cats-effect`,
       Dependencies.`com.github.julien-truffaut`.`monocle-core`,
       Dependencies.`com.github.julien-truffaut`.`monocle-macro`,
+      // libraryDependencies += "org.scala-lang" %% "scala3-staging" % scalaVersion.value,
       // Testing
       testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")),
       // TODO: other

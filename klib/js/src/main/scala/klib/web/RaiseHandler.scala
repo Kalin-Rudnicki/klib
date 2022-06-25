@@ -7,7 +7,7 @@ import zio.*
 
 import klib.utils.*
 
-sealed abstract class RaiseHandler[-A, -S](runtime: Runtime[Executable.BaseEnv]) { self =>
+sealed abstract class RaiseHandler[-A, -S](runtime: Runtime[Executable.Env]) { self =>
 
   // =====| To Implement  |=====
 
@@ -66,7 +66,7 @@ object RaiseHandler {
 
   def apply[A, S](
       _handleRaise: Raise[A, S] => SKTask[Unit],
-      _runtime: Runtime[Executable.BaseEnv],
+      _runtime: Runtime[Executable.Env],
   ): RaiseHandler[A, S] =
     new RaiseHandler[A, S](_runtime) {
       override protected def handleRaise(raise: Raise[A, S]): SKTask[Unit] = _handleRaise(raise)
@@ -78,7 +78,7 @@ object RaiseHandler {
       widget: AVWidget[A, S, Any],
       handleA: A => SKTask[List[Raise.StandardOrUpdate[S]]],
       titleF: Page.TitleF[S],
-      runtime: Runtime[Executable.BaseEnv],
+      runtime: Runtime[Executable.Env],
   ): RaiseHandler[A, S] =
     new RaiseHandler[A, S](runtime) {
 

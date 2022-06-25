@@ -9,6 +9,7 @@ import zio.*
 
 import klib.fp.typeclass.DecodeFromString
 import klib.utils.*
+import klib.web.endpoint.ParamMap
 
 final case class RouteMatcher[T](private val attemptMatch: (List[String], ParamMap) => Option[(List[String], T)]) {
 
@@ -36,7 +37,7 @@ final case class RouteMatcher[T](private val attemptMatch: (List[String], ParamM
       case _              => None
     }
 
-  def attemptToLoadPage(renderer: VDomActions.Renderer, runtime: Runtime[Executable.BaseEnv])(implicit ev: T <:< Page): SKTask[Unit] =
+  def attemptToLoadPage(renderer: VDomActions.Renderer, runtime: Runtime[Executable.Env])(implicit ev: T <:< Page): SKTask[Unit] =
     for {
       pathname <- ZIO.kAttempt("Unable to get pathname from window")(window.location.pathname)
       search <- ZIO.kAttempt("Unable to get search from window")(window.location.search)

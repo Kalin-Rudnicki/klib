@@ -55,23 +55,6 @@ sealed abstract class KError(
 }
 object KError {
 
-  // TODO (KR) : Remove
-  def main(args: Array[String]): Unit = {
-    List[KError](
-      KError.UserError("User"),
-      KError.UserError("User", "Internal"),
-      KError.UserError("User", "Internal\nAnd a second line"),
-      KError.UserError("User", "Internal", new RuntimeException),
-      KError.UserError("User", "Internal", new RuntimeException("With a message")),
-      KError.UserError("User", new RuntimeException),
-      KError.Unexpected("Woa..."),
-      KError.Unexpected("Woa...", KError.SystemFailure("How did this happen!!!")),
-    ).foreach { error =>
-      println()
-      println(error.fullInternalMessage)
-    }
-  }
-
   // =====| Error Types |=====
 
   enum ErrorType {

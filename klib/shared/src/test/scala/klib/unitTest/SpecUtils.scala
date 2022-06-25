@@ -20,9 +20,9 @@ object SpecUtils {
 
   abstract class KSpec[Env](implicit
       val tag: EnvironmentTag[Env],
-  ) extends RunnableSpec[TestEnvironment with Env, Any] {
+  ) extends ZIOSpec[TestEnvironment with Env] {
 
-    protected final type TestSpec = ZSpec[Environment, Any]
+    protected final type TestSpec = Spec[Environment, Any]
 
     protected def layers: KRLayer[TestEnvironment, Env]
 
@@ -42,6 +42,8 @@ object SpecUtils {
   }
 
   // =====| Assertions |=====
+
+  import zio.test.AssertionM.Render.*
 
   def assertNel[T](assertion: Assertion[List[T]]): Assertion[NonEmptyList[T]] =
     assertion.imap("NonEmptyList", _.toList)

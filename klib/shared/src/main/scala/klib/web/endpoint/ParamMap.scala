@@ -1,4 +1,4 @@
-package klib.web
+package klib.web.endpoint
 
 import cats.data.*
 import cats.syntax.either.*
@@ -9,29 +9,28 @@ import zio.json.*
 import klib.fp.typeclass.*
 import klib.utils.*
 
-final class ParamMap(mapType: String, map: Map[String, String]) {
+final class ParamMap(mapType: String, map: Map[String, String]) { self =>
 
   // =====| Add |=====
 
-  private def copy(f: Map[String, String] => Map[String, String]): ParamMap =
-    new ParamMap(mapType, f(map))
+  private def copy(f: Map[String, String] => Map[String, String]): ParamMap = ParamMap(mapType, f(map))
 
   def addParam[T: EncodeToString](key: String, value: T): ParamMap =
-    copy(_.updated(key, EncodeToString[T].encode(value)))
+    self.copy(_.updated(key, EncodeToString[T].encode(value)))
 
-  def addParamO[T: EncodeToString](key: String, value: Option[T]): ParamMap =
+  def addParamOpt[T: EncodeToString](key: String, value: Option[T]): ParamMap =
     value match {
-      case Some(value) => addParam[T](key, value)
-      case None        => this
+      case Some(value) => self.addParam[T](key, value)
+      case None        => self
     }
 
   def addJsonParam[T: JsonEncoder](key: String, value: T): ParamMap =
     addParam[T](key, value)(using EncodeToString.fromJsonEncoder[T])
 
-  def addJsonParamO[T: JsonEncoder](key: String, value: Option[T]): ParamMap =
+  def addJsonParamOpt[T: JsonEncoder](key: String, value: Option[T]): ParamMap =
     value match {
-      case Some(value) => addJsonParam[T](key, value)
-      case None        => this
+      case Some(value) => self.addJsonParam[T](key, value)
+      case None        => self
     }
 
   // =====| Get |=====
@@ -61,6 +60,11 @@ final class ParamMap(mapType: String, map: Map[String, String]) {
 
   def getJsonParamO[T: JsonDecoder](key: String): EitherErrorNEL[Option[T]] =
     getParamO[T](key)(using DecodeFromString.fromJsonDecoder[T])
+
+  // =====| Misc |=====
+
+  override def toString: String =
+    map.toList.sortBy(_._1).map { (k, v) => s"$k -> $v" }.mkString(s"ParamMap[$mapType](", ", ", ")")
 
 }
 object ParamMap {
